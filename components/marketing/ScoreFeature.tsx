@@ -10,12 +10,12 @@ const SCORE_DIMENSIONS = [
 
 export function ScoreFeature() {
   return (
-    <section id="score" className="px-6 py-28">
+    <section id="score" className="px-6 py-20">
       <div className="mx-auto" style={{ maxWidth: 1200 }}>
-        <div className="grid gap-16 items-center lg:grid-cols-2 lg:gap-20">
+        <div className="grid gap-10 items-center lg:grid-cols-2 lg:gap-14">
           {/* Left */}
           <div>
-            <p className="mb-3 text-xs uppercase tracking-widest text-white/25">
+            <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
               评分诊断能力
             </p>
             <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
@@ -23,7 +23,7 @@ export function ScoreFeature() {
               <br />
               不行，再改
             </h2>
-            <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/45">
+            <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/55">
               上传现有作品集，系统按 8 个维度出具评分报告。
               不只给分，还告诉你具体哪里不过线、优先修哪里。
             </p>
@@ -32,7 +32,7 @@ export function ScoreFeature() {
             </p>
 
             {/* Score levels */}
-            <div className="mt-8 flex flex-col gap-2">
+            <div className="mt-6 flex flex-col gap-2">
               {[
                 { range: "85–100 分", label: "可直接投递", color: "bg-emerald-500" },
                 { range: "50–84 分", label: "建议局部修改", color: "bg-amber-500" },
@@ -40,7 +40,7 @@ export function ScoreFeature() {
               ].map((level) => (
                 <div key={level.range} className="flex items-center gap-3">
                   <span className={`h-1.5 w-1.5 rounded-full ${level.color}`} />
-                  <span className="font-mono text-xs text-white/40">{level.range}</span>
+                  <span className="font-mono text-xs text-white/50">{level.range}</span>
                   <span className="text-xs text-white/30">—</span>
                   <span className="text-xs text-white/50">{level.label}</span>
                 </div>
@@ -49,7 +49,7 @@ export function ScoreFeature() {
 
             <Link
               href="/login?next=/score"
-              className="mt-10 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+              className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
             >
               免费给作品集打分
             </Link>
@@ -88,9 +88,9 @@ export function ScoreFeature() {
                     <div className="mb-1.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-white/65">{d.label}</span>
-                        <span className="text-[10px] text-white/25">{d.weight} 分权重</span>
+                        <span className="text-[10px] text-white/35">{d.weight} 分权重</span>
                       </div>
-                      <span className="font-mono text-xs text-white/40">{d.score}</span>
+                      <span className="font-mono text-xs text-white/50">{d.score}</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
                       <div
@@ -110,12 +110,12 @@ export function ScoreFeature() {
 
               {/* Summary issues */}
               <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                <p className="mb-3 text-xs font-medium text-white/40">主要问题</p>
+                <p className="mb-3 text-xs font-medium text-white/50">主要问题</p>
                 <div className="space-y-2">
                   {["角色表达不够清晰", "缺少量化结果数据", "项目选择需要精简"].map((p) => (
                     <div key={p} className="flex items-start gap-2">
                       <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400/50" />
-                      <span className="text-xs leading-relaxed text-white/40">{p}</span>
+                      <span className="text-xs leading-relaxed text-white/50">{p}</span>
                     </div>
                   ))}
                 </div>

@@ -120,17 +120,17 @@ const STEPS = [
   },
   {
     step: "03",
-    title: "先看结构和重点",
-    body: "先预览整份作品集的板块结构与内容大纲，确认后再生成。可调整优先级与展示顺序。",
-    tag: "可控",
-    Mock: OutlineMock,
+    title: "AI 生成结构和第一版初稿",
+    body: "由 AI 根据你的真实信息生成作品集大纲与初稿，不是模板拼接，是按你的项目重新叙述。生成前可预览结构，确认再继续。",
+    tag: "AI 生成",
+    Mock: GenerateMock,
   },
   {
     step: "04",
-    title: "生成第一版作品集",
-    body: "基于你提供的真实信息生成初稿。不是模板拼接，是根据你的项目重新叙述。",
-    tag: "AI 生成",
-    Mock: GenerateMock,
+    title: "手动调整内容和顺序",
+    body: "AI 生成第一版后，你可以继续编辑文案、调整板块顺序、补充图片，完全可控。",
+    tag: "可编辑",
+    Mock: OutlineMock,
   },
   {
     step: "05",
@@ -148,17 +148,17 @@ export function HowItWorks() {
         <div className="grid gap-16 items-start lg:grid-cols-[320px_1fr] lg:gap-24">
           {/* Left: sticky heading */}
           <div className="lg:sticky lg:top-24">
-            <p className="mb-3 text-xs uppercase tracking-widest text-white/25">
+            <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
               使用流程
             </p>
             <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
               10–20 分钟，
               <br />
-              从零散到
+              从项目素材到
               <br />
-              可投递
+              作品集初稿
             </h2>
-            <p className="mt-5 text-sm leading-relaxed text-white/40">
+            <p className="mt-5 text-sm leading-relaxed text-white/50">
               不需要从零开始排版，不需要自己写文案。
               按步骤补充真实信息，AI 帮你整理成型。
             </p>
@@ -173,17 +173,17 @@ export function HowItWorks() {
               >
                 {/* Content */}
                 <div className="flex gap-6">
-                  <span className="mt-0.5 shrink-0 font-mono text-sm text-white/20">
+                  <span className="mt-0.5 shrink-0 font-mono text-sm text-white/40">
                     {item.step}
                   </span>
                   <div>
                     <div className="mb-2 flex items-center gap-3">
                       <h3 className="text-[15px] font-semibold text-white">{item.title}</h3>
-                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/30">
+                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/40">
                         {item.tag}
                       </span>
                     </div>
-                    <p className="text-sm leading-relaxed text-white/40">{item.body}</p>
+                    <p className="text-sm leading-relaxed text-white/50">{item.body}</p>
                   </div>
                 </div>
 

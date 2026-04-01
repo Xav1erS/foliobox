@@ -24,9 +24,9 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-                这些项目经过
+                几种常见项目，整理成
                 <br />
-                重制后都提交了
+                作品集之后会是什么样
               </h2>
               <div className="max-w-xs sm:text-right">
                 <p className="text-sm text-white/40">

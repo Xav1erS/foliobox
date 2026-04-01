@@ -38,7 +38,7 @@ export function PainPoints() {
         <div className="grid gap-16 lg:grid-cols-[380px_1fr] lg:gap-24">
           {/* Left: heading */}
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <p className="mb-3 text-xs uppercase tracking-widest text-white/25">
+            <p className="mb-3 text-xs uppercase tracking-widest text-white/45">
               设计师真实痛点
             </p>
             <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
@@ -46,7 +46,7 @@ export function PainPoints() {
               <br />
               是不会整理
             </h2>
-            <p className="mt-5 text-sm leading-relaxed text-white/40">
+            <p className="mt-5 text-sm leading-relaxed text-white/50">
               大多数设计师卡在这里，不是能力问题，是表达问题。
             </p>
           </div>
@@ -63,7 +63,7 @@ export function PainPoints() {
                   <span className="mt-0.5 shrink-0 font-mono text-sm text-white/20">{item.num}</span>
                   <div>
                     <h3 className="mb-2 text-base font-semibold text-white">{item.title}</h3>
-                    <p className="text-sm leading-relaxed text-white/45">{item.body}</p>
+                    <p className="text-sm leading-relaxed text-white/55">{item.body}</p>
                   </div>
                 </div>
               ))}
@@ -77,7 +77,7 @@ export function PainPoints() {
                   className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5"
                 >
                   <h4 className="mb-2 text-sm font-medium text-white/60">{item.title}</h4>
-                  <p className="text-xs leading-relaxed text-white/35">{item.body}</p>
+                  <p className="text-xs leading-relaxed text-white/45">{item.body}</p>
                 </div>
               ))}
             </div>

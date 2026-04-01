@@ -22,7 +22,7 @@ export function FAQ() {
     <section id="faq" className="px-6 py-28">
       <div className="mx-auto" style={{ maxWidth: 800 }}>
         <div className="mb-12">
-          <p className="mb-3 text-xs uppercase tracking-widest text-white/25">
+          <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
             常见问题
           </p>
           <h2 className="text-4xl font-bold tracking-tight text-white">FAQ</h2>
@@ -32,14 +32,14 @@ export function FAQ() {
           {FAQS.map((item, i) => (
             <div
               key={item.q}
-              className="grid grid-cols-[auto_1fr] gap-6 border-t border-white/6 py-7 last:border-b last:border-white/6"
+              className="grid grid-cols-[auto_1fr] gap-6 border-t border-white/8 py-7 last:border-b last:border-white/8"
             >
-              <span className="mt-0.5 font-mono text-sm text-white/20">
+              <span className="mt-0.5 font-mono text-sm text-white/30">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div>
                 <h3 className="mb-2 text-[15px] font-semibold text-white">{item.q}</h3>
-                <p className="text-sm leading-relaxed text-white/45">{item.a}</p>
+                <p className="text-sm leading-relaxed text-white/55">{item.a}</p>
               </div>
             </div>
           ))}

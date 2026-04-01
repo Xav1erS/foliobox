@@ -14,13 +14,15 @@ export function CtaBanner() {
       />
 
       <div className="relative mx-auto flex flex-col items-center text-center" style={{ maxWidth: 1200 }}>
-        <p className="mb-3 text-xs uppercase tracking-widest text-white/25">
+        <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
           开始使用
         </p>
         <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-          你的作品集，能投了吗？
+          你的作品集，
+            <br />
+            现在拿得出手了吗？
         </h2>
-        <p className="mt-4 text-base text-white/45" style={{ maxWidth: 480 }}>
+        <p className="mt-4 text-base text-white/55" style={{ maxWidth: 480 }}>
           先免费打分看看差距，再决定是否重制。不注册也能用。
         </p>
 
