@@ -1,15 +1,49 @@
-// 展示页确认页 — 待实现
-// 参考 Spec 5.1 § 9）展示页确认页：缩略图列表 / 勾选 / 拖拽排序
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { AssetsClient } from "./AssetsClient";
+
 export default async function AssetsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const project = await db.project.findUnique({
+    where: { id, userId: session.user.id },
+    include: {
+      assets: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+
+  if (!project) notFound();
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="text-2xl font-bold">选择展示页</h1>
-      <p className="mt-2 text-neutral-500">项目 {id}：勾选要展示的页面，拖拽排序。</p>
+      {/* Header */}
+      <div className="mb-8">
+        <p className="mb-1 text-xs text-neutral-400">{project.name}</p>
+        <h1 className="text-xl font-semibold text-neutral-900">选择展示页</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          勾选要展示的设计稿页面，调整顺序，设置封面。
+        </p>
+      </div>
+
+      <AssetsClient
+        projectId={id}
+        sourceType={project.sourceType}
+        initialAssets={project.assets.map((a) => ({
+          id: a.id,
+          imageUrl: a.imageUrl,
+          title: a.title ?? "",
+          selected: a.selected,
+          sortOrder: a.sortOrder,
+          isCover: a.isCover,
+        }))}
+      />
     </div>
   );
 }
