@@ -1,0 +1,313 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// NextAuth.js required models
+// ─────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────
+// App models
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // App relations
+  profile           DesignerProfile?
+  resumes           Resume[]
+  projects          Project[]
+  portfolioScores   PortfolioScore[]
+  portfolioOutlines PortfolioOutline[]
+  portfolioDrafts   PortfolioDraft[]
+  publishedPortfolios PublishedPortfolio[]
+}
+
+model DesignerProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  currentTitle      String?
+  yearsOfExperience String?
+  industry          String?
+  specialties       String[]
+  targetRole        String?
+  strengths         String[]
+  tonePreference    String?
+  source            ProfileSource @default(MANUAL)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ProfileSource {
+  MANUAL
+  RESUME_PARSE
+}
+
+model Resume {
+  id          String      @id @default(cuid())
+  userId      String
+  fileUrl     String
+  fileType    ResumeFileType
+  parseStatus ParseStatus @default(PENDING)
+  rawText     String?     @db.Text
+  parsedJson  Json?
+  createdAt   DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ResumeFileType {
+  PDF
+  DOCX
+}
+
+enum ParseStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  userId       String
+  name         String
+  sourceType   ProjectSource
+  sourceUrl    String?
+  importStatus ImportStatus  @default(DRAFT)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets   ProjectAsset[]
+  facts    ProjectFact?
+  outlines PortfolioOutline[] @relation("OutlineProjects")
+  drafts   PortfolioDraft[]
+}
+
+enum ProjectSource {
+  FIGMA
+  IMAGES
+  MANUAL
+}
+
+enum ImportStatus {
+  DRAFT
+  IMPORTING
+  IMPORTED
+  FAILED
+}
+
+model ProjectAsset {
+  id        String    @id @default(cuid())
+  projectId String
+  assetType AssetType
+  title     String?
+  imageUrl  String
+  sortOrder Int       @default(0)
+  selected  Boolean   @default(false)
+  isCover   Boolean   @default(false)
+  metaJson  Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+}
+
+enum AssetType {
+  PAGE
+  FRAME
+  IMAGE
+}
+
+model ProjectFact {
+  id                 String            @id @default(cuid())
+  projectId          String            @unique
+  projectType        String?
+  industry           String?
+  timeline           String?
+  stage              String?
+  hasLaunched        Boolean?
+  background         String?           @db.Text
+  targetUsers        String?           @db.Text
+  businessGoal       String?           @db.Text
+  constraints        String?           @db.Text
+  roleTitle          String?
+  involvementLevel   InvolvementLevel?
+  responsibilities   String[]
+  collaborators      String[]
+  keyContribution    String?           @db.Text
+  biggestChallenge   String?           @db.Text
+  keyHighlights      String[]
+  designRationale    String?           @db.Text
+  tradeoffs          String?           @db.Text
+  resultSummary      String?           @db.Text
+  measurableImpact   String?           @db.Text
+  substituteEvidence String?           @db.Text
+  targetJob          String?
+  targetCompanyType  String?
+  emphasis           String[]
+  tonePreference     String?
+  updatedAt          DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum InvolvementLevel {
+  LEAD
+  CORE
+  SUPPORT
+}
+
+model PortfolioScore {
+  id                 String         @id @default(cuid())
+  userId             String?
+  inputType          ScoreInputType
+  inputUrl           String?
+  totalScore         Int
+  level              ScoreLevel
+  dimensionScores    Json
+  summaryPoints      String[]
+  recommendedActions String[]
+  createdAt          DateTime       @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+enum ScoreInputType {
+  LINK
+  PDF
+  IMAGES
+}
+
+enum ScoreLevel {
+  READY
+  NEEDS_IMPROVEMENT
+  NOT_READY
+}
+
+model PortfolioOutline {
+  id                   String        @id @default(cuid())
+  userId               String
+  status               OutlineStatus @default(DRAFT)
+  overallTheme         VariantType   @default(BALANCED)
+  totalEstimatedPages  Int           @default(0)
+  estimatedTokenCost   Int?
+  sectionsJson         Json
+  selectedThumbnailMap Json          @default("{}")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects Project[]        @relation("OutlineProjects")
+  drafts   PortfolioDraft[]
+}
+
+enum OutlineStatus {
+  DRAFT
+  CONFIRMED
+  RENDERING
+  DONE
+  FAILED
+}
+
+enum VariantType {
+  PROFESSIONAL
+  BALANCED
+  EXPRESSIVE
+}
+
+model PortfolioDraft {
+  id          String       @id @default(cuid())
+  userId      String
+  projectId   String
+  outlineId   String?
+  variantType VariantType
+  status      DraftStatus  @default(PENDING)
+  title       String?
+  contentJson Json
+  previewHtml String?      @db.Text
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  outline   PortfolioOutline? @relation(fields: [outlineId], references: [id], onDelete: SetNull)
+  published PublishedPortfolio?
+}
+
+enum DraftStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+model PublishedPortfolio {
+  id            String   @id @default(cuid())
+  draftId       String   @unique
+  userId        String
+  slug          String   @unique
+  publishedHtml String   @db.Text
+  pdfUrl        String?
+  isPublished   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  draft PortfolioDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
