@@ -23,10 +23,37 @@ export async function PUT(request: Request) {
 
   const body = await request.json();
 
+  // Allowlist fields — never trust raw body directly
+  const {
+    currentTitle,
+    yearsOfExperience,
+    industry,
+    specialties,
+    targetRole,
+    strengths,
+    tonePreference,
+    linkedinUrl,
+    portfolioUrl,
+  } = body as Record<string, unknown>;
+
+  const safeData = Object.fromEntries(
+    Object.entries({
+      currentTitle,
+      yearsOfExperience,
+      industry,
+      specialties,
+      targetRole,
+      strengths,
+      tonePreference,
+      linkedinUrl,
+      portfolioUrl,
+    }).filter(([, v]) => v !== undefined)
+  );
+
   const profile = await db.designerProfile.upsert({
     where: { userId: session.user.id },
-    update: body,
-    create: { ...body, userId: session.user.id },
+    update: safeData,
+    create: { ...safeData, userId: session.user.id },
   });
 
   return NextResponse.json({ profile });

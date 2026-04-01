@@ -8,7 +8,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const draft = await db.portfolioDraft.findUnique({ where: { id } });
+  const draft = await db.portfolioDraft.findUnique({
+    where: { id, userId: session.user.id },
+  });
   if (!draft) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ draft });
 }
@@ -20,6 +22,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   const { id } = await params;
   const body = await request.json();
-  const draft = await db.portfolioDraft.update({ where: { id }, data: body });
+  const draft = await db.portfolioDraft.update({
+    where: { id, userId: session.user.id },
+    data: body,
+  });
   return NextResponse.json({ draft });
 }

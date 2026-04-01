@@ -111,6 +111,21 @@ export async function POST(req: NextRequest) {
     if (inputType === "link") {
       const url = formData.get("inputUrl") as string;
       if (!url) return NextResponse.json({ error: "请提供链接" }, { status: 400 });
+
+      // SSRF protection: only allow public HTTP/HTTPS URLs
+      try {
+        const parsed = new URL(url);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          return NextResponse.json({ error: "链接格式无效" }, { status: 400 });
+        }
+        const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "::1"];
+        if (blocked.some((h) => parsed.hostname === h || parsed.hostname.endsWith(".local"))) {
+          return NextResponse.json({ error: "链接格式无效" }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ error: "链接格式无效" }, { status: 400 });
+      }
+
       inputUrl = url;
 
       // Attempt to fetch page text for scoring

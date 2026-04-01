@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
@@ -23,8 +24,9 @@ function formatDate(date: Date) {
 
 export default async function DashboardPage() {
   const session = await auth();
+  if (!session?.user?.id) redirect("/login");
   const projects = await db.project.findMany({
-    where: { userId: session!.user!.id },
+    where: { userId: session.user.id },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { assets: true } } },
   });

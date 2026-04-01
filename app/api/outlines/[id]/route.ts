@@ -10,7 +10,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const body = await request.json();
   const outline = await db.portfolioOutline.update({
-    where: { id },
+    where: { id, userId: session.user.id },
     data: body,
   });
   return NextResponse.json({ outline });
