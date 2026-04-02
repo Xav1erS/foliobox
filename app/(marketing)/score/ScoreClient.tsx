@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Link as LinkIcon, ImageIcon, Loader2 } from "lucide-react";
 
-const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_IMAGES = 20;
 
 type Tab = "link" | "pdf" | "images";
@@ -14,34 +14,132 @@ export function ScoreClient() {
   const [tab, setTab] = useState<Tab>("link");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
+  const [isDraggingImages, setIsDraggingImages] = useState(false);
 
   const [url, setUrl] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const previewUrls = imageFiles.map((file) => URL.createObjectURL(file));
+    setImagePreviewUrls(previewUrls);
+
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imageFiles]);
 
   function switchTab(t: Tab) {
     setTab(t);
     setError("");
   }
 
-  function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    if (file && file.size > MAX_PDF_SIZE) {
-      setError("文件不能超过 20MB");
+  function setPdfSelection(file: File | null) {
+    if (file && file.size > MAX_SCORE_UPLOAD_SIZE) {
+      setError("评分入口当前仅支持 20MB 以内的 PDF，请压缩后重试");
+      setPdfFile(null);
       return;
     }
     setError("");
     setPdfFile(file);
   }
 
-  function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+  function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPdfSelection(file);
+  }
+
+  function setImageSelection(files: File[]) {
     if (files.length > MAX_IMAGES) {
       setError(`最多上传 ${MAX_IMAGES} 张图片`);
+      setImageFiles([]);
+      return;
+    }
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_SCORE_UPLOAD_SIZE) {
+      setError("评分入口当前仅支持总大小 20MB 以内的截图，请压缩后重试");
+      setImageFiles([]);
       return;
     }
     setError("");
     setImageFiles(files);
+  }
+
+  function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    setImageSelection(files);
+  }
+
+  function handlePdfDragOver(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPdf(true);
+  }
+
+  function handlePdfDragLeave(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPdf(false);
+  }
+
+  function handlePdfDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPdf(false);
+
+    const file = Array.from(e.dataTransfer.files).find(
+      (item) => item.type === "application/pdf" || item.name.toLowerCase().endsWith(".pdf")
+    );
+    if (!file) {
+      setError("请拖入 PDF 文件");
+      return;
+    }
+
+    if (pdfInputRef.current) {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      pdfInputRef.current.files = dataTransfer.files;
+    }
+
+    setPdfSelection(file);
+  }
+
+  function handleImagesDragOver(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImages(true);
+  }
+
+  function handleImagesDragLeave(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImages(false);
+  }
+
+  function handleImagesDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingImages(false);
+
+    const files = Array.from(e.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/")
+    );
+    if (files.length === 0) {
+      setError("请拖入 JPG / PNG / WebP 图片");
+      return;
+    }
+
+    if (imageInputRef.current) {
+      const dataTransfer = new DataTransfer();
+      files.forEach((file) => dataTransfer.items.add(file));
+      imageInputRef.current.files = dataTransfer.files;
+    }
+
+    setImageSelection(files);
   }
 
   async function handleSubmit() {
@@ -74,6 +172,10 @@ export function ScoreClient() {
 
       const res = await fetch("/api/scores", { method: "POST", body: formData });
       if (!res.ok) {
+        if (res.status === 413) {
+          setError("上传内容过大。评分入口当前仅支持 20MB 以内的 PDF 或截图总大小");
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? "评分失败，请稍后重试");
         return;
@@ -159,21 +261,48 @@ export function ScoreClient() {
             {tab === "pdf" && (
               <div className="space-y-3">
                 <label className="block text-xs text-white/45">上传 PDF 文件</label>
-                <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-white/25 hover:bg-white/[0.04]">
+                <label
+                  onDragOver={handlePdfDragOver}
+                  onDragLeave={handlePdfDragLeave}
+                  onDrop={handlePdfDrop}
+                  className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-white/[0.02] transition-colors ${
+                    isDraggingPdf
+                      ? "border-white/45 bg-white/[0.08]"
+                      : "border-white/15 hover:border-white/25 hover:bg-white/[0.04]"
+                  }`}
+                >
                   <Upload className="h-5 w-5 text-white/30" />
                   <span className="text-sm text-white/50">
                     {pdfFile ? pdfFile.name : "点击或拖拽上传 PDF"}
                   </span>
-                  <span className="text-xs text-white/25">最大 20MB</span>
-                  <input type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
+                  <span className="text-xs text-white/25">支持最大 20MB</span>
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={handlePdfChange}
+                  />
                 </label>
+                <p className="text-xs text-white/30">
+                  当前评分入口支持最大 20MB 的 PDF，超过后请压缩再试。
+                </p>
               </div>
             )}
 
             {tab === "images" && (
               <div className="space-y-3">
                 <label className="block text-xs text-white/45">上传作品集截图</label>
-                <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-white/25 hover:bg-white/[0.04]">
+                <label
+                  onDragOver={handleImagesDragOver}
+                  onDragLeave={handleImagesDragLeave}
+                  onDrop={handleImagesDrop}
+                  className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-white/[0.02] transition-colors ${
+                    isDraggingImages
+                      ? "border-white/45 bg-white/[0.08]"
+                      : "border-white/15 hover:border-white/25 hover:bg-white/[0.04]"
+                  }`}
+                >
                   <ImageIcon className="h-5 w-5 text-white/30" />
                   <span className="text-sm text-white/50">
                     {imageFiles.length > 0
@@ -181,9 +310,10 @@ export function ScoreClient() {
                       : "点击或拖拽上传截图"}
                   </span>
                   <span className="text-xs text-white/25">
-                    支持 JPG / PNG，建议 3–10 张（最多 {MAX_IMAGES} 张）
+                    支持 JPG / PNG，建议 3–10 张，最多 20 张，总大小 20MB 以内
                   </span>
                   <input
+                    ref={imageInputRef}
                     type="file"
                     accept="image/*"
                     multiple
@@ -191,6 +321,30 @@ export function ScoreClient() {
                     onChange={handleImagesChange}
                   />
                 </label>
+                {imagePreviewUrls.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                    {imagePreviewUrls.map((previewUrl, index) => (
+                      <div
+                        key={`${previewUrl}-${index}`}
+                        className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]"
+                      >
+                        <div className="aspect-[3/4] bg-white/[0.04]">
+                          <img
+                            src={previewUrl}
+                            alt={`作品集截图 ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="border-t border-white/10 px-2 py-1 text-[10px] text-white/45">
+                          第 {index + 1} 张
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="text-xs text-white/30">
+                  如果截图总大小超过 20MB，建议先压缩后再评分。
+                </p>
               </div>
             )}
 

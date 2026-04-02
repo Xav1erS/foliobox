@@ -9,6 +9,19 @@ export type LLMTask =
   | "label_extraction"        // 标签/标题提取
   | "consistency_check";      // 简历与作品集一致性检查
 
+export interface LLMTrackContext {
+  userId?: string | null;
+  projectId?: string | null;
+  outlineId?: string | null;
+  draftId?: string | null;
+  portfolioScoreId?: string | null;
+  inputType?: string | null;
+  fileSizeBytes?: number | null;
+  pageCount?: number | null;
+  itemCount?: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 export interface GenerateOptions {
   task?: LLMTask;
   model?: string;
@@ -16,6 +29,7 @@ export interface GenerateOptions {
   maxTokens?: number;
   systemPrompt?: string;
   vision?: boolean;
+  track?: LLMTrackContext;
 }
 
 export interface ImageInput {

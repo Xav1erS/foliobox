@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-// pdf-parse is CommonJS, must use require
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+import { createRequire } from "node:module";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
+
+const require = createRequire(import.meta.url);
+const { PDFParse } = require("pdf-parse") as {
+  PDFParse: new (params: { data: Buffer }) => {
+    getInfo: (options?: { parsePageInfo?: boolean }) => Promise<{ total?: number }>;
+    getText: (options?: { partial?: number[] }) => Promise<{ text: string }>;
+    destroy: () => Promise<void>;
+  };
+};
+
+const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_SCORE_IMAGES = 20;
 
 // ─── Zod schema for LLM output ───────────────────────────────────────────────
 
@@ -74,10 +84,23 @@ ${content}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function extractPdfText(file: File): Promise<string> {
+async function extractPdfText(
+  file: File
+): Promise<{ text: string; pageCount: number | null }> {
   const buffer = Buffer.from(await file.arrayBuffer());
-  const result = await pdfParse(buffer);
-  return result.text.slice(0, 12000); // ~3000 tokens
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const [info, result] = await Promise.all([
+      parser.getInfo({ parsePageInfo: true }),
+      parser.getText(),
+    ]);
+    return {
+      text: result.text.slice(0, 12000), // ~3000 tokens
+      pageCount: info.total ?? null,
+    };
+  } finally {
+    await parser.destroy();
+  }
 }
 
 async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
@@ -156,31 +179,65 @@ export async function POST(req: NextRequest) {
         task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
+        track: {
+          userId: session?.user?.id ?? null,
+          inputType: "link",
+          metadata: { inputUrl },
+        },
       });
 
     } else if (inputType === "pdf") {
       const file = formData.get("file") as File | null;
       if (!file) return NextResponse.json({ error: "请上传 PDF" }, { status: 400 });
+      if (file.size > MAX_SCORE_UPLOAD_SIZE) {
+        return NextResponse.json(
+          { error: "评分入口当前仅支持 20MB 以内的 PDF，请压缩后重试" },
+          { status: 400 }
+        );
+      }
 
-      let pdfText: string;
+      let pdfPayload: { text: string; pageCount: number | null };
       try {
-        pdfText = await extractPdfText(file);
+        pdfPayload = await extractPdfText(file);
       } catch {
         return NextResponse.json({ error: "PDF 解析失败，请确认文件未加密" }, { status: 422 });
       }
 
-      contentForLLM = `PDF 文件名：${file.name}\n\n提取文本内容：\n${pdfText}`;
+      contentForLLM = `PDF 文件名：${file.name}\n\n提取文本内容：\n${pdfPayload.text}`;
       const prompt = buildScoringPrompt(contentForLLM, "PDF");
       scoreOutput = await llm.generateStructured(prompt, ScoreOutputSchema, {
         task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
+        track: {
+          userId: session?.user?.id ?? null,
+          inputType: "pdf",
+          fileSizeBytes: file.size,
+          pageCount: pdfPayload.pageCount,
+          metadata: {
+            fileName: file.name,
+            mimeType: file.type,
+          },
+        },
       });
 
     } else {
       // images — use vision model
       const files = formData.getAll("files") as File[];
       if (files.length === 0) return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+      if (files.length > MAX_SCORE_IMAGES) {
+        return NextResponse.json(
+          { error: `评分入口最多上传 ${MAX_SCORE_IMAGES} 张截图` },
+          { status: 400 }
+        );
+      }
+      const totalImageSize = files.reduce((sum, file) => sum + file.size, 0);
+      if (totalImageSize > MAX_SCORE_UPLOAD_SIZE) {
+        return NextResponse.json(
+          { error: "评分入口当前仅支持总大小 20MB 以内的截图，请压缩后重试" },
+          { status: 400 }
+        );
+      }
 
       const images = await filesToImageInputs(files);
       if (images.length === 0) {
@@ -195,6 +252,15 @@ export async function POST(req: NextRequest) {
         task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
+        track: {
+          userId: session?.user?.id ?? null,
+          inputType: "images",
+          fileSizeBytes: totalImageSize,
+          itemCount: images.length,
+          metadata: {
+            uploadedFileCount: files.length,
+          },
+        },
       });
     }
 

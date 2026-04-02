@@ -134,6 +134,18 @@ ${enabledSections.map((s) => `- [${s.type}] ${s.title}（约 ${s.estimatedPages}
       systemPrompt: "你是一位资深 UX 作品集撰稿专家。始终以有效 JSON 格式返回结果。",
       temperature: 0.5,
       maxTokens: 4000,
+      track: {
+        userId: session.user.id,
+        projectId,
+        outlineId: id,
+        draftId: draft.id,
+        itemCount: assets.length,
+        metadata: {
+          projectName,
+          enabledSectionCount: enabledSections.length,
+          overallTheme: outline.overallTheme,
+        },
+      },
     });
 
     await db.portfolioDraft.update({

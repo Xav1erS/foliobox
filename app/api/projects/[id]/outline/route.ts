@@ -81,6 +81,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       task: "outline_generation",
       systemPrompt: "你是一位资深 UX 作品集设计顾问。始终以有效 JSON 格式返回结果，不要包含任何说明文字。",
       temperature: 0.4,
+      track: {
+        userId: session.user.id,
+        projectId: id,
+        itemCount: assets.length,
+        metadata: {
+          projectName: project.name,
+          hasFacts: !!facts,
+        },
+      },
     });
 
     const outline = await db.portfolioOutline.create({
