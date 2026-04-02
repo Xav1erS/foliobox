@@ -12,6 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
+import { InlineTip } from "@/components/app/InlineTip";
+import { SectionCard } from "@/components/app/SectionCard";
+import { StickyActionBar } from "@/components/app/StickyActionBar";
 
 interface ProfileData {
   currentTitle?: string | null;
@@ -133,9 +136,10 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
 
   return (
     <div className="space-y-8">
-      {/* Basic info */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-5 text-sm font-semibold text-neutral-700">基本信息</h2>
+      <SectionCard
+        title="基本信息"
+        description="当前职位、年限和行业会影响作品集中的自我定位、语气和背景可信度。"
+      >
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs text-neutral-500">当前职位 / Title</Label>
@@ -172,11 +176,12 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
             />
           </div>
         </div>
-      </section>
+      </SectionCard>
 
-      {/* Specialties */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-1 text-sm font-semibold text-neutral-700">擅长方向</h2>
+      <SectionCard
+        title="擅长方向"
+        description="这些标签会影响 AI 在项目里更偏向突出你的方法、视觉表达还是业务理解。"
+      >
         <p className="mb-4 text-xs text-neutral-400">最多选 5 个</p>
         <TagSelector
           options={SPECIALTY_OPTIONS}
@@ -184,11 +189,12 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           onChange={(v) => set("specialties", v)}
           max={5}
         />
-      </section>
+      </SectionCard>
 
-      {/* Target */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-5 text-sm font-semibold text-neutral-700">求职目标</h2>
+      <SectionCard
+        title="求职目标"
+        description="目标岗位和核心优势会影响项目强调重点，帮助作品集更贴近你想投的方向。"
+      >
         <div className="space-y-5">
           <div className="space-y-1.5">
             <Label className="text-xs text-neutral-500">目标岗位方向</Label>
@@ -210,12 +216,13 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
             />
           </div>
         </div>
-      </section>
+      </SectionCard>
 
-      {/* Tone */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-1 text-sm font-semibold text-neutral-700">文案风格偏好</h2>
-        <p className="mb-4 text-xs text-neutral-400">影响 AI 生成作品集时的叙述语气</p>
+      <SectionCard
+        title="文案风格偏好"
+        description="风格偏好会影响 AI 生成第一版时的叙述方式，但不会改变你的真实项目事实。"
+      >
+        <p className="mb-4 text-xs text-neutral-400">选择一条更接近你目标投递场景的表达语气</p>
         <div className="grid gap-3 sm:grid-cols-3">
           {TONE_OPTIONS.map(({ value, label }) => (
             <button
@@ -237,20 +244,24 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
             </button>
           ))}
         </div>
-      </section>
+      </SectionCard>
 
-      {/* Save */}
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving} className="px-8">
-          {saving ? "保存中..." : "保存档案"}
-        </Button>
-        {saved && (
-          <span className="text-sm text-emerald-600">已保存 ✓</span>
-        )}
-        {error && (
-          <span className="text-sm text-red-500">{error}</span>
-        )}
-      </div>
+      <InlineTip>
+        档案信息并不是越多越好。优先保证真实、清楚、和你的当前求职方向一致，通常会比堆很多标签更有效。
+      </InlineTip>
+
+      <StickyActionBar className="-mx-6">
+        <div className="text-xs text-neutral-500">
+          保存后会在后续生成作品集时作为默认档案上下文使用。
+        </div>
+        <div className="flex items-center gap-3">
+          {saved ? <span className="text-sm text-emerald-600">已保存 ✓</span> : null}
+          {error ? <span className="text-sm text-red-500">{error}</span> : null}
+          <Button onClick={handleSave} disabled={saving} className="h-11 rounded-xl px-8">
+            {saving ? "保存中..." : "保存档案"}
+          </Button>
+        </div>
+      </StickyActionBar>
     </div>
   );
 }

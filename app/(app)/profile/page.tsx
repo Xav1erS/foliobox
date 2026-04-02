@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProfileForm } from "@/components/app/ProfileForm";
+import { PageHeader } from "@/components/app/PageHeader";
+import { ResumeContextBanner } from "@/components/app/ResumeContextBanner";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -9,14 +11,20 @@ export default async function ProfilePage() {
   });
 
   return (
-    <div className="mx-auto max-w-2xl px-8 py-10">
-      <div className="mb-8">
-        <h1 className="text-xl font-semibold text-neutral-900">设计师档案</h1>
-        <p className="mt-0.5 text-sm text-neutral-500">
-          这些信息会用于生成更贴合你背景的作品集文案。
-        </p>
+    <div className="mx-auto max-w-4xl px-6 py-10">
+      <PageHeader
+        eyebrow="Profile"
+        title="设计师档案"
+        description="这些信息会作为 AI 输入，影响作品集中的自我定位、强调重点和整体叙述语气。"
+      />
+      <div className="mt-6">
+        <ResumeContextBanner>
+          建议先补充当前职位、经验年限、擅长方向与目标岗位，再去生成第一版作品集。这样 AI 给出的项目表达会更贴合你的求职背景。
+        </ResumeContextBanner>
       </div>
-      <ProfileForm initialData={profile} />
+      <div className="mt-8">
+        <ProfileForm initialData={profile} />
+      </div>
     </div>
   );
 }

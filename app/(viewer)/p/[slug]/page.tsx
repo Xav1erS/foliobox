@@ -14,10 +14,5 @@ export default async function PublicPortfolioPage({
 
   if (!portfolio) notFound();
 
-  // Render the stored HTML directly — it is sanitized on creation (escHtml)
-  return (
-    <div
-      dangerouslySetInnerHTML={{ __html: portfolio.publishedHtml }}
-    />
-  );
+  return <div dangerouslySetInnerHTML={{ __html: portfolio.publishedHtml }} />;
 }

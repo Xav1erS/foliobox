@@ -35,19 +35,22 @@ npm run db:generate  # 重新生成 Prisma Client（schema 改完后运行）
 ```
 app/
   (app)/              # 需登录的应用页面（layout 含 auth 校验）
-    dashboard/        # 项目列表
-    payment/result/   # 支付结果页
+    dashboard/        # 工作台首页
     profile/          # 用户资料
     projects/[id]/
       assets/         # 素材导入
       facts/          # 项目关键信息表单
       outline/        # 大纲确认页（含 OutlineClient.tsx）
       editor/         # Block 编辑器（含 EditorClient.tsx）
-  (auth)/             # 登录 / 验证页（无 app layout）
+  (focus)/            # 聚焦流程页面（无营销导航、无工作台侧栏）
+    login/            # 登录 / 验证
+    payment/result/   # 支付结果页
+    score/[id]/       # 评分结果页（免费简版 / 付费完整版）
   (marketing)/        # 公开页面
     page.tsx          # Landing Page
     pricing/          # 价格页
     score/            # 免费评分入口
+  (viewer)/           # 公开浏览壳
     p/[slug]/         # 已发布作品集展示页
   (print)/            # 打印视图（独立 layout，无导航，用于 PDF 导出）
     projects/[id]/print/
@@ -100,7 +103,42 @@ hooks/
 | Phase 3 | AI 草稿渲染 + Block 编辑器 + PDF 打印视图 + 在线链接发布 | 完成 |
 | Phase 4 | 支付系统（Order/UserPlan/BillingEvent）+ 权限校验 + Paywall 拦截 + 价格页 | 完成 |
 
+核心闭环（评分 → 注册 → 导入 → 事实表单 → 生成大纲 → 渲染草稿 → 编辑 → 发布/PDF）已完整打通。
+
+另已完成当前版本一致性收口的基础结构：
+
+- 新增 `(focus)` route group，用于评分结果、登录解锁、支付结果等聚焦页面
+- 新增公开浏览壳，公开作品集不再复用营销壳
+- Dashboard 改为工作台首页，不再跳转到不存在的 `/projects/[id]`
+- 导入页改为三步向导，但继续沿用现有 `POST /api/projects` 与 `POST /api/projects/import/images`
+- 评分结果页支持“免费简版结果 / 付费完整版结果”两态
+- 共享页面骨架组件已冻结：`PageHeader`、`SectionCard`、`EmptyState`、`StepHeader`、`StickyActionBar`、`InlineTip`、`ProgressHint`、`PermissionGate`、`ResumeContextBanner`
+
 `npm run build` 当前无报错。
+
+---
+
+## 未完成 / 待实现（对照 Spec）
+
+以下缺口均已在代码库中有骨架或占位，尚未真实实现：
+
+### P0 优先（影响商业化或付费墙完整性）
+
+**1. 支付真实接入**
+`lib/payment/wechat.ts` / `lib/payment/alipay.ts` 为 stub，`createOrder` 返回占位数据，`queryOrder` 始终返回 `pending`，无法真实收款。回调路由验签逻辑同为 stub。真实 SDK 接入需商户证书，替换对应文件中 `TODO` 标注部分即可。
+
+### P0 但可延后
+
+**2. 简历上传与解析**
+`app/api/resumes/route.ts` 为 stub（仅返回 `TODO` 字符串），Vercel Blob 上传、解析逻辑、`POST /api/profiles/from-resume/:id` 均未实现。设计师档案页有入口但上传后无实际效果。
+
+**3. 案例详情页（`/cases/[slug]`）**
+Landing Page 案例卡片可点击，但 `app/(marketing)/cases/[slug]/page.tsx` 仅为占位文字。Spec §A2 要求完整 Before/After 对比，覆盖 B2B / C 端各一个。
+
+### P1 级别
+
+**4. Figma 自动拉帧**
+导入页保存了 Figma URL 并有提示"MVP 阶段暂不自动拉取"，但无 Figma API 集成，用户仍需手动上传截图。
 
 ---
 
@@ -137,6 +175,60 @@ hooks/
 
 **返回上下文（7.15C）：**
 支付结果页从 `Order` 记录读取 `sourceScene/projectId/draftId` 还原流程，不信任 URL 参数。
+
+---
+
+## 当前 IA / Shell 约定
+
+当前版本必须按以下页面壳层组织：
+
+- `MarketingShell`
+  - `/`
+  - `/pricing`
+  - `/score`
+  - `/cases/[slug]`
+- `FocusShell`
+  - `/score/[id]`
+  - `/login`
+  - `/login/verify`
+  - `/payment/result`
+- `AppShell`
+  - `/dashboard`
+  - `/profile`
+  - `/projects/*`
+- `PublicViewerShell`
+  - `/p/[slug]`
+- `Print`
+  - `/projects/[id]/print`
+
+硬规则：
+
+- `MarketingShell` 可以出现营销导航和营销 CTA
+- `FocusShell` 不允许出现营销导航，不允许出现与当前任务无关的 CTA
+- `AppShell` 只放工作台相关入口
+- `PublicViewerShell` 不出现营销导航，也不出现工作台 UI
+
+---
+
+## 当前一致性改造目标
+
+后续开发默认遵循以下当前版本基线：
+
+- Dashboard 是工作台首页，不是项目纯列表页
+- 项目卡必须跳转到真实可继续步骤，不允许链接到不存在的 `/projects/[id]`
+- 项目继续路径优先级固定为：`editor > outline > facts > assets`
+- 评分结果页必须区分：
+  - 免费简版结果
+  - 付费完整版结果
+- 导入页必须维持三步向导：
+  - 选择导入方式
+  - 填写最小项目信息
+  - 确认并进入素材确认
+- 设计师档案页要明确说明各字段“会影响什么生成结果”
+- 设计系统收口以共享 token 为目标：
+  - 官网深色，工作台浅色
+  - 共享字体、圆角、描边、主按钮与 icon 风格
+  - 不要为 Marketing / Focus / App 再各造一套 UI 语言
 
 ---
 

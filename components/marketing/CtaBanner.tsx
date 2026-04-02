@@ -28,13 +28,13 @@ export function CtaBanner() {
 
         <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
           <Link
-            href="/login?next=/score"
+            href="/score"
             className="flex h-12 min-w-[200px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
             先给我的作品集打分
           </Link>
           <Link
-            href="/login"
+            href="/login?next=/projects/new"
             className="flex h-12 min-w-[180px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
           >
             直接开始整理作品集

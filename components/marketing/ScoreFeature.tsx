@@ -48,7 +48,7 @@ export function ScoreFeature() {
             </div>
 
             <Link
-              href="/login?next=/score"
+              href="/score"
               className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
             >
               免费给作品集打分

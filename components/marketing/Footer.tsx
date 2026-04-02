@@ -8,7 +8,7 @@ export function Footer() {
           <div>
             <p className="text-sm font-semibold text-white">集盒 FolioBox</p>
             <p className="mt-0.5 text-xs text-white/25">
-              把零散项目整理成更能投的作品集
+              把零散项目整理成拿得出手的作品集
             </p>
           </div>
 

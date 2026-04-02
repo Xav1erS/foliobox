@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
-  Star,
   User,
   PlusCircle,
   LogOut,
@@ -13,8 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "我的项目", icon: LayoutDashboard },
-  { href: "/score", label: "作品集评分", icon: Star },
+  { href: "/dashboard", label: "工作台首页", icon: LayoutDashboard },
   { href: "/profile", label: "设计师档案", icon: User },
 ];
 

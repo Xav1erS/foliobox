@@ -34,10 +34,10 @@ export function Navbar() {
             登录
           </Link>
           <Link
-            href="/login?next=/score"
+            href="/score"
             className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-white/90 transition-colors"
           >
-            免费评分 →
+            开始评分 →
           </Link>
         </div>
       </div>

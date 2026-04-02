@@ -211,11 +211,24 @@ export default function ScorePage() {
         </div>
 
         {/* Privacy note */}
-        <p className="mt-6 text-center text-xs text-white/25" style={{ maxWidth: 440 }}>
+      <p className="mt-6 text-center text-xs text-white/25" style={{ maxWidth: 440 }}>
           上传内容仅用于本次评分，不会用于训练或展示给其他用户。
           敏感内容建议截图前手动打码处理。
         </p>
       </main>
+
+      {loading ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 px-6 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-white" />
+            <p className="mt-5 text-xs uppercase tracking-[0.18em] text-white/35">Focus</p>
+            <h2 className="mt-3 text-2xl font-semibold text-white">正在生成评分结果</h2>
+            <p className="mt-3 text-sm leading-6 text-white/55">
+              我们正在按 8 个维度整理这份作品集的简版评分结果，完成后会直接进入聚焦结果页继续下一步。
+            </p>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
