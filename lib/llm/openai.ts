@@ -1,41 +1,89 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { ProxyAgent } from "undici";
+import {
+  getOpenAIModelConfig,
+  resolveOpenAIModel,
+} from "./model-routing";
 import type { GenerateOptions, ImageInput, LLMProvider } from "./provider";
 
-const PRIMARY_MODEL = "gpt-4o";
-const LITE_MODEL = "gpt-4o-mini";
+function getProxyUrl(): string | undefined {
+  return (
+    process.env.OPENAI_PROXY_URL ||
+    process.env.HTTPS_PROXY ||
+    process.env.HTTP_PROXY ||
+    process.env.ALL_PROXY ||
+    undefined
+  );
+}
 
 function getClient(): OpenAI {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is not set");
   }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const proxyUrl = getProxyUrl();
+  const proxyAgent = proxyUrl ? new ProxyAgent(proxyUrl) : null;
+
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    fetch: proxyAgent
+      ? ((input, init) =>
+          fetch(input, {
+            ...(init ?? {}),
+            dispatcher: proxyAgent,
+          } as RequestInit & { dispatcher: ProxyAgent })) as typeof fetch
+      : undefined,
+  });
 }
 
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
-  private primaryModel: string;
-  private liteModel: string;
+  private defaultOptions: GenerateOptions;
 
   constructor(useLite = false) {
     this.client = getClient();
-    this.primaryModel = useLite ? LITE_MODEL : PRIMARY_MODEL;
-    this.liteModel = LITE_MODEL;
+    this.defaultOptions = useLite ? { model: getOpenAIModelConfig().lite } : {};
+  }
+
+  private logUsage(
+    method: string,
+    model: string,
+    startedAt: number,
+    options?: GenerateOptions,
+    usage?: OpenAI.Completions.CompletionUsage
+  ) {
+    const elapsedMs = Date.now() - startedAt;
+    const task = options?.task ?? "unspecified";
+
+    console.info("[llm]", {
+      provider: "openai",
+      method,
+      task,
+      model,
+      elapsedMs,
+      promptTokens: usage?.prompt_tokens ?? null,
+      completionTokens: usage?.completion_tokens ?? null,
+      totalTokens: usage?.total_tokens ?? null,
+    });
   }
 
   async generate(prompt: string, options?: GenerateOptions): Promise<string> {
-    const model = options?.model ?? this.primaryModel;
+    const finalOptions = { ...this.defaultOptions, ...options };
+    const model = resolveOpenAIModel(finalOptions);
+    const startedAt = Date.now();
     const response = await this.client.chat.completions.create({
       model,
-      temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens,
+      temperature: finalOptions.temperature ?? 0.7,
+      max_completion_tokens: finalOptions.maxTokens,
       messages: [
-        ...(options?.systemPrompt
-          ? [{ role: "system" as const, content: options.systemPrompt }]
+        ...(finalOptions.systemPrompt
+          ? [{ role: "system" as const, content: finalOptions.systemPrompt }]
           : []),
         { role: "user" as const, content: prompt },
       ],
     });
+    this.logUsage("generate", model, startedAt, finalOptions, response.usage);
     return response.choices[0]?.message?.content ?? "";
   }
 
@@ -44,22 +92,31 @@ export class OpenAIProvider implements LLMProvider {
     schema: z.ZodSchema<T>,
     options?: GenerateOptions
   ): Promise<T> {
-    const model = options?.model ?? this.primaryModel;
+    const finalOptions = { ...this.defaultOptions, ...options };
+    const model = resolveOpenAIModel(finalOptions);
+    const startedAt = Date.now();
     const response = await this.client.chat.completions.create({
       model,
-      temperature: options?.temperature ?? 0.3,
-      max_tokens: options?.maxTokens,
+      temperature: finalOptions.temperature ?? 0.3,
+      max_completion_tokens: finalOptions.maxTokens,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system" as const,
           content:
-            (options?.systemPrompt ?? "") +
+            (finalOptions.systemPrompt ?? "") +
             "\nRespond with valid JSON matching the requested schema.",
         },
         { role: "user" as const, content: prompt },
       ],
     });
+    this.logUsage(
+      "generateStructured",
+      model,
+      startedAt,
+      finalOptions,
+      response.usage
+    );
 
     const raw = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw);
@@ -72,8 +129,13 @@ export class OpenAIProvider implements LLMProvider {
     schema: z.ZodSchema<T>,
     options?: GenerateOptions
   ): Promise<T> {
-    // Vision always uses the primary model (gpt-4o)
-    const model = options?.model ?? PRIMARY_MODEL;
+    const finalOptions = {
+      ...this.defaultOptions,
+      ...options,
+      vision: true,
+    };
+    const model = resolveOpenAIModel(finalOptions);
+    const startedAt = Date.now();
 
     const imageContent = images.map((img) => ({
       type: "image_url" as const,
@@ -85,14 +147,14 @@ export class OpenAIProvider implements LLMProvider {
 
     const response = await this.client.chat.completions.create({
       model,
-      temperature: options?.temperature ?? 0.3,
-      max_tokens: options?.maxTokens,
+      temperature: finalOptions.temperature ?? 0.3,
+      max_completion_tokens: finalOptions.maxTokens,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
           content:
-            (options?.systemPrompt ?? "") +
+            (finalOptions.systemPrompt ?? "") +
             "\nRespond with valid JSON matching the requested schema.",
         },
         {
@@ -104,6 +166,13 @@ export class OpenAIProvider implements LLMProvider {
         },
       ],
     });
+    this.logUsage(
+      "generateStructuredWithImages",
+      model,
+      startedAt,
+      finalOptions,
+      response.usage
+    );
 
     const raw = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw);

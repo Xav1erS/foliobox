@@ -5,7 +5,7 @@ import { z } from "zod";
 const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { llm, llmLite } from "@/lib/llm/openai";
+import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
 
@@ -152,7 +152,8 @@ export async function POST(req: NextRequest) {
       }
 
       const prompt = buildScoringPrompt(contentForLLM, "链接");
-      scoreOutput = await llmLite.generateStructured(prompt, ScoreOutputSchema, {
+      scoreOutput = await llm.generateStructured(prompt, ScoreOutputSchema, {
+        task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
       });
@@ -170,7 +171,8 @@ export async function POST(req: NextRequest) {
 
       contentForLLM = `PDF 文件名：${file.name}\n\n提取文本内容：\n${pdfText}`;
       const prompt = buildScoringPrompt(contentForLLM, "PDF");
-      scoreOutput = await llmLite.generateStructured(prompt, ScoreOutputSchema, {
+      scoreOutput = await llm.generateStructured(prompt, ScoreOutputSchema, {
+        task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
       });
@@ -190,6 +192,7 @@ export async function POST(req: NextRequest) {
         "截图"
       );
       scoreOutput = await llm.generateStructuredWithImages(prompt, images, ScoreOutputSchema, {
+        task: "portfolio_score",
         temperature: 0.2,
         maxTokens: 1500,
       });

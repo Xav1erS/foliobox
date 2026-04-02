@@ -130,6 +130,7 @@ ${enabledSections.map((s) => `- [${s.type}] ${s.title}（约 ${s.estimatedPages}
 
   try {
     const contentData = await llm.generateStructured(prompt, DraftSchema, {
+      task: "case_study_generation",
       systemPrompt: "你是一位资深 UX 作品集撰稿专家。始终以有效 JSON 格式返回结果。",
       temperature: 0.5,
       maxTokens: 4000,

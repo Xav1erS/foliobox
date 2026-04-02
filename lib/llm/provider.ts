@@ -1,10 +1,21 @@
 import { z } from "zod";
 
+export type LLMTask =
+  | "outline_generation"      // 生成作品集大纲
+  | "case_study_generation"   // 生成作品集初稿
+  | "resume_parse"            // 简历解析
+  | "portfolio_score"         // 作品集评分
+  | "text_rewrite"            // 文案改写
+  | "label_extraction"        // 标签/标题提取
+  | "consistency_check";      // 简历与作品集一致性检查
+
 export interface GenerateOptions {
+  task?: LLMTask;
   model?: string;
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  vision?: boolean;
 }
 
 export interface ImageInput {
@@ -39,15 +50,6 @@ export interface LLMProvider {
     options?: GenerateOptions
   ): Promise<T>;
 }
-
-export type LLMTask =
-  | "outline_generation"      // 生成作品集大纲
-  | "case_study_generation"   // 生成作品集初稿
-  | "resume_parse"            // 简历解析
-  | "portfolio_score"         // 作品集评分
-  | "text_rewrite"            // 文案改写
-  | "label_extraction"        // 标签/标题提取
-  | "consistency_check";      // 简历与作品集一致性检查
 
 /**
  * 每个任务建议使用的模型档位
