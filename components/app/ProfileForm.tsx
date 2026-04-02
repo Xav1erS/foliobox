@@ -142,7 +142,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
       >
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs text-neutral-500">当前职位 / Title</Label>
+            <Label className="text-xs text-neutral-500">你现在的职位</Label>
             <Input
               value={form.currentTitle ?? ""}
               onChange={(e) => set("currentTitle", e.target.value)}
@@ -151,7 +151,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-neutral-500">工作年限</Label>
+            <Label className="text-xs text-neutral-500">你有几年相关经验</Label>
             <Select
               value={form.yearsOfExperience ?? ""}
               onValueChange={(v) => set("yearsOfExperience", v)}
@@ -168,7 +168,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           </div>
 
           <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs text-neutral-500">行业 / 业务方向</Label>
+            <Label className="text-xs text-neutral-500">你主要做过什么行业或业务</Label>
             <Input
               value={form.industry ?? ""}
               onChange={(e) => set("industry", e.target.value)}
@@ -179,35 +179,25 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
       </SectionCard>
 
       <SectionCard
-        title="擅长方向"
-        description="这些标签会影响 AI 在项目里更偏向突出你的方法、视觉表达还是业务理解。"
+        title="擅长方向与优势"
+        description="这些标签会一起影响 AI 在项目里更偏向突出你的方法、视觉表达、业务理解和个人优势。"
       >
-        <p className="mb-4 text-xs text-neutral-400">最多选 5 个</p>
-        <TagSelector
-          options={SPECIALTY_OPTIONS}
-          selected={form.specialties ?? []}
-          onChange={(v) => set("specialties", v)}
-          max={5}
-        />
-      </SectionCard>
-
-      <SectionCard
-        title="求职目标"
-        description="目标岗位和核心优势会影响项目强调重点，帮助作品集更贴近你想投的方向。"
-      >
-        <div className="space-y-5">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-neutral-500">目标岗位方向</Label>
-            <Input
-              value={form.targetRole ?? ""}
-              onChange={(e) => set("targetRole", e.target.value)}
-              placeholder="如：大厂产品设计师、创业公司全栈设计、C 端增长设计"
+        <div className="space-y-6">
+          <div>
+            <p className="mb-4 text-xs text-neutral-400">选几个最能代表你当前方向的标签，最多 5 个</p>
+            <TagSelector
+              options={SPECIALTY_OPTIONS}
+              selected={form.specialties ?? []}
+              onChange={(v) => set("specialties", v)}
+              max={5}
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-neutral-500">核心优势标签</Label>
-            <p className="text-xs text-neutral-400">最多选 4 个，将影响作品集的表达重点</p>
+            <Label className="text-xs text-neutral-500">你最想被看到的优势</Label>
+            <p className="text-xs text-neutral-400">
+              最多选 4 个，这会影响作品集里更强调的方法、能力和判断
+            </p>
             <TagSelector
               options={STRENGTH_OPTIONS}
               selected={form.strengths ?? []}
@@ -219,10 +209,26 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
       </SectionCard>
 
       <SectionCard
+        title="求职目标"
+        description="目标岗位会影响项目强调重点，帮助作品集更贴近你当前想投的方向。"
+      >
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-neutral-500">你现在主要想投什么岗位</Label>
+            <Input
+              value={form.targetRole ?? ""}
+              onChange={(e) => set("targetRole", e.target.value)}
+              placeholder="如：大厂产品设计师、创业公司全栈设计、C 端增长设计"
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="文案风格偏好"
         description="风格偏好会影响 AI 生成第一版时的叙述方式，但不会改变你的真实项目事实。"
       >
-        <p className="mb-4 text-xs text-neutral-400">选择一条更接近你目标投递场景的表达语气</p>
+        <p className="mb-4 text-xs text-neutral-400">选一个更接近你目标投递场景的表达语气</p>
         <div className="grid gap-3 sm:grid-cols-3">
           {TONE_OPTIONS.map(({ value, label }) => (
             <button
