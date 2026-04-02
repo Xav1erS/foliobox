@@ -1,6 +1,104 @@
-import Link from "next/link";
+"use client";
 
-export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Menu } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  getNavbarPrimaryAction,
+  getNavbarSecondaryAction,
+} from "@/lib/marketing-cta";
+
+type NavbarPage = "home" | "pricing" | "score";
+
+export function Navbar({
+  isLoggedIn = false,
+  currentPage = "home",
+}: {
+  isLoggedIn?: boolean;
+  currentPage?: NavbarPage;
+}) {
+  const [activeSection, setActiveSection] = useState<string | null>(
+    currentPage === "home" ? null : currentPage
+  );
+
+  const navItems = useMemo(
+    () => [
+      {
+        key: "cases",
+        label: "案例展示",
+        href: currentPage === "home" ? "#cases" : "/#cases",
+      },
+      {
+        key: "how",
+        label: "使用流程",
+        href: currentPage === "home" ? "#how" : "/#how",
+      },
+      {
+        key: "score",
+        label: "评分诊断",
+        href: currentPage === "score" ? "/score" : currentPage === "home" ? "#score" : "/#score",
+      },
+      {
+        key: "pricing",
+        label: "价格方案",
+        href: "/pricing",
+      },
+      {
+        key: "faq",
+        label: "FAQ",
+        href: currentPage === "home" ? "#faq" : "/#faq",
+      },
+    ],
+    [currentPage]
+  );
+
+  useEffect(() => {
+    if (currentPage !== "home") {
+      setActiveSection(currentPage);
+      return;
+    }
+
+    const sectionIds = ["cases", "how", "score", "faq"] as const;
+
+    function updateActiveSection() {
+      const marker = window.scrollY + 120;
+      let nextActive: string | null = null;
+
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const top = el.offsetTop;
+        const bottom = top + el.offsetHeight;
+        if (marker >= top && marker < bottom) {
+          nextActive = id;
+        }
+      }
+
+      setActiveSection(nextActive);
+    }
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("hashchange", updateActiveSection);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("hashchange", updateActiveSection);
+    };
+  }, [currentPage]);
+
+  const primaryCta = getNavbarPrimaryAction(isLoggedIn);
+  const secondaryCta = getNavbarSecondaryAction(isLoggedIn);
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
@@ -11,28 +109,92 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
         {/* Nav links */}
         <nav className="hidden items-center gap-6 md:flex">
-          <Link href="#cases" className="text-sm text-white/50 hover:text-white transition-colors">
-            案例展示
-          </Link>
-          <Link href="#how" className="text-sm text-white/50 hover:text-white transition-colors">
-            使用流程
-          </Link>
-          <Link href="#score" className="text-sm text-white/50 hover:text-white transition-colors">
-            评分诊断
-          </Link>
-          <Link href="#faq" className="text-sm text-white/50 hover:text-white transition-colors">
-            FAQ
-          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={`text-sm transition-colors ${
+                activeSection === item.key
+                  ? "text-white"
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         {/* CTAs */}
         <div className="flex items-center gap-2">
           <Link
-            href={isLoggedIn ? "/dashboard" : "/score"}
-            className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-white/90 transition-colors"
+            href={secondaryCta.href}
+            className="hidden rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
           >
-            {isLoggedIn ? "进入工作台 →" : "开始评分 →"}
+            {secondaryCta.label}
           </Link>
+          <Link
+            href={primaryCta.href}
+            className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+          >
+            {primaryCta.label} →
+          </Link>
+
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-none">
+              <DialogHeader className="border-b border-white/10 px-5 py-4 text-left">
+                <DialogTitle className="text-sm font-semibold tracking-tight text-white">
+                  集盒 FolioBox
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="flex h-full flex-col px-5 py-5">
+                <div className="space-y-2">
+                  {navItems.map((item) => (
+                    <DialogClose asChild key={item.key}>
+                      <Link
+                        href={item.href}
+                        className={`block rounded-xl px-3 py-3 text-sm transition-colors ${
+                          activeSection === item.key
+                            ? "bg-white/10 text-white"
+                            : "text-white/65 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    </DialogClose>
+                  ))}
+                </div>
+
+                <div className="mt-6 space-y-3 border-t border-white/10 pt-6">
+                  <DialogClose asChild>
+                    <Link
+                      href={primaryCta.href}
+                      className="flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                    >
+                      {primaryCta.label}
+                    </Link>
+                  </DialogClose>
+                  <DialogClose asChild>
+                    <Link
+                      href={secondaryCta.href}
+                      className="flex h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+                    >
+                      {secondaryCta.label}
+                    </Link>
+                  </DialogClose>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </header>

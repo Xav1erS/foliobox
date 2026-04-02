@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getRequiredSession } from "@/lib/required-session";
 import { OutlineClient } from "./OutlineClient";
 
 export default async function OutlinePage({
@@ -13,10 +13,11 @@ export default async function OutlinePage({
   const { id } = await params;
   const { oid } = await searchParams;
 
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
   if (!oid) notFound();
+
+  const session = await getRequiredSession(
+    `/projects/${id}/outline?oid=${encodeURIComponent(oid)}`
+  );
 
   const [outline, rawAssets] = await Promise.all([
     db.portfolioOutline.findUnique({

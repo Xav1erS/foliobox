@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +6,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SectionCard } from "@/components/app/SectionCard";
 import { FileText, Clock3, ArrowRight, PlusCircle, CreditCard, Star, User } from "lucide-react";
+import { getRequiredSession } from "@/lib/required-session";
 
 const STATUS_LABEL: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   DRAFT: { label: "草稿", variant: "secondary" },
@@ -82,8 +81,7 @@ function getContinuePath(project: {
 }
 
 export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const session = await getRequiredSession("/dashboard");
 
   const [projects, latestScore, userPlan] = await Promise.all([
     db.project.findMany({
@@ -152,7 +150,7 @@ export default async function DashboardPage() {
               }
             />
 
-            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 lg:grid-cols-3">
               <SectionCard
                 title="从 Figma 开始"
                 description="保存链接后继续进入素材确认页，MVP 阶段仍由你手动上传关键截图。"
@@ -172,15 +170,6 @@ export default async function DashboardPage() {
                 </Link>
               </SectionCard>
               <SectionCard
-                title="先给作品集打分"
-                description="如果你已经有现成作品集，可以先做一次评分，判断现在是否已经拿得出手。"
-              >
-                <Link href="/score" className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900">
-                  去评分
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </SectionCard>
-              <SectionCard
                 title="先补设计师档案"
                 description="完善你的职位、年限、优势和目标岗位，这会影响 AI 生成的自我定位与表达重心。"
               >
@@ -190,6 +179,28 @@ export default async function DashboardPage() {
                 </Link>
               </SectionCard>
             </div>
+
+            <SectionCard
+              title="工具"
+              description="这些入口更像辅助工具，不属于工作台主流程，但你随时都可以使用。"
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Link
+                  href="/score"
+                  className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100"
+                >
+                  <Star className="h-4 w-4 text-neutral-900" />
+                  <p className="mt-3 text-sm font-medium text-neutral-900">先给作品集打分</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">
+                    如果你已经有现成作品集，可以先做一次评分，判断现在是否已经拿得出手。
+                  </p>
+                  <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-900">
+                    去评分
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </Link>
+              </div>
+            </SectionCard>
           </div>
         ) : (
           <div className="space-y-6">

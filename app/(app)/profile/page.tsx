@@ -1,13 +1,13 @@
-import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProfileForm } from "@/components/app/ProfileForm";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ResumeContextBanner } from "@/components/app/ResumeContextBanner";
+import { getRequiredSession } from "@/lib/required-session";
 
 export default async function ProfilePage() {
-  const session = await auth();
+  const session = await getRequiredSession("/profile");
   const profile = await db.designerProfile.findUnique({
-    where: { userId: session!.user!.id },
+    where: { userId: session.user.id },
   });
 
   return (

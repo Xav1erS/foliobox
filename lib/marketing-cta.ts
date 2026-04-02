@@ -1,0 +1,40 @@
+export type MarketingAction = {
+  href: string;
+  label: string;
+};
+
+export function getNavbarPrimaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/dashboard", label: "进入工作台" }
+    : { href: "/score", label: "开始评分" };
+}
+
+export function getNavbarSecondaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/projects/new", label: "继续整理作品集" }
+    : { href: "/pricing", label: "查看价格" };
+}
+
+export function getHeroPrimaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/dashboard", label: "进入工作台" }
+    : { href: "/score", label: "先给我的作品集打分" };
+}
+
+export function getHeroSecondaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/projects/new", label: "继续整理作品集" }
+    : { href: "/login?next=/projects/new", label: "直接开始整理作品集" };
+}
+
+export function getPricingPrimaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/dashboard", label: "进入工作台" }
+    : { href: "/score", label: "先免费打分看看" };
+}
+
+export function getPricingSecondaryAction(isLoggedIn: boolean): MarketingAction {
+  return isLoggedIn
+    ? { href: "/projects/new", label: "继续整理作品集" }
+    : { href: "/login?next=/projects/new", label: "直接开始整理作品集" };
+}

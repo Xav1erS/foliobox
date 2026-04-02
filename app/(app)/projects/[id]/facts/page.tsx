@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getRequiredSession } from "@/lib/required-session";
 import { FactsForm } from "./FactsForm";
 
 export default async function FactsPage({
@@ -9,8 +9,7 @@ export default async function FactsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const session = await getRequiredSession(`/projects/${id}/facts`);
 
   const project = await db.project.findUnique({ where: { id, userId: session.user.id } });
   if (!project) notFound();

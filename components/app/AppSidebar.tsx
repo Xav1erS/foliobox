@@ -5,17 +5,20 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
-  Star,
   User,
+  Star,
   PlusCircle,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+const PRIMARY_NAV_ITEMS = [
   { href: "/dashboard", label: "工作台首页", icon: LayoutDashboard },
-  { href: "/score", label: "作品集评分", icon: Star },
   { href: "/profile", label: "设计师档案", icon: User },
+];
+
+const TOOL_NAV_ITEMS = [
+  { href: "/score", label: "作品集评分", icon: Star },
 ];
 
 export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
@@ -41,22 +44,42 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
       </Link>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-0.5">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-              pathname === href || pathname.startsWith(href + "/")
-                ? "bg-neutral-100 font-medium text-neutral-900"
-                : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-          </Link>
-        ))}
+      <nav className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-0.5">
+          {PRIMARY_NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                pathname === href || pathname.startsWith(href + "/")
+                  ? "bg-neutral-100 font-medium text-neutral-900"
+                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </div>
+
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <p className="px-3 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+            工具
+          </p>
+          <div className="mt-2 flex flex-col gap-0.5">
+            {TOOL_NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
       </nav>
 
       {/* User + logout */}

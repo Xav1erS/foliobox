@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getRequiredSession } from "@/lib/required-session";
 import { EditorClient } from "./EditorClient";
 
 export default async function EditorPage({
@@ -13,10 +13,11 @@ export default async function EditorPage({
   const { id } = await params;
   const { did } = await searchParams;
 
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
   if (!did) notFound();
+
+  const session = await getRequiredSession(
+    `/projects/${id}/editor?did=${encodeURIComponent(did)}`
+  );
 
   const [draft, project, rawAssets] = await Promise.all([
     db.portfolioDraft.findUnique({ where: { id: did, userId: session.user.id } }),

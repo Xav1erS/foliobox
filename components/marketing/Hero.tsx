@@ -1,6 +1,13 @@
 import Link from "next/link";
+import {
+  getHeroPrimaryAction,
+  getHeroSecondaryAction,
+} from "@/lib/marketing-cta";
 
 export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
+  const primaryAction = getHeroPrimaryAction(isLoggedIn);
+  const secondaryAction = getHeroSecondaryAction(isLoggedIn);
+
   return (
     <section className="relative overflow-hidden pt-14">
       {/* Grid background */}
@@ -50,16 +57,16 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         {/* CTAs */}
         <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
           <Link
-            href={isLoggedIn ? "/dashboard" : "/score"}
+            href={primaryAction.href}
             className="flex h-12 min-w-[200px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
-            {isLoggedIn ? "进入工作台" : "先给我的作品集打分"}
+            {primaryAction.label}
           </Link>
           <Link
-            href={isLoggedIn ? "/projects/new" : "/login?next=/projects/new"}
+            href={secondaryAction.href}
             className="flex h-12 min-w-[200px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
           >
-            {isLoggedIn ? "继续整理作品集" : "直接开始整理作品集"}
+            {secondaryAction.label}
           </Link>
         </div>
 

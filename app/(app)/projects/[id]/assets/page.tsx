@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getRequiredSession } from "@/lib/required-session";
 import { AssetsClient } from "./AssetsClient";
 
 export default async function AssetsPage({
@@ -9,8 +9,7 @@ export default async function AssetsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const session = await getRequiredSession(`/projects/${id}/assets`);
 
   const project = await db.project.findUnique({
     where: { id, userId: session.user.id },
