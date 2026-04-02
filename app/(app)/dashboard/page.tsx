@@ -152,7 +152,7 @@ export default async function DashboardPage() {
               }
             />
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
               <SectionCard
                 title="从 Figma 开始"
                 description="保存链接后继续进入素材确认页，MVP 阶段仍由你手动上传关键截图。"
@@ -168,6 +168,15 @@ export default async function DashboardPage() {
               >
                 <Link href="/projects/new" className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900">
                   上传截图
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </SectionCard>
+              <SectionCard
+                title="先给作品集打分"
+                description="如果你已经有现成作品集，可以先做一次评分，判断现在是否已经拿得出手。"
+              >
+                <Link href="/score" className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900">
+                  去评分
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </SectionCard>
