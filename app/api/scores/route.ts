@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm, llmLite } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
+import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
 
 // ─── Zod schema for LLM output ───────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ const DimensionScoreSchema = z.object({
 
 const ScoreOutputSchema = z.object({
   totalScore: z.number().min(0).max(100),
-  level: z.enum(["ready", "needs_improvement", "not_ready"]),
+  level: z.enum(["ready", "needs_improvement", "draft", "not_ready"]),
   dimensionScores: z.object({
     firstScreenProfessionalism: DimensionScoreSchema, // 首屏专业感 15分
     scannability: DimensionScoreSchema,               // 可扫描性 15分
@@ -53,8 +54,9 @@ function buildScoringPrompt(content: string, inputType: string): string {
 ## 评分等级
 
 - 85–100 分：ready（可直接投递）
-- 50–84 分：needs_improvement（建议局部修改）
-- 50 分以下：not_ready（暂不建议投递）
+- 70–84 分：needs_improvement（具备投递价值，但建议局部优化）
+- 50–69 分：draft（可作为草稿，不建议直接投递）
+- 50 分以下：not_ready（不建议直接投递）
 
 ## 作品集内容（来源：${inputType}）
 
@@ -64,7 +66,7 @@ ${content}
 
 按 JSON 输出，字段说明：
 - totalScore: 综合总分（0-100），按各维度满分比例加权计算
-- level: "ready" | "needs_improvement" | "not_ready"
+- level: "ready" | "needs_improvement" | "draft" | "not_ready"
 - dimensionScores: 每个维度的 score（0-100，代表该维度得分占满分的百分比）和 comment（1-2 句中文说明）
 - summaryPoints: 3-5 条高层问题摘要（中文，每条不超过 30 字）
 - recommendedActions: 3-5 条改进建议（中文，每条不超过 30 字，可操作）`;
@@ -200,12 +202,7 @@ export async function POST(req: NextRequest) {
         inputType: inputType === "link" ? "LINK" : inputType === "pdf" ? "PDF" : "IMAGES",
         inputUrl,
         totalScore: scoreOutput.totalScore,
-        level:
-          scoreOutput.level === "ready"
-            ? "READY"
-            : scoreOutput.level === "needs_improvement"
-            ? "NEEDS_IMPROVEMENT"
-            : "NOT_READY",
+        level: getPortfolioScoreLevelFromTotalScore(scoreOutput.totalScore),
         dimensionScores: scoreOutput.dimensionScores,
         summaryPoints: scoreOutput.summaryPoints,
         recommendedActions: scoreOutput.recommendedActions,

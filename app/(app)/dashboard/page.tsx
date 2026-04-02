@@ -7,18 +7,16 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SectionCard } from "@/components/app/SectionCard";
 import { FileText, Clock3, ArrowRight, PlusCircle, CreditCard, Star, User } from "lucide-react";
 import { getRequiredSession } from "@/lib/required-session";
+import {
+  PORTFOLIO_SCORE_LEVEL_CONFIG,
+  resolvePortfolioScoreLevel,
+} from "@/lib/portfolio-score-level";
 
 const STATUS_LABEL: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   DRAFT: { label: "草稿", variant: "secondary" },
   IMPORTING: { label: "导入中", variant: "outline" },
   IMPORTED: { label: "已导入", variant: "default" },
   FAILED: { label: "失败", variant: "destructive" },
-};
-
-const SCORE_LABEL: Record<string, string> = {
-  READY: "可直接投递",
-  NEEDS_IMPROVEMENT: "建议改进后投递",
-  NOT_READY: "暂不建议投递",
 };
 
 const PLAN_COPY: Record<string, { title: string; description: string }> = {
@@ -114,6 +112,9 @@ export default async function DashboardPage() {
   ]);
 
   const recentProject = projects[0] ?? null;
+  const latestScoreLevel = latestScore
+    ? resolvePortfolioScoreLevel(latestScore.totalScore, latestScore.level)
+    : null;
   const currentPlan = userPlan?.planType ?? "FREE";
   const planCopy = PLAN_COPY[currentPlan] ?? PLAN_COPY.FREE;
 
@@ -195,7 +196,7 @@ export default async function DashboardPage() {
                     如果你已经有现成作品集，可以先做一次评分，判断现在是否已经拿得出手。
                   </p>
                   <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-900">
-                    去评分
+                    先给我的作品集打分
                     <ArrowRight className="h-4 w-4" />
                   </span>
                 </Link>
@@ -244,7 +245,11 @@ export default async function DashboardPage() {
                       <span className="pb-1 text-sm text-neutral-400">/100</span>
                     </div>
                     <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                      <p className="text-sm font-medium text-neutral-900">{SCORE_LABEL[latestScore.level] ?? "评分已生成"}</p>
+                      <p className="text-sm font-medium text-neutral-900">
+                        {latestScoreLevel
+                          ? PORTFOLIO_SCORE_LEVEL_CONFIG[latestScoreLevel].label
+                          : "评分已生成"}
+                      </p>
                       <p className="mt-1 text-xs text-neutral-500">生成于 {formatDate(latestScore.createdAt)}</p>
                     </div>
                     <Button asChild variant="outline" className="h-11 rounded-xl px-5">
@@ -259,7 +264,7 @@ export default async function DashboardPage() {
                     <p className="text-sm leading-6 text-neutral-500">你还没有登录后的评分记录。可以先给现有作品集打分，再决定是否继续整理。</p>
                     <Button asChild variant="outline" className="h-11 rounded-xl px-5">
                       <Link href="/score">
-                        开始评分
+                        先给我的作品集打分
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>

@@ -103,7 +103,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <div className="h-3 w-3 rounded-full bg-white/10" />
               </div>
               <div className="rounded bg-white/[0.05] px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
-                foliobox.design/portfolio/preview
+                foliobox.art/portfolio/preview
               </div>
             </div>
 
@@ -212,7 +212,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               </div>
               <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-400">
                 <span className="h-1 w-1 rounded-full bg-amber-400" />
-                建议改进后投递
+                具备投递价值，但建议局部优化
               </div>
               <div className="space-y-2">
                 {[

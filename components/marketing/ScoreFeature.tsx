@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  PORTFOLIO_SCORE_LEVEL_CONFIG,
+  PORTFOLIO_SCORE_LEVEL_ORDER,
+} from "@/lib/portfolio-score-level";
 
 const SCORE_DIMENSIONS = [
   { label: "首屏专业感", score: 65, weight: 15 },
@@ -33,18 +37,21 @@ export function ScoreFeature() {
 
             {/* Score levels */}
             <div className="mt-6 flex flex-col gap-2">
-              {[
-                { range: "85–100 分", label: "可直接投递", color: "bg-emerald-500" },
-                { range: "50–84 分", label: "建议局部修改", color: "bg-amber-500" },
-                { range: "50 分以下", label: "暂不建议投递", color: "bg-red-500/60" },
-              ].map((level) => (
-                <div key={level.range} className="flex items-center gap-3">
-                  <span className={`h-1.5 w-1.5 rounded-full ${level.color}`} />
-                  <span className="font-mono text-xs text-white/50">{level.range}</span>
-                  <span className="text-xs text-white/30">—</span>
-                  <span className="text-xs text-white/50">{level.label}</span>
-                </div>
-              ))}
+              {PORTFOLIO_SCORE_LEVEL_ORDER.map((levelKey) => {
+                const level = PORTFOLIO_SCORE_LEVEL_CONFIG[levelKey];
+                return (
+                  <div key={level.rangeLabel} className="flex items-center gap-3">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${level.indicatorClassName}`}
+                    />
+                    <span className="font-mono text-xs text-white/50">
+                      {level.rangeLabel}
+                    </span>
+                    <span className="text-xs text-white/30">—</span>
+                    <span className="text-xs text-white/50">{level.label}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <Link
@@ -75,9 +82,13 @@ export function ScoreFeature() {
                   <div className="text-5xl font-bold tabular-nums text-white">72</div>
                   <div className="mt-1 text-xs text-white/30">/ 100 分</div>
                 </div>
-                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  建议改进后投递
+                <div
+                  className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.badgeClassName}`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.indicatorClassName}`}
+                  />
+                  {PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.label}
                 </div>
               </div>
 
@@ -95,9 +106,11 @@ export function ScoreFeature() {
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
                       <div
                         className={`h-full rounded-full ${
-                          d.score >= 70
+                          d.score >= 85
                             ? "bg-emerald-500/60"
-                            : d.score >= 55
+                            : d.score >= 70
+                            ? "bg-emerald-400/60"
+                            : d.score >= 50
                             ? "bg-amber-500/60"
                             : "bg-red-500/50"
                         }`}

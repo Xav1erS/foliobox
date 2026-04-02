@@ -7,7 +7,7 @@ export function EditorialPageHeader({
   introParagraphs,
 }: Pick<EditorialContent, "eyebrow" | "title" | "subtitle" | "introParagraphs">) {
   return (
-    <header className="border-b border-white/8 px-6 pb-16 pt-28 sm:pb-20">
+    <header className="px-6 pb-8 pt-28 sm:pb-10">
       <div className="mx-auto max-w-4xl">
         <p className="mb-4 text-xs uppercase tracking-[0.28em] text-white/35">
           {eyebrow}
@@ -19,12 +19,14 @@ export function EditorialPageHeader({
           {subtitle}
         </p>
 
-        <div className="mt-8 max-w-3xl space-y-4">
-          {introParagraphs.map((paragraph) => (
-            <p key={paragraph} className="text-base leading-8 text-white/60 sm:text-lg sm:leading-9">
-              {paragraph}
-            </p>
-          ))}
+        <div className="mt-10 max-w-3xl rounded-[28px] border border-white/8 bg-white/[0.03] px-6 py-6 sm:px-7">
+          <div className="space-y-4">
+            {introParagraphs.map((paragraph) => (
+              <p key={paragraph} className="text-base leading-8 text-white/60 sm:text-lg sm:leading-9">
+                {paragraph}
+              </p>
+            ))}
+          </div>
         </div>
       </div>
     </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Menu } from "lucide-react";
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
   getNavbarSecondaryAction,
 } from "@/lib/marketing-cta";
 
-type NavbarPage = "home" | "pricing" | "score" | "editorial";
+type NavbarPage = "home" | "pricing" | "score" | "editorial" | "legal";
 
 export function Navbar({
   isLoggedIn = false,
@@ -26,31 +26,12 @@ export function Navbar({
   isLoggedIn?: boolean;
   currentPage?: NavbarPage;
 }) {
-  const [activeSection, setActiveSection] = useState<string | null>(
-    currentPage === "pricing" || currentPage === "score" ? currentPage : null
-  );
-
-  const navItems = useMemo(
+  const primaryItems = useMemo(
     () => [
       {
-        key: "cases",
-        label: "案例展示",
-        href: currentPage === "home" ? "#cases" : "/#cases",
-      },
-      {
-        key: "how",
-        label: "使用流程",
-        href: currentPage === "home" ? "#how" : "/#how",
-      },
-      {
-        key: "score",
-        label: "评分诊断",
-        href:
-          currentPage === "score"
-            ? "/score"
-            : currentPage === "home"
-              ? "#score"
-              : "/#score",
+        key: "home",
+        label: "首页",
+        href: "/",
       },
       {
         key: "pricing",
@@ -58,53 +39,31 @@ export function Navbar({
         href: "/pricing",
       },
       {
-        key: "faq",
-        label: "FAQ",
-        href: currentPage === "home" ? "#faq" : "/#faq",
+        key: "editorial",
+        label: "开发者说",
+        href: "/editorial/developers-note",
       },
     ],
-    [currentPage]
+    []
   );
-
-  useEffect(() => {
-    if (currentPage !== "home") {
-      setActiveSection(
-        currentPage === "pricing" || currentPage === "score" ? currentPage : null
-      );
-      return;
-    }
-
-    const sectionIds = ["cases", "how", "score", "faq"] as const;
-
-    function updateActiveSection() {
-      const marker = window.scrollY + 120;
-      let nextActive: string | null = null;
-
-      for (const id of sectionIds) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const top = el.offsetTop;
-        const bottom = top + el.offsetHeight;
-        if (marker >= top && marker < bottom) {
-          nextActive = id;
-        }
-      }
-
-      setActiveSection(nextActive);
-    }
-
-    updateActiveSection();
-    window.addEventListener("scroll", updateActiveSection, { passive: true });
-    window.addEventListener("hashchange", updateActiveSection);
-
-    return () => {
-      window.removeEventListener("scroll", updateActiveSection);
-      window.removeEventListener("hashchange", updateActiveSection);
-    };
-  }, [currentPage]);
 
   const primaryCta = getNavbarPrimaryAction(isLoggedIn);
   const secondaryCta = getNavbarSecondaryAction(isLoggedIn);
+  const activePrimaryKey = (() => {
+    switch (currentPage) {
+      case "home":
+        return "home";
+      case "pricing":
+        return "pricing";
+      case "editorial":
+        return "editorial";
+      case "score":
+      case "legal":
+        return null;
+      default:
+        return null;
+    }
+  })();
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-md">
@@ -116,12 +75,12 @@ export function Navbar({
 
         {/* Nav links */}
         <nav className="hidden items-center gap-6 md:flex">
-          {navItems.map((item) => (
+          {primaryItems.map((item) => (
             <Link
               key={item.key}
               href={item.href}
               className={`text-sm transition-colors ${
-                activeSection === item.key
+                activePrimaryKey === item.key
                   ? "text-white"
                   : "text-white/50 hover:text-white"
               }`}
@@ -165,12 +124,12 @@ export function Navbar({
 
               <div className="flex h-full flex-col px-5 py-5">
                 <div className="space-y-2">
-                  {navItems.map((item) => (
+                  {primaryItems.map((item) => (
                     <DialogClose asChild key={item.key}>
                       <Link
                         href={item.href}
                         className={`block rounded-xl px-3 py-3 text-sm transition-colors ${
-                          activeSection === item.key
+                          activePrimaryKey === item.key
                             ? "bg-white/10 text-white"
                             : "text-white/65 hover:bg-white/5 hover:text-white"
                         }`}

@@ -6,13 +6,13 @@ export type MarketingAction = {
 export function getNavbarPrimaryAction(isLoggedIn: boolean): MarketingAction {
   return isLoggedIn
     ? { href: "/dashboard", label: "进入工作台" }
-    : { href: "/score", label: "开始评分" };
+    : { href: "/score", label: "先给我的作品集打分" };
 }
 
 export function getNavbarSecondaryAction(isLoggedIn: boolean): MarketingAction {
   return isLoggedIn
     ? { href: "/projects/new", label: "继续整理作品集" }
-    : { href: "/pricing", label: "查看价格" };
+    : { href: "/pricing", label: "查看价格方案" };
 }
 
 export function getHeroPrimaryAction(isLoggedIn: boolean): MarketingAction {
@@ -30,7 +30,7 @@ export function getHeroSecondaryAction(isLoggedIn: boolean): MarketingAction {
 export function getPricingPrimaryAction(isLoggedIn: boolean): MarketingAction {
   return isLoggedIn
     ? { href: "/dashboard", label: "进入工作台" }
-    : { href: "/score", label: "先免费打分看看" };
+    : { href: "/score", label: "先给我的作品集打分" };
 }
 
 export function getPricingSecondaryAction(isLoggedIn: boolean): MarketingAction {

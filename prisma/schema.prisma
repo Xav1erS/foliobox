@@ -242,6 +242,7 @@ enum ScoreInputType {
 enum ScoreLevel {
   READY
   NEEDS_IMPROVEMENT
+  DRAFT
   NOT_READY
 }
 

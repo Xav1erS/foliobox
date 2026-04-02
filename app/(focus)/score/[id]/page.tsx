@@ -4,6 +4,10 @@ import { ArrowRight, Lock } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getUserPlan } from "@/lib/entitlement";
+import {
+  PORTFOLIO_SCORE_LEVEL_CONFIG,
+  resolvePortfolioScoreLevel,
+} from "@/lib/portfolio-score-level";
 import { StepHeader } from "@/components/app/StepHeader";
 import { PermissionGate } from "@/components/app/PermissionGate";
 
@@ -34,29 +38,9 @@ const DIMENSIONS: { key: keyof DimensionScores; label: string; weight: number }[
   { key: "jobFit", label: "投递适配度", weight: 5 },
 ];
 
-const LEVEL_CONFIG = {
-  READY: {
-    label: "可直接投递",
-    badge: "bg-emerald-500/15 border-emerald-500/20 text-emerald-400",
-    bar: "bg-emerald-500",
-    desc: "这份作品集已经具备较强的投递完成度，可以继续确认细节后正式使用。",
-  },
-  NEEDS_IMPROVEMENT: {
-    label: "建议改进后投递",
-    badge: "bg-amber-500/15 border-amber-500/20 text-amber-400",
-    bar: "bg-amber-500",
-    desc: "你已经有一版可用基础，但还有几处关键问题值得先修正再投递。",
-  },
-  NOT_READY: {
-    label: "暂不建议投递",
-    badge: "bg-red-500/15 border-red-500/20 text-red-400",
-    bar: "bg-red-500",
-    desc: "建议先整理项目表达与结构，再生成一版更完整的作品集初稿。",
-  },
-};
-
 function scoreColor(score: number) {
-  if (score >= 70) return "bg-emerald-500/70";
+  if (score >= 85) return "bg-emerald-500/70";
+  if (score >= 70) return "bg-emerald-400/70";
   if (score >= 50) return "bg-amber-500/70";
   return "bg-red-500/70";
 }
@@ -76,7 +60,8 @@ export default async function ScoreResultPage({
   if (!score) notFound();
 
   const dims = score.dimensionScores as unknown as DimensionScores;
-  const level = LEVEL_CONFIG[score.level];
+  const resolvedLevel = resolvePortfolioScoreLevel(score.totalScore, score.level);
+  const level = PORTFOLIO_SCORE_LEVEL_CONFIG[resolvedLevel];
   const planType = session?.user?.id ? await getUserPlan(session.user.id) : "FREE";
   const canViewFull = planType !== "FREE";
   const isLoggedIn = !!session?.user?.id;
@@ -102,12 +87,12 @@ export default async function ScoreResultPage({
             <span className="mb-2 text-2xl text-white/30">/100</span>
           </div>
           <div className="mt-5">
-            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${level.badge}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${level.bar}`} />
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${level.badgeClassName}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${level.indicatorClassName}`} />
               {level.label}
             </span>
           </div>
-          <p className="mt-4 text-sm leading-6 text-white/55">{level.desc}</p>
+          <p className="mt-4 text-sm leading-6 text-white/55">{level.description}</p>
 
           <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-5">
             <h2 className="text-sm font-semibold text-white/80">主要问题摘要</h2>

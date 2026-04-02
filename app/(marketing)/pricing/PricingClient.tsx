@@ -111,7 +111,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
                   href="/score"
                   className="flex h-10 w-full items-center justify-center rounded-xl border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
                 >
-                  {isLoggedIn ? "继续免费评分" : "免费开始"}
+                  {isLoggedIn ? "继续查看评分结果" : "先给我的作品集打分"}
                 </Link>
               ) : !isLoggedIn ? (
                 <Link
