@@ -7,13 +7,17 @@ import { ScoreFeature } from "@/components/marketing/ScoreFeature";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CtaBanner } from "@/components/marketing/CtaBanner";
 import { Footer } from "@/components/marketing/Footer";
+import { auth } from "@/lib/auth";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth();
+  const isLoggedIn = !!session?.user?.id;
+
   return (
     <main className="bg-black text-white">
-      <Navbar />
+      <Navbar isLoggedIn={isLoggedIn} />
 
-      <Hero />
+      <Hero isLoggedIn={isLoggedIn} />
 
       {/* Case examples — 1280px */}
       <section id="cases" className="px-6 py-28">
@@ -55,7 +59,7 @@ export default function LandingPage() {
 
       <FAQ />
 
-      <CtaBanner />
+      <CtaBanner isLoggedIn={isLoggedIn} />
 
       <Footer />
     </main>

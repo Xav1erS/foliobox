@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function CtaBanner() {
+export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   return (
     <section className="relative overflow-hidden border-y border-white/8 px-6 py-20">
       {/* Grid */}
@@ -28,16 +28,16 @@ export function CtaBanner() {
 
         <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
           <Link
-            href="/score"
+            href={isLoggedIn ? "/dashboard" : "/score"}
             className="flex h-12 min-w-[200px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
-            先给我的作品集打分
+            {isLoggedIn ? "进入工作台" : "先给我的作品集打分"}
           </Link>
           <Link
-            href="/login?next=/projects/new"
+            href={isLoggedIn ? "/projects/new" : "/login?next=/projects/new"}
             className="flex h-12 min-w-[180px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
           >
-            直接开始整理作品集
+            {isLoggedIn ? "继续整理作品集" : "直接开始整理作品集"}
           </Link>
         </div>
       </div>

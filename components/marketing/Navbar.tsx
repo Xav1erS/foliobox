@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function Navbar() {
+export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
@@ -28,16 +28,10 @@ export function Navbar() {
         {/* CTAs */}
         <div className="flex items-center gap-2">
           <Link
-            href="/login"
-            className="hidden rounded-lg px-4 py-1.5 text-sm text-white/60 hover:text-white transition-colors sm:block"
-          >
-            登录
-          </Link>
-          <Link
-            href="/score"
+            href={isLoggedIn ? "/dashboard" : "/score"}
             className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-white/90 transition-colors"
           >
-            开始评分 →
+            {isLoggedIn ? "进入工作台 →" : "开始评分 →"}
           </Link>
         </div>
       </div>
