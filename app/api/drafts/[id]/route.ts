@@ -21,10 +21,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
+
+  const existing = await db.portfolioDraft.findUnique({ where: { id, userId: session.user.id } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const body = await request.json();
-  const draft = await db.portfolioDraft.update({
-    where: { id, userId: session.user.id },
-    data: body,
-  });
+  // Allowlist — only permit safe fields
+  const { contentJson, title } = body as Record<string, unknown>;
+  const safeData = Object.fromEntries(
+    Object.entries({ contentJson, title }).filter(([, v]) => v !== undefined)
+  );
+
+  const draft = await db.portfolioDraft.update({ where: { id, userId: session.user.id }, data: safeData });
   return NextResponse.json({ draft });
 }

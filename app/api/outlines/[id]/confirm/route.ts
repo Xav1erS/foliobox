@@ -9,7 +9,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
   const { id } = await params;
   const outline = await db.portfolioOutline.update({
-    where: { id },
+    where: { id, userId: session.user.id },
     data: { status: "CONFIRMED" },
   });
   return NextResponse.json({ outline });

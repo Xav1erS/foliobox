@@ -1,22 +1,71 @@
-// 生成结果页 / 编辑页 — 待实现
-// 参考 Spec 5.1 § 12）生成结果页/编辑页：版本切换 / 文案编辑 / 图片替换 / 导出
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { EditorClient } from "./EditorClient";
+
 export default async function EditorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ did?: string }>;
 }) {
   const { id } = await params;
+  const { did } = await searchParams;
+
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  if (!did) notFound();
+
+  const [draft, project, rawAssets] = await Promise.all([
+    db.portfolioDraft.findUnique({ where: { id: did, userId: session.user.id } }),
+    db.project.findUnique({ where: { id, userId: session.user.id } }),
+    db.projectAsset.findMany({
+      where: { projectId: id, selected: true },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, imageUrl: true, title: true },
+    }),
+  ]);
+
+  if (!draft || !project) notFound();
+
+  const assets = rawAssets.map((a) => ({ ...a, title: a.title ?? "" }));
+
   return (
-    <div className="flex h-screen">
-      {/* 编辑侧栏 */}
-      <aside className="w-72 border-r bg-white p-4">
-        <p className="text-sm font-semibold">编辑面板</p>
-        <p className="mt-1 text-xs text-neutral-500">项目 {id}</p>
-      </aside>
-      {/* 预览画布 */}
-      <main className="flex-1 overflow-auto bg-neutral-100 p-8">
-        <p className="text-neutral-400">作品集预览区（待实现）</p>
-      </main>
-    </div>
+    <EditorClient
+      draftId={did}
+      projectId={id}
+      projectName={project.name}
+      initialContentJson={draft.contentJson as unknown as DraftContentJson}
+      assets={assets}
+    />
   );
+}
+
+export interface Block {
+  id: string;
+  type:
+    | "hero"
+    | "section_heading"
+    | "rich_text"
+    | "bullet_list"
+    | "stat_group"
+    | "image_single"
+    | "image_grid"
+    | "caption"
+    | "quote"
+    | "divider"
+    | "closing";
+  data: Record<string, unknown>;
+}
+
+export interface Page {
+  id: string;
+  title: string;
+  blocks: Block[];
+}
+
+export interface DraftContentJson {
+  pages: Page[];
 }

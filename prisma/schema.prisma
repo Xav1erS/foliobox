@@ -75,6 +75,8 @@ model User {
   portfolioOutlines PortfolioOutline[]
   portfolioDrafts   PortfolioDraft[]
   publishedPortfolios PublishedPortfolio[]
+  orders            Order[]
+  userPlans         UserPlan[]
 }
 
 model DesignerProfile {
@@ -310,4 +312,81 @@ model PublishedPortfolio {
 
   draft PortfolioDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// Billing models
+// ─────────────────────────────────────────────
+
+enum PlanType {
+  FREE
+  PRO
+  SPRINT
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PlanStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum BillingEventType {
+  CREATED
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  planType        PlanType
+  amount          Int
+  currency        String      @default("CNY")
+  status          OrderStatus @default(PENDING)
+  provider        String?
+  providerOrderId String?
+  // Return context (7.15C): stored server-side so result page doesn't trust URL params
+  sourceScene     String?     // e.g. "pdf_export" | "full_rewrite" | "publish_link"
+  projectId       String?
+  draftId         String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events   BillingEvent[]
+  userPlan UserPlan?
+}
+
+model UserPlan {
+  id            String     @id @default(cuid())
+  userId        String
+  planType      PlanType   @default(FREE)
+  status        PlanStatus @default(ACTIVE)
+  startedAt     DateTime?
+  expiresAt     DateTime?
+  sourceOrderId String?    @unique
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+}
+
+model BillingEvent {
+  id          String           @id @default(cuid())
+  orderId     String
+  eventType   BillingEventType
+  payloadJson Json?
+  createdAt   DateTime         @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }

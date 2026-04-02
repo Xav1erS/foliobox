@@ -33,7 +33,7 @@ interface FactsData {
   targetCompanyType?: string | null;
 }
 
-const PROJECT_TYPES = ["B 端 / 中后台", "C 端 / App", "G 端 / 政务", "品牌 / 视觉", "运营设计", "其他"];
+const PROJECT_TYPES = ["B 端 / 中后台", "C 端 / App", "G 端 / 政务", "数字产品体验优化", "其他"];
 const INVOLVEMENT_LEVELS = [
   { value: "LEAD", label: "主导（Lead Designer）" },
   { value: "CORE", label: "核心成员（Core Member）" },
@@ -132,7 +132,21 @@ export function FactsForm({
       setSubmitting(false);
       return;
     }
-    router.push(`/projects/${projectId}/outline`);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/outline`, { method: "POST" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "大纲生成失败，请重试");
+        setSubmitting(false);
+        return;
+      }
+      const { outlineId } = await res.json();
+      router.push(`/projects/${projectId}/outline?oid=${outlineId}`);
+    } catch {
+      setError("网络错误，请重试");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -334,9 +348,9 @@ export function FactsForm({
 
         <Button onClick={handleSubmit} disabled={submitting} className="h-10 px-6">
           {submitting ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />跳转中…</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />AI 生成中，请稍候…</>
           ) : (
-            <>生成作品集大纲 <ArrowRight className="ml-2 h-4 w-4" /></>
+            <>AI 生成作品集大纲 <ArrowRight className="ml-2 h-4 w-4" /></>
           )}
         </Button>
       </div>

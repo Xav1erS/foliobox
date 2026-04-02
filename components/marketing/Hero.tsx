@@ -20,7 +20,7 @@ export function Hero() {
         {/* Badge */}
         <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-1.5 text-xs text-white/70">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          OpenAI 驱动 · 面向国内设计师
+          OpenAI 驱动 · 面向产品 / UX 设计师
         </div>
 
         {/* Heading */}
