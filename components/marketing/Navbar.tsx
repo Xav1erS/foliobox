@@ -17,7 +17,7 @@ import {
   getNavbarSecondaryAction,
 } from "@/lib/marketing-cta";
 
-type NavbarPage = "home" | "pricing" | "score";
+type NavbarPage = "home" | "pricing" | "score" | "editorial";
 
 export function Navbar({
   isLoggedIn = false,
@@ -27,7 +27,7 @@ export function Navbar({
   currentPage?: NavbarPage;
 }) {
   const [activeSection, setActiveSection] = useState<string | null>(
-    currentPage === "home" ? null : currentPage
+    currentPage === "pricing" || currentPage === "score" ? currentPage : null
   );
 
   const navItems = useMemo(
@@ -45,7 +45,12 @@ export function Navbar({
       {
         key: "score",
         label: "评分诊断",
-        href: currentPage === "score" ? "/score" : currentPage === "home" ? "#score" : "/#score",
+        href:
+          currentPage === "score"
+            ? "/score"
+            : currentPage === "home"
+              ? "#score"
+              : "/#score",
       },
       {
         key: "pricing",
@@ -63,7 +68,9 @@ export function Navbar({
 
   useEffect(() => {
     if (currentPage !== "home") {
-      setActiveSection(currentPage);
+      setActiveSection(
+        currentPage === "pricing" || currentPage === "score" ? currentPage : null
+      );
       return;
     }
 

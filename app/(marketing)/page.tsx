@@ -3,11 +3,13 @@ import { Hero } from "@/components/marketing/Hero";
 import { CaseCard, EXAMPLE_CASES } from "@/components/marketing/CaseCard";
 import { PainPoints } from "@/components/marketing/PainPoints";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { DevelopersNotePreview } from "@/components/marketing/DevelopersNotePreview";
 import { ScoreFeature } from "@/components/marketing/ScoreFeature";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CtaBanner } from "@/components/marketing/CtaBanner";
 import { Footer } from "@/components/marketing/Footer";
 import { auth } from "@/lib/auth";
+import { developersNoteContent } from "@/content/editorial/developers-note";
 
 export default async function LandingPage() {
   const session = await auth();
@@ -54,6 +56,8 @@ export default async function LandingPage() {
       <PainPoints />
 
       <HowItWorks />
+
+      <DevelopersNotePreview content={developersNoteContent} />
 
       <ScoreFeature />
 
