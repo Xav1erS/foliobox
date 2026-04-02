@@ -24,6 +24,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verifyRequest: "/login/verify",
     error: "/login",
   },
+  session: {
+    strategy: "database",
+    maxAge: 30 * 24 * 60 * 60,  // 30 天
+    updateAge: 24 * 60 * 60,    // 每 24h 刷新 expires，避免频繁写 DB
+  },
   callbacks: {
     session({ session, user }) {
       session.user.id = user.id;
