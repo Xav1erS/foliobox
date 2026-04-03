@@ -24,6 +24,7 @@ const ClaudePageSchema = z.object({
 const ClaudeParseResultSchema = z.object({
   pages: z.array(ClaudePageSchema).min(1),
 });
+type ClaudeParseResult = z.infer<typeof ClaudeParseResultSchema>;
 
 const ClaudeMessagesResponseSchema = z.object({
   content: z.array(
@@ -41,6 +42,89 @@ const ClaudeMessagesResponseSchema = z.object({
     })
     .optional(),
 });
+
+function extractJsonBlock(raw: string) {
+  const objectStart = raw.indexOf("{");
+  const objectEnd = raw.lastIndexOf("}");
+  const arrayStart = raw.indexOf("[");
+  const arrayEnd = raw.lastIndexOf("]");
+
+  if (objectStart !== -1 && objectEnd > objectStart) {
+    return raw.slice(objectStart, objectEnd + 1);
+  }
+
+  if (arrayStart !== -1 && arrayEnd > arrayStart) {
+    return raw.slice(arrayStart, arrayEnd + 1);
+  }
+
+  throw new Error("claude_pdf_invalid_json");
+}
+
+function parseMaybeWrappedPages(value: unknown): ClaudeParseResult {
+  const directResult = ClaudeParseResultSchema.safeParse(value);
+  if (directResult.success) {
+    return directResult.data;
+  }
+
+  if (Array.isArray(value)) {
+    return ClaudeParseResultSchema.parse({ pages: value });
+  }
+
+  if (value && typeof value === "object") {
+    const candidate = value as Record<string, unknown>;
+
+    for (const key of ["result", "data", "output", "document", "payload"]) {
+      const nested = candidate[key];
+      const nestedResult = ClaudeParseResultSchema.safeParse(nested);
+      if (nestedResult.success) {
+        return nestedResult.data;
+      }
+
+      if (Array.isArray(nested)) {
+        return ClaudeParseResultSchema.parse({ pages: nested });
+      }
+    }
+
+    for (const key of ["json", "response", "content", "text"]) {
+      const nested = candidate[key];
+      if (typeof nested === "string") {
+        const parsed = parseMaybeWrappedPages(JSON.parse(extractJsonBlock(nested)));
+        if (parsed) {
+          return parsed;
+        }
+      }
+    }
+  }
+
+  return ClaudeParseResultSchema.parse(value);
+}
+
+function extractPagesFromClaudeResponse(
+  parsed: z.infer<typeof ClaudeMessagesResponseSchema>
+): ClaudeParseResult {
+  const toolUse = parsed.content.find(
+    (item) => item.type === "tool_use" && item.name === "submit_pdf_pages"
+  );
+
+  if (toolUse?.input) {
+    try {
+      return parseMaybeWrappedPages(toolUse.input);
+    } catch {
+      // Continue to text fallback below so minor schema drift does not force provider fallback.
+    }
+  }
+
+  const rawText = parsed.content
+    .filter((item) => item.type === "text" && typeof item.text === "string")
+    .map((item) => item.text ?? "")
+    .join("\n");
+
+  if (!rawText.trim()) {
+    throw new Error("claude_pdf_missing_pages_payload");
+  }
+
+  return parseMaybeWrappedPages(JSON.parse(extractJsonBlock(rawText)));
+}
 
 function getProxyUrl(): string | undefined {
   return (
@@ -181,13 +265,7 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
     }
 
     const parsed = ClaudeMessagesResponseSchema.parse(await response.json());
-    const toolUse = parsed.content.find(
-      (item) => item.type === "tool_use" && item.name === "submit_pdf_pages"
-    );
-    if (!toolUse?.input) {
-      throw new Error("claude_pdf_missing_tool_use");
-    }
-    const result = ClaudeParseResultSchema.parse(toolUse.input);
+    const result = extractPagesFromClaudeResponse(parsed);
 
     const scanResult = buildScanResult({
       inputType: "pdf",
@@ -211,6 +289,7 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
       metadata: {
         model: ANTHROPIC_PDF_MODEL,
         usage: parsed.usage ?? null,
+        contentBlockTypes: parsed.content.map((item) => item.type),
         providerProfile: this.profile,
       },
     };
