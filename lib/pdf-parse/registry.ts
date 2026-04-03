@@ -5,10 +5,10 @@ import { MistralPDFParseProvider } from "@/lib/pdf-parse/mistral";
 import { LocalPDFParseProvider } from "@/lib/pdf-parse/local";
 
 const DEFAULT_PROVIDER_CHAIN: PDFParseProviderName[] = [
-  "azure_doc_intelligence",
-  "claude_pdf",
   "mistral_ocr",
   "pdf_parse_fallback",
+  "claude_pdf",
+  "azure_doc_intelligence",
 ];
 
 function parseProviderName(value: string): PDFParseProviderName | null {

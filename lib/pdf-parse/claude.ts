@@ -44,10 +44,24 @@ const ClaudeMessagesResponseSchema = z.object({
 });
 
 function extractJsonBlock(raw: string) {
+  const cleaned = raw.replace(/```json|```/gi, "").trim();
   const objectStart = raw.indexOf("{");
   const objectEnd = raw.lastIndexOf("}");
   const arrayStart = raw.indexOf("[");
   const arrayEnd = raw.lastIndexOf("]");
+
+  const cleanedObjectStart = cleaned.indexOf("{");
+  const cleanedObjectEnd = cleaned.lastIndexOf("}");
+  const cleanedArrayStart = cleaned.indexOf("[");
+  const cleanedArrayEnd = cleaned.lastIndexOf("]");
+
+  if (cleanedObjectStart !== -1 && cleanedObjectEnd > cleanedObjectStart) {
+    return cleaned.slice(cleanedObjectStart, cleanedObjectEnd + 1);
+  }
+
+  if (cleanedArrayStart !== -1 && cleanedArrayEnd > cleanedArrayStart) {
+    return cleaned.slice(cleanedArrayStart, cleanedArrayEnd + 1);
+  }
 
   if (objectStart !== -1 && objectEnd > objectStart) {
     return raw.slice(objectStart, objectEnd + 1);
@@ -58,6 +72,90 @@ function extractJsonBlock(raw: string) {
   }
 
   throw new Error("claude_pdf_invalid_json");
+}
+
+function escapeJsonStringContent(input: string) {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+
+    if (!inString) {
+      result += char;
+      if (char === '"') {
+        inString = true;
+      }
+      continue;
+    }
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      let cursor = index + 1;
+      while (cursor < input.length && /\s/.test(input[cursor]!)) {
+        cursor += 1;
+      }
+
+      const next = input[cursor];
+      if (next === "," || next === "}" || next === "]" || next === ":" || next === undefined) {
+        result += char;
+        inString = false;
+      } else {
+        result += '\\"';
+      }
+      continue;
+    }
+
+    if (char === "\n") {
+      result += "\\n";
+      continue;
+    }
+
+    if (char === "\r") {
+      result += "\\r";
+      continue;
+    }
+
+    if (char === "\t") {
+      result += "\\t";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+function repairJsonText(input: string) {
+  return escapeJsonStringContent(
+    input
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/,\s*([}\]])/g, "$1")
+  );
+}
+
+function parseJsonWithRepair(raw: string) {
+  const jsonText = extractJsonBlock(raw);
+
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return JSON.parse(repairJsonText(jsonText));
+  }
 }
 
 function parseMaybeWrappedPages(value: unknown): ClaudeParseResult {
@@ -88,7 +186,7 @@ function parseMaybeWrappedPages(value: unknown): ClaudeParseResult {
     for (const key of ["json", "response", "content", "text"]) {
       const nested = candidate[key];
       if (typeof nested === "string") {
-        const parsed = parseMaybeWrappedPages(JSON.parse(extractJsonBlock(nested)));
+        const parsed = parseMaybeWrappedPages(parseJsonWithRepair(nested));
         if (parsed) {
           return parsed;
         }
@@ -123,7 +221,7 @@ function extractPagesFromClaudeResponse(
     throw new Error("claude_pdf_missing_pages_payload");
   }
 
-  return parseMaybeWrappedPages(JSON.parse(extractJsonBlock(rawText)));
+  return parseMaybeWrappedPages(parseJsonWithRepair(rawText));
 }
 
 function getProxyUrl(): string | undefined {
