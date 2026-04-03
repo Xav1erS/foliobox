@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
@@ -23,6 +25,7 @@ import {
   buildScanResult,
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
+import { PDF_WORKER_GZIP_BASE64 } from "@/vendor/pdf-parse/pdf-worker-gzip";
 
 const HAS_NATIVE_PDF_VISUAL_GLOBALS =
   typeof globalThis.DOMMatrix !== "undefined" &&
@@ -78,15 +81,27 @@ const { PDFParse } = require("pdf-parse") as {
   PDFParse: PDFParseClass;
 };
 
-const PDF_PARSE_WORKER_PATH = path.join(
-  process.cwd(),
-  "vendor",
-  "pdf-parse",
-  "pdf.worker.mjs"
-);
+const PDF_PARSE_WORKER_PATH = path.join("/tmp", "foliobox-pdf.worker.mjs");
 
-if (existsSync(PDF_PARSE_WORKER_PATH)) {
-  PDFParse.setWorker(PDF_PARSE_WORKER_PATH);
+function ensurePdfParseWorkerSrc() {
+  try {
+    if (!existsSync(PDF_PARSE_WORKER_PATH)) {
+      mkdirSync(path.dirname(PDF_PARSE_WORKER_PATH), { recursive: true });
+      const workerSource = gunzipSync(Buffer.from(PDF_WORKER_GZIP_BASE64, "base64"));
+      writeFileSync(PDF_PARSE_WORKER_PATH, workerSource);
+    }
+
+    return pathToFileURL(PDF_PARSE_WORKER_PATH).href;
+  } catch (error) {
+    console.warn("Unable to prepare pdf.worker.mjs in /tmp:", error);
+    return undefined;
+  }
+}
+
+const PDF_PARSE_WORKER_SRC = ensurePdfParseWorkerSrc();
+
+if (PDF_PARSE_WORKER_SRC) {
+  PDFParse.setWorker(PDF_PARSE_WORKER_SRC);
 }
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB

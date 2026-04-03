@@ -2,9 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["nodemailer"],
-  outputFileTracingIncludes: {
-    "/api/scores": ["./vendor/pdf-parse/pdf.worker.mjs"],
-  },
   images: {
     remotePatterns: [
       {
