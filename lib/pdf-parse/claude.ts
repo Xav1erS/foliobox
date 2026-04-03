@@ -166,11 +166,12 @@ function buildPrompt() {
   return [
     "请阅读整份 PDF 作品集，并按页返回极简结构化结果。",
     "要求：",
-    "1. 必须调用指定工具返回结构化结果，不要输出 markdown 代码块。",
+    "1. 直接输出 JSON，不要输出 markdown 代码块，不要附加解释。",
     "2. text 需要概括当前页的主要文字内容与信息点，尽量保留角色、项目、结果等关键信息。",
     "3. visualSummary 只在当前页存在明显视觉结构时填写，例如标题层级、表格、图表、强视觉主元素；没有就填 null。",
     "4. 必须覆盖整份 PDF 的每一页，pageNumber 从 1 开始连续编号。",
     "5. 每页 text 保持简洁，控制在 120 字以内。",
+    '6. 输出格式必须严格为：{"pages":[{"pageNumber":1,"text":"...","visualSummary":null}]}',
   ].join("\n");
 }
 
@@ -203,39 +204,6 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
         model: ANTHROPIC_PDF_MODEL,
         max_tokens: 4096,
         temperature: 0,
-        tool_choice: {
-          type: "tool",
-          name: "submit_pdf_pages",
-        },
-        tools: [
-          {
-            name: "submit_pdf_pages",
-            description: "Return a compact page-by-page structured summary for the full PDF.",
-            input_schema: {
-              type: "object",
-              properties: {
-                pages: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      pageNumber: { type: "integer", minimum: 1 },
-                      text: { type: "string" },
-                      visualSummary: {
-                        anyOf: [{ type: "string" }, { type: "null" }],
-                      },
-                    },
-                    required: ["pageNumber", "text", "visualSummary"],
-                    additionalProperties: false,
-                  },
-                  minItems: 1,
-                },
-              },
-              required: ["pages"],
-              additionalProperties: false,
-            },
-          },
-        ],
         messages: [
           {
             role: "user",
@@ -266,6 +234,10 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
 
     const parsed = ClaudeMessagesResponseSchema.parse(await response.json());
     const result = extractPagesFromClaudeResponse(parsed);
+    const rawText = parsed.content
+      .filter((item) => item.type === "text" && typeof item.text === "string")
+      .map((item) => item.text ?? "")
+      .join("\n");
 
     const scanResult = buildScanResult({
       inputType: "pdf",
@@ -290,6 +262,7 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
         model: ANTHROPIC_PDF_MODEL,
         usage: parsed.usage ?? null,
         contentBlockTypes: parsed.content.map((item) => item.type),
+        rawTextPreview: rawText.slice(0, 500),
         providerProfile: this.profile,
       },
     };
