@@ -210,7 +210,10 @@ async function extractPdfScan(file: File) {
       maxVisualAnchors: MAX_PDF_VISUAL_ANCHORS,
     });
 
-    const visualAnchorImages = await extractPdfVisualAnchors(parser, initialCoverage.visualAnchorUnits);
+    const canRenderPdfVisualAnchors = typeof globalThis.DOMMatrix !== "undefined";
+    const visualAnchorImages = canRenderPdfVisualAnchors
+      ? await extractPdfVisualAnchors(parser, initialCoverage.visualAnchorUnits)
+      : [];
     const coverage =
       visualAnchorImages.length > 0
         ? initialCoverage
@@ -231,6 +234,11 @@ async function extractPdfScan(file: File) {
               `PDF 已完成整份页级文本扫描，并补充 ${visualAnchorImages.length} 页视觉锚点用于正式评分。`,
               "正式评分基于整体结构摘要、页面级摘要、项目级摘要和有限视觉锚点完成。",
             ]
+          : !canRenderPdfVisualAnchors
+            ? [
+                "当前运行环境暂不支持 PDF 页截图渲染，正式评分已自动降级为整份文本结构扫描模式。",
+                "正式评分基于整体结构摘要、页面级摘要和项目级摘要完成。",
+              ]
           : [
               "PDF 已完成整份页级文本扫描，但当前视觉锚点生成失败，正式评分暂只基于文本结构摘要。",
               "正式评分基于整体结构摘要、页面级摘要和项目级摘要完成。",
