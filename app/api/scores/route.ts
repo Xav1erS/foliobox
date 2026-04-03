@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import * as path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
@@ -24,7 +21,10 @@ import {
   buildScanResult,
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
-import { PDF_WORKER_GZIP_BASE64 } from "@/vendor/pdf-parse/pdf-worker-gzip";
+const PDF_WORKER_GLOBAL_READY = import("@/vendor/pdf-parse/pdf.worker.mjs").catch((error) => {
+  console.warn("Unable to preload pdf.worker.mjs into the server runtime:", error);
+  return null;
+});
 
 const HAS_NATIVE_PDF_VISUAL_GLOBALS =
   typeof globalThis.DOMMatrix !== "undefined" &&
@@ -79,29 +79,6 @@ type PDFParseClass = {
 const { PDFParse } = require("pdf-parse") as {
   PDFParse: PDFParseClass;
 };
-
-const PDF_PARSE_WORKER_PATH = path.join("/tmp", "foliobox-pdf.worker.mjs");
-
-function ensurePdfParseWorkerSrc() {
-  try {
-    if (!existsSync(PDF_PARSE_WORKER_PATH)) {
-      mkdirSync(path.dirname(PDF_PARSE_WORKER_PATH), { recursive: true });
-      const workerSource = gunzipSync(Buffer.from(PDF_WORKER_GZIP_BASE64, "base64"));
-      writeFileSync(PDF_PARSE_WORKER_PATH, workerSource);
-    }
-
-    return PDF_PARSE_WORKER_PATH;
-  } catch (error) {
-    console.warn("Unable to prepare pdf.worker.mjs in /tmp:", error);
-    return undefined;
-  }
-}
-
-const PDF_PARSE_WORKER_SRC = ensurePdfParseWorkerSrc();
-
-if (PDF_PARSE_WORKER_SRC) {
-  PDFParse.setWorker(PDF_PARSE_WORKER_SRC);
-}
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
@@ -235,6 +212,8 @@ ${content}
 }
 
 async function extractPdfScan(file: File) {
+  await PDF_WORKER_GLOBAL_READY;
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const parser = new PDFParse({ data: buffer });
 
