@@ -1,6 +1,7 @@
 import { put, del, list } from "@vercel/blob";
 
-export type StorageFolder = "resumes" | "project-assets" | "exports";
+export type StorageFolder = "resumes" | "project-assets" | "exports" | "score-inputs";
+const PUBLIC_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 /**
  * Upload a file to Vercel Blob storage.
@@ -32,4 +33,13 @@ export async function deleteFile(url: string): Promise<void> {
 export async function listFiles(folder: StorageFolder) {
   const { blobs } = await list({ prefix: `${folder}/` });
   return blobs;
+}
+
+export function isBlobStorageUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && parsed.hostname.endsWith(PUBLIC_BLOB_HOST_SUFFIX);
+  } catch {
+    return false;
+  }
 }

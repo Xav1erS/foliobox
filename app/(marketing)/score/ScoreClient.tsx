@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link as LinkIcon, ImageIcon, Loader2 } from "lucide-react";
+import { Upload, Link as LinkIcon, ImageIcon, Loader2, X, Plus, FileText } from "lucide-react";
+import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_IMAGES = 20;
@@ -23,6 +24,8 @@ export function ScoreClient() {
   const [error, setError] = useState("");
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
 
   const [url, setUrl] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -75,30 +78,49 @@ export function ScoreClient() {
     setPdfFile(file);
   }
 
+  function formatBytes(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setPdfSelection(file);
   }
 
+  function dedupeFiles(files: File[]) {
+    const seen = new Set<string>();
+    return files.filter((file) => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   function setImageSelection(files: File[]) {
     if (files.length > MAX_IMAGES) {
       setError(`最多上传 ${MAX_IMAGES} 张图片`);
-      setImageFiles([]);
       return;
     }
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
     if (totalSize > MAX_SCORE_UPLOAD_SIZE) {
       setError("评分入口当前仅支持总大小 20MB 以内的截图，请压缩后重试");
-      setImageFiles([]);
       return;
     }
     setError("");
     setImageFiles(files);
   }
 
+  function appendImageSelection(files: File[]) {
+    setImageSelection(dedupeFiles([...imageFiles, ...files]));
+  }
+
   function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    setImageSelection(files);
+    appendImageSelection(files);
+    e.target.value = "";
   }
 
   function handlePdfDragOver(e: React.DragEvent<HTMLLabelElement>) {
@@ -162,11 +184,68 @@ export function ScoreClient() {
 
     if (imageInputRef.current) {
       const dataTransfer = new DataTransfer();
-      files.forEach((file) => dataTransfer.items.add(file));
+      dedupeFiles([...imageFiles, ...files]).forEach((file) => dataTransfer.items.add(file));
       imageInputRef.current.files = dataTransfer.files;
     }
 
-    setImageSelection(files);
+    appendImageSelection(files);
+  }
+
+  function removePdfSelection() {
+    setPdfFile(null);
+    if (pdfInputRef.current) {
+      pdfInputRef.current.value = "";
+    }
+  }
+
+  function removeImageSelection(indexToRemove: number) {
+    const nextFiles = imageFiles.filter((_, index) => index !== indexToRemove);
+    setImageSelection(nextFiles);
+    if (imageInputRef.current) {
+      const dataTransfer = new DataTransfer();
+      nextFiles.forEach((file) => dataTransfer.items.add(file));
+      imageInputRef.current.files = dataTransfer.files;
+    }
+  }
+
+  function syncImageInput(files: File[]) {
+    if (!imageInputRef.current) return;
+    const dataTransfer = new DataTransfer();
+    files.forEach((file) => dataTransfer.items.add(file));
+    imageInputRef.current.files = dataTransfer.files;
+  }
+
+  function moveImage(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    const nextFiles = [...imageFiles];
+    const [movedFile] = nextFiles.splice(fromIndex, 1);
+    nextFiles.splice(toIndex, 0, movedFile);
+    setImageSelection(nextFiles);
+    syncImageInput(nextFiles);
+  }
+
+  function handlePreviewDragStart(index: number) {
+    setDraggedImageIndex(index);
+    setDragOverImageIndex(index);
+  }
+
+  function handlePreviewDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
+    e.preventDefault();
+    if (dragOverImageIndex !== index) {
+      setDragOverImageIndex(index);
+    }
+  }
+
+  function handlePreviewDrop(index: number) {
+    if (draggedImageIndex === null) return;
+    moveImage(draggedImageIndex, index);
+    setDraggedImageIndex(null);
+    setDragOverImageIndex(null);
+  }
+
+  function clearPreviewDragState() {
+    setDraggedImageIndex(null);
+    setDragOverImageIndex(null);
   }
 
   async function handleSubmit() {
@@ -187,22 +266,61 @@ export function ScoreClient() {
     setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("inputType", tab);
       if (tab === "link") {
+        const formData = new FormData();
+        formData.append("inputType", "link");
         formData.append("inputUrl", url.trim());
-      } else if (tab === "pdf" && pdfFile) {
-        formData.append("file", pdfFile);
-      } else {
-        imageFiles.forEach((f) => formData.append("files", f));
-      }
-
-      const res = await fetch("/api/scores", { method: "POST", body: formData });
-      if (!res.ok) {
-        if (res.status === 413) {
-          setError("上传内容过大。评分入口当前仅支持 20MB 以内的 PDF 或截图总大小");
+        const res = await fetch("/api/scores", { method: "POST", body: formData });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? "评分失败，请稍后重试");
           return;
         }
+        const data = await res.json();
+        router.push(`/score/${data.id}`);
+        return;
+      }
+
+      if (tab === "pdf" && pdfFile) {
+        const [uploadedFile] = await uploadFilesFromBrowser({
+          files: [pdfFile],
+          folder: "score-inputs",
+          kind: "score-pdf",
+        });
+
+        const res = await fetch("/api/scores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inputType: "pdf",
+            file: uploadedFile,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? "评分失败，请稍后重试");
+          return;
+        }
+        const data = await res.json();
+        router.push(`/score/${data.id}`);
+        return;
+      }
+
+      const uploadedFiles = await uploadFilesFromBrowser({
+        files: imageFiles,
+        folder: "score-inputs",
+        kind: "score-image",
+      });
+
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputType: "images",
+          files: uploadedFiles,
+        }),
+      });
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? "评分失败，请稍后重试");
         return;
@@ -238,6 +356,7 @@ export function ScoreClient() {
       : tab === "link"
         ? "我们会先理解整站结构，再整理成可评分的摘要。"
         : "我们会先理解整体顺序，再按 8 个维度生成评分结果。";
+  const totalImageSize = imageFiles.reduce((sum, file) => sum + file.size, 0);
 
   return (
     <>
@@ -317,7 +436,7 @@ export function ScoreClient() {
                 >
                   <Upload className="h-5 w-5 text-white/30" />
                   <span className="text-sm text-white/50">
-                    {pdfFile ? pdfFile.name : "点击或拖拽上传 PDF"}
+                    {pdfFile ? "已选择 1 个 PDF 文件" : "点击或拖拽上传 PDF"}
                   </span>
                   <span className="text-xs text-white/25">支持最大 20MB</span>
                   <input
@@ -328,6 +447,28 @@ export function ScoreClient() {
                     onChange={handlePdfChange}
                   />
                 </label>
+                {pdfFile ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+                          <FileText className="h-4 w-4 text-white/50" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-white/75">{pdfFile.name}</p>
+                          <p className="mt-1 text-xs text-white/35">{formatBytes(pdfFile.size)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removePdfSelection}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/45 transition-colors hover:border-white/20 hover:text-white/80"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <p className="text-xs text-white/30">
                   上传成功后会先扫描整份 PDF 的结构，再生成评分结果，不默认只看前几页。
                 </p>
@@ -349,9 +490,7 @@ export function ScoreClient() {
                 >
                   <ImageIcon className="h-5 w-5 text-white/30" />
                   <span className="text-sm text-white/50">
-                    {imageFiles.length > 0
-                      ? `已选择 ${imageFiles.length} 张图片`
-                      : "点击或拖拽上传截图"}
+                    {imageFiles.length > 0 ? `已选择 ${imageFiles.length} 张图片` : "点击或拖拽上传截图"}
                   </span>
                   <span className="text-xs text-white/25">
                     支持 JPG / PNG，建议 3–10 张，最多 20 张，总大小 20MB 以内
@@ -366,24 +505,67 @@ export function ScoreClient() {
                   />
                 </label>
                 {imagePreviewUrls.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                    {imagePreviewUrls.map((previewUrl, index) => (
-                      <div
-                        key={`${previewUrl}-${index}`}
-                        className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]"
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-white/35">
+                        共 {imageFiles.length} 张，当前总大小 {formatBytes(totalImageSize)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-xs text-white/60 transition-colors hover:border-white/20 hover:text-white"
                       >
-                        <div className="aspect-[3/4] bg-white/[0.04]">
-                          <img
-                            src={previewUrl}
-                            alt={`作品集截图 ${index + 1}`}
-                            className="h-full w-full object-cover"
-                          />
+                        <Plus className="h-3.5 w-3.5" />
+                        继续添加
+                      </button>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {imagePreviewUrls.map((previewUrl, index) => (
+                        <div
+                          key={`${previewUrl}-${index}`}
+                          draggable
+                          onDragStart={() => handlePreviewDragStart(index)}
+                          onDragOver={(e) => handlePreviewDragOver(e, index)}
+                          onDrop={() => handlePreviewDrop(index)}
+                          onDragEnd={clearPreviewDragState}
+                          className={`min-w-[180px] overflow-hidden rounded-xl border bg-white/[0.03] transition-all ${
+                            dragOverImageIndex === index
+                              ? "border-white/35 ring-1 ring-white/20"
+                              : "border-white/10"
+                          } ${draggedImageIndex === index ? "opacity-70" : ""}`}
+                        >
+                          <div className="aspect-[4/3] bg-white/[0.04]">
+                            <img
+                              src={previewUrl}
+                              alt={`作品集截图 ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div className="border-t border-white/10 px-3 py-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs text-white/70">
+                                  第 {index + 1} 张 · {imageFiles[index]?.name}
+                                </p>
+                                <p className="mt-1 text-[11px] text-white/35">
+                                  {formatBytes(imageFiles[index]?.size ?? 0)}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeImageSelection(index)}
+                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 text-white/45 transition-colors hover:border-white/20 hover:text-white/80"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="border-t border-white/10 px-2 py-1 text-[10px] text-white/45">
-                          第 {index + 1} 张
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-white/30">
+                      可直接拖拽缩略图调整顺序，系统会按当前顺序理解整组截图。
+                    </p>
                   </div>
                 ) : null}
                 <p className="text-xs text-white/30">

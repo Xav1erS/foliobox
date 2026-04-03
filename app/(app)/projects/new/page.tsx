@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ImageIcon, Info, Link2, Loader2, Tag } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ImageIcon, Info, Link2, Loader2, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -11,12 +12,32 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { ProgressHint } from "@/components/app/ProgressHint";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StickyActionBar } from "@/components/app/StickyActionBar";
+import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 const MAX_IMAGES = 20;
 const STEP_TOTAL = 3;
 const TAG_OPTIONS = ["B 端", "C 端", "Web", "App"];
 
 type Method = "figma" | "images";
+type ScoreContext = {
+  id: string;
+  totalScore: number;
+  level: string;
+  inputType: string;
+  summaryPoints: string[];
+  recommendedActions: string[];
+  coverage?: {
+    detectedProjects?: number;
+    inputType?: string;
+  } | null;
+};
+
+const SCORE_LEVEL_LABEL: Record<string, string> = {
+  READY: "可直接投递",
+  NEEDS_IMPROVEMENT: "建议局部优化",
+  DRAFT: "可作为草稿",
+  NOT_READY: "暂不建议直接投递",
+};
 
 function isFigmaUrl(url: string) {
   try {
@@ -39,6 +60,8 @@ export default function NewProjectPage() {
   const [figmaUrl, setFigmaUrl] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [scoreContext, setScoreContext] = useState<ScoreContext | null>(null);
+  const [scoreContextLoading, setScoreContextLoading] = useState(false);
 
   const canGoStep2 = !!method;
   const canGoStep3 =
@@ -58,6 +81,47 @@ export default function NewProjectPage() {
   }, [method, figmaUrl, imageFiles.length]);
   const fromScore = searchParams.get("from") === "score";
   const scoreId = searchParams.get("sid");
+  const focusPoints = useMemo(() => {
+    if (!scoreContext) return [];
+    return [...scoreContext.recommendedActions, ...scoreContext.summaryPoints].slice(0, 3);
+  }, [scoreContext]);
+  const scoreLevelLabel = scoreContext
+    ? SCORE_LEVEL_LABEL[scoreContext.level] ?? "已生成评分结果"
+    : null;
+
+  useEffect(() => {
+    if (!fromScore || !scoreId) return;
+
+    let cancelled = false;
+    setScoreContextLoading(true);
+
+    fetch(`/api/scores/${scoreId}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error("score_fetch_failed");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setScoreContext(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScoreContext(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setScoreContextLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fromScore, scoreId]);
 
   function toggleTag(tag: string) {
     setTags((prev) =>
@@ -116,11 +180,20 @@ export default function NewProjectPage() {
         return;
       }
 
-      const formData = new FormData();
-      formData.append("name", projectName.trim());
-      imageFiles.forEach((file) => formData.append("files", file));
+      const uploadedFiles = await uploadFilesFromBrowser({
+        files: imageFiles,
+        folder: "project-assets",
+        kind: "project-image",
+      });
 
-      const res = await fetch("/api/projects/import/images", { method: "POST", body: formData });
+      const res = await fetch("/api/projects/import/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: projectName.trim(),
+          files: uploadedFiles,
+        }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? "上传失败，请重试");
@@ -147,9 +220,62 @@ export default function NewProjectPage() {
       {fromScore ? (
         <div className="mt-6">
           <InlineTip>
-            你是从评分结果进入这里的。下一步建议先导入一个真实项目，再把这次评分里提到的问题带入后续整理流程。
+            你是从评分结果进入这里的。当前不会直接复用评分时上传的 PDF、截图或链接，而是把这次暴露出来的问题带进项目整理流程。
             {scoreId ? " 当前评分结果会保留在工作台里，后面可以随时回看。" : ""}
           </InlineTip>
+        </div>
+      ) : null}
+
+      {fromScore ? (
+        <div className="mt-6">
+          <SectionCard
+            title="把这次评分真正带进整理流程"
+            description="这里承接的是评分结论，不是评分原文件。你现在要做的是新建一个可编辑项目，再把最该补的内容优先补起来。"
+          >
+            {scoreContextLoading ? (
+              <p className="text-sm text-neutral-500">正在读取这次评分的重点建议…</p>
+            ) : scoreContext ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">当前评分结果</p>
+                    <div className="mt-2 flex items-end gap-2">
+                      <span className="text-3xl font-semibold text-neutral-900">{scoreContext.totalScore}</span>
+                      <span className="pb-1 text-sm text-neutral-400">/100</span>
+                    </div>
+                    <p className="mt-2 text-sm text-neutral-600">{scoreLevelLabel}</p>
+                  </div>
+                  <Link
+                    href={`/score/${scoreContext.id}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900"
+                  >
+                    回看这次评分结果
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                {focusPoints.length > 0 ? (
+                  <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">这次导入时优先关注</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {focusPoints.map((point) => (
+                        <span
+                          key={point}
+                          className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
+                        >
+                          {point}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-500">
+                当前评分结果仍会保留在工作台里。你可以先导入一个真实项目，后续整理时再回看这次诊断建议。
+              </p>
+            )}
+          </SectionCard>
         </div>
       ) : null}
 
@@ -272,10 +398,12 @@ export default function NewProjectPage() {
               {method === "figma" ? (
                 <InlineTip>
                   MVP 阶段暂不自动拉取 Figma 帧。创建项目后会进入素材确认页，由你手动补充关键截图并选择展示页面。
+                  {focusPoints.length > 0 ? ` 这次建议你优先关注：${focusPoints.join("、")}。` : ""}
                 </InlineTip>
               ) : (
                 <InlineTip>
                   上传完成后仍会进入素材确认页，你可以继续删减、排序并选择哪些页面进入后续作品集生成。
+                  {focusPoints.length > 0 ? ` 这次建议你优先关注：${focusPoints.join("、")}。` : ""}
                 </InlineTip>
               )}
             </div>
@@ -323,6 +451,7 @@ export default function NewProjectPage() {
 
               <InlineTip>
                 这一步只是在确认创建项目前的信息。真正的素材筛选和页面选择，会在下一页继续完成。
+                {focusPoints.length > 0 ? ` 记得把这次评分里最重要的几个问题带进去：${focusPoints.join("、")}。` : ""}
               </InlineTip>
             </div>
           </SectionCard>

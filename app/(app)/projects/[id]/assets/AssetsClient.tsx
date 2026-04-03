@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ArrowUp, ArrowDown, ImageIcon, Loader2 } from "lucide-react";
+import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 interface Asset {
   id: string;
@@ -40,14 +41,16 @@ function FigmaEmptyState({ projectId }: { projectId: string }) {
     setUploading(true);
     setError("");
     try {
-      const formData = new FormData();
-      // Re-use the project — we need a different endpoint to add assets to existing project
-      formData.append("projectId", projectId);
-      files.forEach((f) => formData.append("files", f));
+      const uploadedFiles = await uploadFilesFromBrowser({
+        files,
+        folder: "project-assets",
+        kind: "project-image",
+      });
 
       const res = await fetch(`/api/projects/${projectId}/assets/upload`, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: uploadedFiles }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

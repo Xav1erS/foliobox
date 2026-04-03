@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
+import { isBlobStorageUrl } from "@/lib/storage";
 import {
   SCORE_ANONYMOUS_SESSION_COOKIE,
   type JudgementState,
@@ -82,6 +83,12 @@ const ScoreOutputSchema = z.object({
 });
 
 type ScoreOutput = z.infer<typeof ScoreOutputSchema>;
+type UploadedInputFile = {
+  url: string;
+  name: string;
+  size: number;
+  type: string;
+};
 
 function normalizeText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -402,6 +409,23 @@ async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
   return inputs;
 }
 
+async function downloadUploadedFile(file: UploadedInputFile): Promise<File> {
+  if (!isBlobStorageUrl(file.url)) {
+    throw new Error("invalid_blob_url");
+  }
+
+  const response = await fetch(file.url);
+  if (!response.ok) {
+    throw new Error("blob_fetch_failed");
+  }
+
+  const buffer = await response.arrayBuffer();
+  return new File([buffer], file.name, {
+    type: file.type,
+    lastModified: Date.now(),
+  });
+}
+
 function getAnonymousSessionId(req: NextRequest) {
   return req.cookies.get(SCORE_ANONYMOUS_SESSION_COOKIE)?.value ?? null;
 }
@@ -467,8 +491,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const formData = await req.formData();
-    const inputType = formData.get("inputType") as string;
+    const isJson = req.headers.get("content-type")?.includes("application/json");
+    const body = isJson ? await req.json() : null;
+    const formData = isJson ? null : await req.formData();
+    const inputType = (isJson ? body?.inputType : formData?.get("inputType")) as string;
 
     if (!["link", "pdf", "images"].includes(inputType)) {
       return NextResponse.json({ error: "无效的输入类型" }, { status: 400 });
@@ -486,7 +512,7 @@ export async function POST(req: NextRequest) {
     } = {};
 
     if (inputType === "link") {
-      const url = formData.get("inputUrl") as string;
+      const url = (isJson ? body?.inputUrl : formData?.get("inputUrl")) as string;
       if (!url) return NextResponse.json({ error: "请提供链接" }, { status: 400 });
 
       try {
@@ -527,7 +553,8 @@ export async function POST(req: NextRequest) {
         }
       );
     } else if (inputType === "pdf") {
-      const file = formData.get("file") as File | null;
+      const uploadedFile = (isJson ? body?.file : null) as UploadedInputFile | null;
+      const file = isJson ? (uploadedFile ? await downloadUploadedFile(uploadedFile) : null) : ((formData?.get("file") as File | null) ?? null);
       if (!file) return NextResponse.json({ error: "请上传 PDF" }, { status: 400 });
       if (file.size > MAX_SCORE_UPLOAD_SIZE) {
         return NextResponse.json(
@@ -604,7 +631,10 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-      const files = formData.getAll("files") as File[];
+      const uploadedFiles = (isJson ? body?.files : null) as UploadedInputFile[] | null;
+      const files = isJson
+        ? await Promise.all((uploadedFiles ?? []).map((file) => downloadUploadedFile(file)))
+        : ((formData?.getAll("files") as File[]) ?? []);
       if (files.length === 0) {
         return NextResponse.json({ error: "请上传图片" }, { status: 400 });
       }
