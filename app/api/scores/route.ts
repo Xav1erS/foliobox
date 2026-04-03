@@ -207,15 +207,30 @@ async function extractPdfScan(file: File) {
   try {
     const info = await parser.getInfo({ parsePageInfo: true });
     const totalPages = info.total ?? 0;
-    const entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
+    let usedFullDocumentFallback = false;
+    let entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
 
-    for (let page = 1; page <= totalPages; page += 1) {
-      const pageText = await parser.getText({ partial: [page] });
-      entries.push({
-        unitNumber: page,
-        text: normalizeText(pageText.text ?? ""),
-        sourceHint: `PDF 第 ${page} 页`,
-      });
+    try {
+      for (let page = 1; page <= totalPages; page += 1) {
+        const pageText = await parser.getText({ partial: [page] });
+        entries.push({
+          unitNumber: page,
+          text: normalizeText(pageText.text ?? ""),
+          sourceHint: `PDF 第 ${page} 页`,
+        });
+      }
+    } catch (pageLevelError) {
+      console.warn("PDF page-level scan failed, falling back to full-document extraction:", pageLevelError);
+      usedFullDocumentFallback = true;
+      const fullText = await parser.getText();
+      entries = [
+        {
+          unitNumber: 1,
+          text: normalizeText(fullText.text ?? ""),
+          sourceHint:
+            totalPages > 0 ? `PDF 全文提取（共 ${totalPages} 页）` : "PDF 全文提取",
+        },
+      ];
     }
 
     const scanResult = buildScanResult({
@@ -257,6 +272,11 @@ async function extractPdfScan(file: File) {
               `PDF 已完成整份页级文本扫描，并补充 ${visualAnchorImages.length} 页视觉锚点用于正式评分。`,
               "正式评分基于整体结构摘要、页面级摘要、项目级摘要和有限视觉锚点完成。",
             ]
+          : usedFullDocumentFallback
+            ? [
+                "当前 PDF 的页级解析不稳定，系统已自动退回整份全文扫描模式。",
+                "正式评分基于整体结构摘要、全文摘要和项目级摘要完成。",
+              ]
           : !canRenderPdfVisualAnchors
             ? [
                 "当前运行环境暂不支持 PDF 页截图渲染，正式评分已自动降级为整份文本结构扫描模式。",
@@ -601,8 +621,12 @@ export async function POST(req: NextRequest) {
       let pdfScan;
       try {
         pdfScan = await extractPdfScan(file);
-      } catch {
-        return NextResponse.json({ error: "PDF 解析失败，请确认文件未加密" }, { status: 422 });
+      } catch (error) {
+        console.error("PDF scan failed:", error);
+        return NextResponse.json(
+          { error: "PDF 解析失败，当前文件暂时无法完成结构扫描，请稍后重试或换一份导出版本" },
+          { status: 422 }
+        );
       }
 
       coverage = pdfScan.coverage;
