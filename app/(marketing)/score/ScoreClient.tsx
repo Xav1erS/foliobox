@@ -20,6 +20,7 @@ export function ScoreClient() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("link");
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<"uploading" | "processing">("processing");
   const [processingStep, setProcessingStep] = useState(0);
   const [error, setError] = useState("");
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
@@ -44,7 +45,7 @@ export function ScoreClient() {
   }, [imageFiles]);
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading || loadingStage !== "processing") {
       setProcessingStep(0);
       return;
     }
@@ -61,7 +62,7 @@ export function ScoreClient() {
     }, 1600);
 
     return () => window.clearInterval(timer);
-  }, [loading, tab]);
+  }, [loading, loadingStage, tab]);
 
   function switchTab(t: Tab) {
     setTab(t);
@@ -263,6 +264,7 @@ export function ScoreClient() {
     }
 
     setLoading(true);
+    setLoadingStage(tab === "link" ? "processing" : "uploading");
     setError("");
 
     try {
@@ -282,12 +284,14 @@ export function ScoreClient() {
       }
 
       if (tab === "pdf" && pdfFile) {
+        setLoadingStage("uploading");
         const [uploadedFile] = await uploadFilesFromBrowser({
           files: [pdfFile],
           folder: "score-inputs",
           kind: "score-pdf",
         });
 
+        setLoadingStage("processing");
         const res = await fetch("/api/scores", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -306,12 +310,14 @@ export function ScoreClient() {
         return;
       }
 
+      setLoadingStage("uploading");
       const uploadedFiles = await uploadFilesFromBrowser({
         files: imageFiles,
         folder: "score-inputs",
         kind: "score-image",
       });
 
+      setLoadingStage("processing");
       const res = await fetch("/api/scores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -327,10 +333,15 @@ export function ScoreClient() {
       }
       const data = await res.json();
       router.push(`/score/${data.id}`);
-    } catch {
-      setError("网络错误，请稍后重试");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("client token")) {
+        setError("上传初始化失败，请稍后重试。如果持续失败，说明线上上传配置还未生效。");
+      } else {
+        setError("上传或评分失败，请稍后重试");
+      }
     } finally {
       setLoading(false);
+      setLoadingStage("processing");
     }
   }
 
@@ -356,6 +367,16 @@ export function ScoreClient() {
       : tab === "link"
         ? "我们会先理解整站结构，再整理成可评分的摘要。"
         : "我们会先理解整体顺序，再按 8 个维度生成评分结果。";
+  const loadingTitle =
+    loadingStage === "uploading" ? "正在上传评分材料" : "正在生成评分结果";
+  const loadingDescription =
+    loadingStage === "uploading"
+      ? "我们正在把文件上传到安全存储。10MB 左右的 PDF 或多张截图通常需要 10–30 秒。"
+      : "我们正在按 8 个维度整理这份作品集的简版评分结果，完成后会直接进入聚焦结果页继续下一步。";
+  const loadingHint =
+    loadingStage === "uploading"
+      ? "如果等待超过 30 秒仍无进展，可以关闭后重试。若持续失败，通常是线上上传配置未生效。"
+      : processingDescription;
   const totalImageSize = imageFiles.reduce((sum, file) => sum + file.size, 0);
 
   return (
@@ -604,52 +625,72 @@ export function ScoreClient() {
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-white" />
             <p className="mt-5 text-xs uppercase tracking-[0.18em] text-white/35">Focus</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">正在生成评分结果</h2>
-            <p className="mt-3 text-sm leading-6 text-white/55">
-              我们正在按 8 个维度整理这份作品集的简版评分结果，完成后会直接进入聚焦结果页继续下一步。
-            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-white">{loadingTitle}</h2>
+            <p className="mt-3 text-sm leading-6 text-white/55">{loadingDescription}</p>
             <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-left">
               <p className="text-xs text-white/40">{inputSummary}</p>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-white transition-all"
-                  style={{ width: `${(processingStep / activeSteps.length) * 100}%` }}
-                />
-              </div>
-              <div className="mt-4 space-y-3">
-                {activeSteps.map((step, index) => {
-                  const state =
-                    index + 1 < processingStep
-                      ? "done"
-                      : index + 1 === processingStep
-                        ? "active"
-                        : "pending";
-                  return (
-                    <div key={step} className="flex items-center gap-3">
-                      <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
-                          state === "done"
-                            ? "bg-white text-black"
-                            : state === "active"
-                              ? "border border-white/30 bg-white/10 text-white"
-                              : "border border-white/10 bg-white/[0.03] text-white/35"
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
-                      <span
-                        className={`text-sm ${
-                          state === "pending" ? "text-white/35" : "text-white/75"
-                        }`}
-                      >
-                        {step}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              {loadingStage === "uploading" ? (
+                <div className="mt-4 space-y-3">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-1/2 animate-pulse rounded-full bg-white/80" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/30 bg-white/10 text-[11px] text-white">
+                      1
+                    </span>
+                    <span className="text-sm text-white/75">上传评分材料</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-[11px] text-white/35">
+                      2
+                    </span>
+                    <span className="text-sm text-white/35">上传完成后开始正式评分</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-white transition-all"
+                      style={{ width: `${(processingStep / activeSteps.length) * 100}%` }}
+                    />
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {activeSteps.map((step, index) => {
+                      const state =
+                        index + 1 < processingStep
+                          ? "done"
+                          : index + 1 === processingStep
+                            ? "active"
+                            : "pending";
+                      return (
+                        <div key={step} className="flex items-center gap-3">
+                          <span
+                            className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                              state === "done"
+                                ? "bg-white text-black"
+                                : state === "active"
+                                  ? "border border-white/30 bg-white/10 text-white"
+                                  : "border border-white/10 bg-white/[0.03] text-white/35"
+                            }`}
+                          >
+                            {index + 1}
+                          </span>
+                          <span
+                            className={`text-sm ${
+                              state === "pending" ? "text-white/35" : "text-white/75"
+                            }`}
+                          >
+                            {step}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
-            <p className="mt-4 text-xs leading-5 text-white/40">{processingDescription}</p>
+            <p className="mt-4 text-xs leading-5 text-white/40">{loadingHint}</p>
           </div>
         </div>
       ) : null}

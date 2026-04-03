@@ -32,11 +32,10 @@ export async function POST(request: NextRequest) {
         const payload = parsePayload(clientPayload);
         const session = await auth();
 
-        if (!session?.user?.id) {
-          throw new Error("Unauthorized");
-        }
-
         if (payload.folder === "project-assets" && payload.kind === "project-image") {
+          if (!session?.user?.id) {
+            throw new Error("Unauthorized");
+          }
           return {
             allowedContentTypes: ALLOWED_IMAGE_TYPES,
             maximumSizeInBytes: MAX_FILE_SIZE,

@@ -31,7 +31,9 @@ export async function uploadFilesFromBrowser(params: {
       const blob = await upload(buildPathname(folder, file), file, {
         access: "public",
         contentType: file.type,
-        multipart: file.size > 4 * 1024 * 1024,
+        // Keep client uploads on the simpler direct-upload path for MVP.
+        // The multipart endpoint introduced cross-origin 400s in production.
+        multipart: false,
         handleUploadUrl: "/api/blob/upload",
         clientPayload: JSON.stringify({
           folder,
