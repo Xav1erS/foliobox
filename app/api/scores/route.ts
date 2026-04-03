@@ -86,6 +86,27 @@ const MAX_PDF_VISUAL_ANCHORS = 8;
 const PDF_VISUAL_ANCHOR_WIDTH = 800;
 const ANONYMOUS_SCORE_LIMIT = 3;
 const ANONYMOUS_SCORE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DIMENSION_SCORE_KEYS = [
+  "firstScreenProfessionalism",
+  "scannability",
+  "projectSelection",
+  "roleClarity",
+  "problemDefinition",
+  "resultEvidence",
+  "authenticity",
+  "jobFit",
+] as const;
+
+const DIMENSION_KEY_ALIASES: Record<(typeof DIMENSION_SCORE_KEYS)[number], string[]> = {
+  firstScreenProfessionalism: ["firstScreenProfessionalism", "首屏专业感", "首屏专业性", "首屏印象"],
+  scannability: ["scannability", "可扫描性", "信息可扫描性", "扫描性"],
+  projectSelection: ["projectSelection", "项目选择质量", "项目选择", "项目质量"],
+  roleClarity: ["roleClarity", "角色清晰度", "角色清晰", "职责清晰度"],
+  problemDefinition: ["problemDefinition", "问题定义与设计判断", "问题定义", "设计判断"],
+  resultEvidence: ["resultEvidence", "结果与价值证明", "结果证明", "价值证明"],
+  authenticity: ["authenticity", "真实性与可信度", "真实性", "可信度"],
+  jobFit: ["jobFit", "投递适配度", "岗位适配度", "适配度"],
+};
 
 const JudgementStateSchema = z.enum([
   "full_judgement",
@@ -99,25 +120,130 @@ const DimensionScoreSchema = z.object({
   judgementState: JudgementStateSchema,
 });
 
-const ScoreOutputSchema = z.object({
+type DimensionScore = {
+  score: number;
+  comment: string;
+  judgementState: JudgementState;
+};
+
+type ScoreOutput = {
+  totalScore: number;
+  level: "ready" | "needs_improvement" | "draft" | "not_ready";
+  detectedProjectCount?: number;
+  dimensionScores: Record<(typeof DIMENSION_SCORE_KEYS)[number], DimensionScore>;
+  summaryPoints: string[];
+  recommendedActions: string[];
+};
+
+function normalizeDimensionScoreEntry(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return {
+    score: candidate.score,
+    comment: candidate.comment ?? candidate.summary ?? candidate.reason ?? candidate.note ?? "",
+    judgementState:
+      candidate.judgementState ??
+      candidate.judgmentState ??
+      candidate.state ??
+      candidate.evidenceState ??
+      "limited_judgement",
+  };
+}
+
+function findDimensionKey(rawKey: unknown, fallbackIndex: number) {
+  if (typeof rawKey === "string") {
+    const normalized = rawKey.trim().toLowerCase();
+
+    for (const key of DIMENSION_SCORE_KEYS) {
+      if (
+        key.toLowerCase() === normalized ||
+        DIMENSION_KEY_ALIASES[key].some((alias) => alias.toLowerCase() === normalized)
+      ) {
+        return key;
+      }
+    }
+  }
+
+  return DIMENSION_SCORE_KEYS[fallbackIndex] ?? null;
+}
+
+function normalizeDimensionScores(value: unknown) {
+  if (Array.isArray(value)) {
+    const normalized: Record<string, unknown> = {};
+
+    value.forEach((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+
+      const candidate = entry as Record<string, unknown>;
+      const key = findDimensionKey(
+        candidate.key ?? candidate.name ?? candidate.dimension ?? candidate.label ?? candidate.title,
+        index
+      );
+
+      if (!key) {
+        return;
+      }
+
+      normalized[key] = normalizeDimensionScoreEntry(candidate);
+    });
+
+    return normalized;
+  }
+
+  if (value && typeof value === "object") {
+    const candidate = value as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {};
+
+    for (const key of DIMENSION_SCORE_KEYS) {
+      const directValue = candidate[key];
+      if (directValue !== undefined) {
+        normalized[key] = normalizeDimensionScoreEntry(directValue);
+        continue;
+      }
+
+      const aliasValue = DIMENSION_KEY_ALIASES[key]
+        .map((alias) => candidate[alias])
+        .find((aliasCandidate) => aliasCandidate !== undefined);
+
+      if (aliasValue !== undefined) {
+        normalized[key] = normalizeDimensionScoreEntry(aliasValue);
+      }
+    }
+
+    return normalized;
+  }
+
+  return value;
+}
+
+const ScoreOutputSchema: z.ZodType<ScoreOutput, z.ZodTypeDef, unknown> = z.object({
   totalScore: z.number().min(0).max(100),
   level: z.enum(["ready", "needs_improvement", "draft", "not_ready"]),
   detectedProjectCount: z.number().int().min(0).max(20).optional(),
-  dimensionScores: z.object({
-    firstScreenProfessionalism: DimensionScoreSchema,
-    scannability: DimensionScoreSchema,
-    projectSelection: DimensionScoreSchema,
-    roleClarity: DimensionScoreSchema,
-    problemDefinition: DimensionScoreSchema,
-    resultEvidence: DimensionScoreSchema,
-    authenticity: DimensionScoreSchema,
-    jobFit: DimensionScoreSchema,
-  }),
+  dimensionScores: z.preprocess(
+    normalizeDimensionScores,
+    z.object({
+      firstScreenProfessionalism: DimensionScoreSchema,
+      scannability: DimensionScoreSchema,
+      projectSelection: DimensionScoreSchema,
+      roleClarity: DimensionScoreSchema,
+      problemDefinition: DimensionScoreSchema,
+      resultEvidence: DimensionScoreSchema,
+      authenticity: DimensionScoreSchema,
+      jobFit: DimensionScoreSchema,
+    })
+  ),
   summaryPoints: z.array(z.string()).min(1).max(6),
   recommendedActions: z.array(z.string()).min(1).max(6),
 });
 
-type ScoreOutput = z.infer<typeof ScoreOutputSchema>;
+const ScoreOutputSchemaForLLM = ScoreOutputSchema as unknown as z.ZodSchema<ScoreOutput>;
 type UploadedInputFile = {
   url: string;
   pathname?: string;
@@ -206,7 +332,16 @@ ${content}
 - totalScore: 综合总分（0-100），按各维度满分比例加权计算
 - level: "ready" | "needs_improvement" | "draft" | "not_ready"
 - detectedProjectCount: 识别到的项目数
-- dimensionScores: 每个维度返回 score、comment、judgementState
+- dimensionScores: 必须是 object，不能是数组，且必须包含以下 8 个 key：
+  - firstScreenProfessionalism
+  - scannability
+  - projectSelection
+  - roleClarity
+  - problemDefinition
+  - resultEvidence
+  - authenticity
+  - jobFit
+- 每个 dimensionScores[key] 都必须返回：score、comment、judgementState
 - summaryPoints: 3-5 条高层问题摘要（中文，每条不超过 30 字）
 - recommendedActions: 3-5 条改进建议（中文，每条不超过 30 字，可操作）`;
 }
@@ -607,7 +742,7 @@ export async function POST(req: NextRequest) {
 
       scoreOutput = await llm.generateStructured(
         buildScoringPrompt(linkScan.promptInput, "链接"),
-        ScoreOutputSchema,
+        ScoreOutputSchemaForLLM,
         {
           task: "portfolio_score",
           temperature: 0.2,
@@ -660,7 +795,7 @@ export async function POST(req: NextRequest) {
         scoreOutput = await llm.generateStructuredWithImages(
           buildScoringPrompt(pdfScan.promptInput, "PDF"),
           pdfScan.visualAnchorImages,
-          ScoreOutputSchema,
+          ScoreOutputSchemaForLLM,
           {
             task: "portfolio_score",
             temperature: 0.2,
@@ -683,7 +818,7 @@ export async function POST(req: NextRequest) {
       } else {
         scoreOutput = await llm.generateStructured(
           buildScoringPrompt(pdfScan.promptInput, "PDF"),
-          ScoreOutputSchema,
+          ScoreOutputSchemaForLLM,
           {
             task: "portfolio_score",
             temperature: 0.2,
@@ -745,7 +880,7 @@ export async function POST(req: NextRequest) {
       scoreOutput = await llm.generateStructuredWithImages(
         buildScoringPrompt(imageScan.promptInput, "截图"),
         images,
-        ScoreOutputSchema,
+        ScoreOutputSchemaForLLM,
         {
           task: "portfolio_score",
           temperature: 0.2,
