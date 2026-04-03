@@ -22,6 +22,29 @@ import {
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
 
+const HAS_NATIVE_PDF_VISUAL_GLOBALS =
+  typeof globalThis.DOMMatrix !== "undefined" &&
+  typeof globalThis.ImageData !== "undefined" &&
+  typeof globalThis.Path2D !== "undefined";
+
+if (typeof globalThis.DOMMatrix === "undefined") {
+  class DOMMatrixStub {}
+  (globalThis as typeof globalThis & { DOMMatrix: typeof DOMMatrix }).DOMMatrix =
+    DOMMatrixStub as unknown as typeof DOMMatrix;
+}
+
+if (typeof globalThis.ImageData === "undefined") {
+  class ImageDataStub {}
+  (globalThis as typeof globalThis & { ImageData: typeof ImageData }).ImageData =
+    ImageDataStub as unknown as typeof ImageData;
+}
+
+if (typeof globalThis.Path2D === "undefined") {
+  class Path2DStub {}
+  (globalThis as typeof globalThis & { Path2D: typeof Path2D }).Path2D =
+    Path2DStub as unknown as typeof Path2D;
+}
+
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse") as {
   PDFParse: new (params: { data: Buffer }) => {
@@ -210,7 +233,7 @@ async function extractPdfScan(file: File) {
       maxVisualAnchors: MAX_PDF_VISUAL_ANCHORS,
     });
 
-    const canRenderPdfVisualAnchors = typeof globalThis.DOMMatrix !== "undefined";
+    const canRenderPdfVisualAnchors = HAS_NATIVE_PDF_VISUAL_GLOBALS;
     const visualAnchorImages = canRenderPdfVisualAnchors
       ? await extractPdfVisualAnchors(parser, initialCoverage.visualAnchorUnits)
       : [];
