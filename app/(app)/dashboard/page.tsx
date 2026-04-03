@@ -1,23 +1,26 @@
 import Link from "next/link";
+import { ArrowRight, Clock3, CreditCard, FileText, PlusCircle, Star, User } from "lucide-react";
 import { db } from "@/lib/db";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SectionCard } from "@/components/app/SectionCard";
-import { FileText, Clock3, ArrowRight, PlusCircle, CreditCard, Star, User } from "lucide-react";
 import { getRequiredSession } from "@/lib/required-session";
+import type { ScoreCoverage } from "@/lib/score-contract";
 import {
   PORTFOLIO_SCORE_LEVEL_CONFIG,
   resolvePortfolioScoreLevel,
 } from "@/lib/portfolio-score-level";
-
-const STATUS_LABEL: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  DRAFT: { label: "草稿", variant: "secondary" },
-  IMPORTING: { label: "导入中", variant: "outline" },
-  IMPORTED: { label: "已导入", variant: "default" },
-  FAILED: { label: "失败", variant: "destructive" },
-};
+import {
+  getScoreNextStep,
+  isProfileReadyForGeneration,
+} from "@/lib/score-next-step";
+import {
+  PROJECT_STATUS_LABEL,
+  formatProjectDate,
+  getProjectContinuePath,
+} from "@/lib/project-workflow";
 
 const PLAN_COPY: Record<string, { title: string; description: string }> = {
   FREE: {
@@ -34,55 +37,22 @@ const PLAN_COPY: Record<string, { title: string; description: string }> = {
   },
 };
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function getContinuePath(project: {
-  id: string;
-  facts: { updatedAt: Date } | null;
-  outlines: Array<{ id: string; updatedAt: Date }>;
-  drafts: Array<{ id: string; updatedAt: Date; status: string }>;
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const latestDraft = project.drafts[0];
-  if (latestDraft) {
-    return {
-      href: `/projects/${project.id}/editor?did=${latestDraft.id}`,
-      label: "继续编辑草稿",
-    };
-  }
-
-  const latestOutline = project.outlines[0];
-  if (latestOutline) {
-    return {
-      href: `/projects/${project.id}/outline?oid=${latestOutline.id}`,
-      label: "继续确认大纲",
-    };
-  }
-
-  if (project.facts) {
-    return {
-      href: `/projects/${project.id}/facts`,
-      label: "继续补充项目事实",
-    };
-  }
-
-  return {
-    href: `/projects/${project.id}/assets`,
-    label: "继续确认素材",
-  };
-}
-
-export default async function DashboardPage() {
   const session = await getRequiredSession("/dashboard");
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const fromScore = resolvedSearchParams?.from === "score";
+  const scoreId =
+    typeof resolvedSearchParams?.sid === "string" ? resolvedSearchParams.sid : null;
 
-  const [projects, latestScore, userPlan] = await Promise.all([
-    db.project.findMany({
+  const [projectCount, recentProject, latestScore, focusedScore, userPlan, profile] = await Promise.all([
+    db.project.count({
+      where: { userId: session.user.id },
+    }),
+    db.project.findFirst({
       where: { userId: session.user.id },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -104,26 +74,64 @@ export default async function DashboardPage() {
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     }),
+    scoreId
+      ? db.portfolioScore.findFirst({
+          where: { id: scoreId, userId: session.user.id },
+        })
+      : Promise.resolve(null),
     db.userPlan.findFirst({
       where: { userId: session.user.id, status: "ACTIVE" },
       orderBy: { createdAt: "desc" },
       select: { planType: true, expiresAt: true },
     }),
+    db.designerProfile.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        currentTitle: true,
+        yearsOfExperience: true,
+        targetRole: true,
+        specialties: true,
+        strengths: true,
+      },
+    }),
   ]);
 
-  const recentProject = projects[0] ?? null;
   const latestScoreLevel = latestScore
     ? resolvePortfolioScoreLevel(latestScore.totalScore, latestScore.level)
     : null;
+  const focusedScoreLevel = focusedScore
+    ? resolvePortfolioScoreLevel(focusedScore.totalScore, focusedScore.level)
+    : null;
   const currentPlan = userPlan?.planType ?? "FREE";
   const planCopy = PLAN_COPY[currentPlan] ?? PLAN_COPY.FREE;
+  const profileReady = isProfileReadyForGeneration(profile);
+  const focusedScoreCoverage = focusedScore
+    ? (((focusedScore.coverageJson ?? {
+        inputType: focusedScore.inputType.toLowerCase(),
+        totalUnits: 0,
+        isFullCoverage: false,
+        detectedProjects: 0,
+        scoringSources: [],
+        visualAnchorUnits: [],
+      }) as unknown) as ScoreCoverage)
+    : null;
+  const scoreNextStep =
+    focusedScore && focusedScoreCoverage
+      ? getScoreNextStep({
+          scoreId: focusedScore.id,
+          level: focusedScoreLevel ?? "DRAFT",
+          coverage: focusedScoreCoverage,
+          isLoggedIn: true,
+          profileReady,
+        })
+      : null;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
       <PageHeader
         eyebrow="Workspace"
         title="工作台首页"
-        description="从这里继续你上一次的评分、项目整理和发布动作，不需要重新找入口。"
+        description="这里的任务只有一个：帮你尽快回到最近的工作上下文。全部项目管理请进入“我的项目”。"
         actions={
           <Button asChild className="h-11 rounded-xl px-5">
             <Link href="/projects/new">
@@ -134,8 +142,71 @@ export default async function DashboardPage() {
         }
       />
 
+      {fromScore ? (
+        <div className="mt-6">
+          <SectionCard
+            title="从评分结果继续"
+            description={
+              scoreNextStep?.description ??
+              "你刚才的评分结果已经带进工作台了。接下来可以新建项目，开始把零散内容整理成第一版。"
+            }
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                {focusedScore ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-3xl font-semibold tracking-tight text-neutral-900">
+                        {focusedScore.totalScore}
+                      </span>
+                      <span className="text-sm text-neutral-400">/100</span>
+                      {focusedScoreLevel ? (
+                        <Badge variant="outline">
+                          {PORTFOLIO_SCORE_LEVEL_CONFIG[focusedScoreLevel].label}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm leading-6 text-neutral-500">
+                      {scoreNextStep?.title ?? focusedScore.summaryPoints.slice(0, 2).join(" · ")}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm leading-6 text-neutral-500">
+                    评分结果本身不会替你生成作品集，但它可以帮助你带着更清楚的问题进入后续整理流程。
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {focusedScore ? (
+                  <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                    <Link href={`/score/${focusedScore.id}`}>
+                      查看这次评分结果
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button asChild className="h-11 rounded-xl px-5">
+                  <Link href={scoreNextStep?.primaryHref ?? `/projects/new?from=score&sid=${scoreId}`}>
+                    {scoreNextStep?.primaryLabel ?? "新建项目开始整理"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                {scoreNextStep?.secondaryHref ? (
+                  <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                    <Link href={scoreNextStep.secondaryHref}>
+                      {scoreNextStep.secondaryLabel}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+      ) : null}
+
       <div className="mt-8">
-        {projects.length === 0 ? (
+        {projectCount === 0 ? (
           <div className="space-y-4">
             <EmptyState
               icon={<FileText className="h-6 w-6 text-neutral-400" />}
@@ -205,39 +276,48 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid gap-4 xl:grid-cols-2">
-              <SectionCard title="最近一次编辑" description="继续回到上一次最接近产出的步骤。">
-                {recentProject ? (
+            <SectionCard
+              title="继续上一次整理"
+              description="这是工作台首页的主任务区块。先回到最近一个项目的下一步，不需要重新找入口。"
+            >
+              {recentProject ? (
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-wrap items-start gap-3">
                       <div>
-                        <p className="text-base font-semibold text-neutral-900">{recentProject.name}</p>
+                        <p className="text-xl font-semibold text-neutral-900">{recentProject.name}</p>
                         <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
                           <Clock3 className="h-3.5 w-3.5" />
-                          最近更新于 {formatDate(recentProject.updatedAt)}
+                          最近更新于 {formatProjectDate(recentProject.updatedAt)}
                         </p>
                       </div>
-                      <Badge variant={(STATUS_LABEL[recentProject.importStatus] ?? STATUS_LABEL.DRAFT).variant}>
-                        {(STATUS_LABEL[recentProject.importStatus] ?? STATUS_LABEL.DRAFT).label}
+                      <Badge variant={(PROJECT_STATUS_LABEL[recentProject.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT).variant}>
+                        {(PROJECT_STATUS_LABEL[recentProject.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT).label}
                       </Badge>
                     </div>
-                    <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-                      <p className="text-xs text-neutral-500">下一步</p>
-                      <p className="mt-1 text-sm font-medium text-neutral-900">
-                        {getContinuePath(recentProject).label}
-                      </p>
-                    </div>
-                    <Button asChild className="h-11 rounded-xl px-5">
-                      <Link href={getContinuePath(recentProject).href}>
-                        {getContinuePath(recentProject).label}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                ) : null}
-              </SectionCard>
 
-              <SectionCard title="最近一次评分" description="先判断现在这份作品集是否拿得出手，再决定是否继续整理。">
+                    <div className="inline-flex rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-400">下一步动作</p>
+                        <p className="mt-1 text-sm font-medium text-neutral-900">
+                          {getProjectContinuePath(recentProject).label}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button asChild className="h-12 rounded-xl px-6">
+                    <Link href={getProjectContinuePath(recentProject).href}>
+                      {getProjectContinuePath(recentProject).label}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+            </SectionCard>
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <SectionCard title="最近一次评分" description="评分记录是辅助信息块，用来回到诊断结果，不与主任务区块同权竞争。">
                 {latestScore ? (
                   <div className="space-y-4">
                     <div className="flex items-end gap-3">
@@ -250,7 +330,7 @@ export default async function DashboardPage() {
                           ? PORTFOLIO_SCORE_LEVEL_CONFIG[latestScoreLevel].label
                           : "评分已生成"}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-500">生成于 {formatDate(latestScore.createdAt)}</p>
+                      <p className="mt-1 text-xs text-neutral-500">生成于 {formatProjectDate(latestScore.createdAt)}</p>
                     </div>
                     <Button asChild variant="outline" className="h-11 rounded-xl px-5">
                       <Link href={`/score/${latestScore.id}`}>
@@ -278,7 +358,7 @@ export default async function DashboardPage() {
                     <p className="text-sm font-medium text-neutral-900">{planCopy.title}</p>
                     <p className="mt-1 text-sm leading-6 text-neutral-500">{planCopy.description}</p>
                     {userPlan?.expiresAt ? (
-                      <p className="mt-2 text-xs text-neutral-400">有效期至 {formatDate(userPlan.expiresAt)}</p>
+                      <p className="mt-2 text-xs text-neutral-400">有效期至 {formatProjectDate(userPlan.expiresAt)}</p>
                     ) : null}
                   </div>
                   <Button asChild variant="outline" className="h-11 rounded-xl px-5">
@@ -290,17 +370,17 @@ export default async function DashboardPage() {
                 </div>
               </SectionCard>
 
-              <SectionCard title="快捷入口" description="常用动作集中在这里，帮助你快速继续而不是重新开始。">
-                <div className="grid gap-3 sm:grid-cols-2">
+              <SectionCard title="快捷入口" description="这里只保留高频入口；完整项目管理请进入“我的项目”页面。">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                   <Link href="/projects/new" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
                     <PlusCircle className="h-4 w-4 text-neutral-900" />
                     <p className="mt-3 text-sm font-medium text-neutral-900">新建项目</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">从 Figma 链接或截图开始整理作品集。</p>
                   </Link>
-                  <Link href={recentProject ? getContinuePath(recentProject).href : "/projects/new"} className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+                  <Link href="/projects" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
                     <FileText className="h-4 w-4 text-neutral-900" />
-                    <p className="mt-3 text-sm font-medium text-neutral-900">继续上次编辑</p>
-                    <p className="mt-1 text-xs leading-5 text-neutral-500">回到最近一个项目的下一步，不丢上下文。</p>
+                    <p className="mt-3 text-sm font-medium text-neutral-900">查看全部项目</p>
+                    <p className="mt-1 text-xs leading-5 text-neutral-500">集中管理全部项目，不依赖工作台首页的最近项目。</p>
                   </Link>
                   <Link href={latestScore ? `/score/${latestScore.id}` : "/score"} className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
                     <Star className="h-4 w-4 text-neutral-900" />
@@ -315,51 +395,6 @@ export default async function DashboardPage() {
                 </div>
               </SectionCard>
             </div>
-
-            <SectionCard
-              title="我的项目"
-              description={`共 ${projects.length} 个项目。所有项目卡片都直接落到当前可继续的真实步骤。`}
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {projects.map((project) => {
-                  const status = STATUS_LABEL[project.importStatus] ?? STATUS_LABEL.DRAFT;
-                  const nextStep = getContinuePath(project);
-
-                  return (
-                    <Link
-                      key={project.id}
-                      href={nextStep.href}
-                      className="group rounded-2xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-sm"
-                    >
-                      <div className="flex h-32 items-center justify-center rounded-xl bg-neutral-50 transition-colors group-hover:bg-neutral-100">
-                        <FileText className="h-8 w-8 text-neutral-300" />
-                      </div>
-
-                      <div className="mt-4 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-neutral-900">{project.name}</p>
-                          <p className="mt-1 text-xs text-neutral-400">{formatDate(project.updatedAt)}</p>
-                        </div>
-                        <Badge variant={status.variant} className="shrink-0 text-xs">
-                          {status.label}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-400">继续路径</p>
-                        <p className="mt-1 text-sm font-medium text-neutral-800">{nextStep.label}</p>
-                        <p className="mt-1 text-xs text-neutral-500">
-                          {project._count.assets} 张素材
-                          {project.facts ? " · 已补充项目事实" : ""}
-                          {project.outlines.length > 0 ? " · 已生成大纲" : ""}
-                          {project.drafts.length > 0 ? " · 已生成草稿" : ""}
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </SectionCard>
           </div>
         )}
       </div>

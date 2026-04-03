@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { createRequire } from "node:module";
+import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
+import {
+  SCORE_ANONYMOUS_SESSION_COOKIE,
+  type JudgementState,
+  type ScoreCoverage,
+  type ScoreProcessingMeta,
+} from "@/lib/score-contract";
+import {
+  buildCoverage,
+  buildPromptInputFromScan,
+  buildScanResult,
+} from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
 
 const require = createRequire(import.meta.url);
@@ -12,32 +25,57 @@ const { PDFParse } = require("pdf-parse") as {
   PDFParse: new (params: { data: Buffer }) => {
     getInfo: (options?: { parsePageInfo?: boolean }) => Promise<{ total?: number }>;
     getText: (options?: { partial?: number[] }) => Promise<{ text: string }>;
+    getScreenshot: (options?: {
+      partial?: number[];
+      desiredWidth?: number;
+      imageBuffer?: boolean;
+    }) => Promise<{
+      pages: Array<{
+        data?: Uint8Array;
+        dataUrl?: string;
+        pageNumber: number;
+        width: number;
+        height: number;
+        scale: number;
+      }>;
+      total: number;
+    }>;
     destroy: () => Promise<void>;
   };
 };
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
+const MAX_PDF_VISUAL_ANCHORS = 8;
+const PDF_VISUAL_ANCHOR_WIDTH = 800;
+const ANONYMOUS_SCORE_LIMIT = 3;
+const ANONYMOUS_SCORE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-// ─── Zod schema for LLM output ───────────────────────────────────────────────
+const JudgementStateSchema = z.enum([
+  "full_judgement",
+  "limited_judgement",
+  "insufficient_evidence",
+]);
 
 const DimensionScoreSchema = z.object({
   score: z.number().min(0).max(100),
   comment: z.string(),
+  judgementState: JudgementStateSchema,
 });
 
 const ScoreOutputSchema = z.object({
   totalScore: z.number().min(0).max(100),
   level: z.enum(["ready", "needs_improvement", "draft", "not_ready"]),
+  detectedProjectCount: z.number().int().min(0).max(20).optional(),
   dimensionScores: z.object({
-    firstScreenProfessionalism: DimensionScoreSchema, // 首屏专业感 15分
-    scannability: DimensionScoreSchema,               // 可扫描性 15分
-    projectSelection: DimensionScoreSchema,           // 项目选择质量 10分
-    roleClarity: DimensionScoreSchema,                // 角色清晰度 15分
-    problemDefinition: DimensionScoreSchema,          // 问题定义与设计判断 20分
-    resultEvidence: DimensionScoreSchema,             // 结果与价值证明 15分
-    authenticity: DimensionScoreSchema,               // 真实性与可信度 5分
-    jobFit: DimensionScoreSchema,                     // 投递适配度 5分
+    firstScreenProfessionalism: DimensionScoreSchema,
+    scannability: DimensionScoreSchema,
+    projectSelection: DimensionScoreSchema,
+    roleClarity: DimensionScoreSchema,
+    problemDefinition: DimensionScoreSchema,
+    resultEvidence: DimensionScoreSchema,
+    authenticity: DimensionScoreSchema,
+    jobFit: DimensionScoreSchema,
   }),
   summaryPoints: z.array(z.string()).min(1).max(6),
   recommendedActions: z.array(z.string()).min(1).max(6),
@@ -45,10 +83,46 @@ const ScoreOutputSchema = z.object({
 
 type ScoreOutput = z.infer<typeof ScoreOutputSchema>;
 
-// ─── Prompt builder ───────────────────────────────────────────────────────────
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function stripHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ");
+}
+
+function extractLinks(html: string, currentUrl: URL, origin: string) {
+  const matches = [...html.matchAll(/href=["']([^"']+)["']/gi)];
+  const urls: string[] = [];
+
+  for (const match of matches) {
+    const raw = match[1];
+    if (!raw || raw.startsWith("#") || raw.startsWith("mailto:") || raw.startsWith("tel:")) {
+      continue;
+    }
+
+    try {
+      const resolved = new URL(raw, currentUrl);
+      if (resolved.origin !== origin) continue;
+      urls.push(resolved.toString());
+    } catch {
+      continue;
+    }
+  }
+
+  return Array.from(new Set(urls));
+}
+
+function extractTitle(html: string) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match ? normalizeText(match[1]) : null;
+}
 
 function buildScoringPrompt(content: string, inputType: string): string {
-  return `你是一位专业的国内设计招聘顾问，擅长评估设计师作品集。请根据以下作品集内容，按 8 个维度进行评分。
+  return `你是一位专业的国内设计招聘顾问，擅长评估设计师作品集。请根据以下作品集扫描结果与内容摘要，按 8 个维度进行评分。
 
 ## 评分维度与权重
 
@@ -68,6 +142,17 @@ function buildScoringPrompt(content: string, inputType: string): string {
 - 50–69 分：draft（可作为草稿，不建议直接投递）
 - 50 分以下：not_ready（不建议直接投递）
 
+## 判断状态定义
+
+- full_judgement：证据充分，可完整判断
+- limited_judgement：已有部分证据，但判断有限
+- insufficient_evidence：证据不足，不应给出强判断
+
+要求：
+- 不要因为证据不足而直接给极低分
+- 若当前输入不足以完整判断某维度，请降低结论强度并使用 limited_judgement 或 insufficient_evidence
+- detectedProjectCount 按当前输入中实际可识别出的项目数量估算
+
 ## 作品集内容（来源：${inputType}）
 
 ${content}
@@ -77,35 +162,236 @@ ${content}
 按 JSON 输出，字段说明：
 - totalScore: 综合总分（0-100），按各维度满分比例加权计算
 - level: "ready" | "needs_improvement" | "draft" | "not_ready"
-- dimensionScores: 每个维度的 score（0-100，代表该维度得分占满分的百分比）和 comment（1-2 句中文说明）
+- detectedProjectCount: 识别到的项目数
+- dimensionScores: 每个维度返回 score、comment、judgementState
 - summaryPoints: 3-5 条高层问题摘要（中文，每条不超过 30 字）
 - recommendedActions: 3-5 条改进建议（中文，每条不超过 30 字，可操作）`;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function extractPdfText(
-  file: File
-): Promise<{ text: string; pageCount: number | null }> {
+async function extractPdfScan(file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const parser = new PDFParse({ data: buffer });
+
   try {
-    const [info, result] = await Promise.all([
-      parser.getInfo({ parsePageInfo: true }),
-      parser.getText(),
-    ]);
+    const info = await parser.getInfo({ parsePageInfo: true });
+    const totalPages = info.total ?? 0;
+    const entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
+
+    for (let page = 1; page <= totalPages; page += 1) {
+      const pageText = await parser.getText({ partial: [page] });
+      entries.push({
+        unitNumber: page,
+        text: normalizeText(pageText.text ?? ""),
+        sourceHint: `PDF 第 ${page} 页`,
+      });
+    }
+
+    const scanResult = buildScanResult({
+      inputType: "pdf",
+      entries,
+      estimatedInputTokens: Math.round(
+        entries.reduce((sum, entry) => sum + entry.text.length, 0) / 4
+      ),
+    });
+
+    const initialCoverage = buildCoverage({
+      scanResult,
+      isFullCoverage: true,
+      includeVisualAnchors: true,
+      maxVisualAnchors: MAX_PDF_VISUAL_ANCHORS,
+    });
+
+    const visualAnchorImages = await extractPdfVisualAnchors(parser, initialCoverage.visualAnchorUnits);
+    const coverage =
+      visualAnchorImages.length > 0
+        ? initialCoverage
+        : {
+            ...initialCoverage,
+            scoringSources: initialCoverage.scoringSources.filter(
+              (source) => source !== "visual_anchor_pages"
+            ),
+            visualAnchorUnits: [],
+          };
+
+    const processing: ScoreProcessingMeta = {
+      strategy: "mvp_scan_compress_score_v1",
+      scanResult,
+      notes:
+        visualAnchorImages.length > 0
+          ? [
+              `PDF 已完成整份页级文本扫描，并补充 ${visualAnchorImages.length} 页视觉锚点用于正式评分。`,
+              "正式评分基于整体结构摘要、页面级摘要、项目级摘要和有限视觉锚点完成。",
+            ]
+          : [
+              "PDF 已完成整份页级文本扫描，但当前视觉锚点生成失败，正式评分暂只基于文本结构摘要。",
+              "正式评分基于整体结构摘要、页面级摘要和项目级摘要完成。",
+            ],
+    };
+
     return {
-      text: result.text.slice(0, 12000), // ~3000 tokens
-      pageCount: info.total ?? null,
+      promptInput: buildPromptInputFromScan(scanResult),
+      scanResult,
+      coverage,
+      processing,
+      visualAnchorImages,
     };
   } finally {
     await parser.destroy();
   }
 }
 
+async function extractPdfVisualAnchors(
+  parser: InstanceType<typeof PDFParse>,
+  visualAnchorUnits: number[]
+): Promise<ImageInput[]> {
+  if (visualAnchorUnits.length === 0) {
+    return [];
+  }
+
+  try {
+    const screenshotResult = await parser.getScreenshot({
+      partial: visualAnchorUnits,
+      desiredWidth: PDF_VISUAL_ANCHOR_WIDTH,
+      imageBuffer: true,
+    });
+
+    return screenshotResult.pages.reduce<ImageInput[]>((images, page) => {
+      if (!page.data || page.data.length === 0) {
+        return images;
+      }
+
+      images.push({
+        base64: Buffer.from(page.data).toString("base64"),
+        mimeType: "image/png",
+      });
+      return images;
+    }, []);
+  } catch (error) {
+    console.error("PDF visual anchor extraction failed:", error);
+    return [];
+  }
+}
+
+async function extractLinkScan(url: string) {
+  const rootUrl = new URL(url);
+  const queue: Array<{ url: string; depth: number }> = [{ url: rootUrl.toString(), depth: 0 }];
+  const visited = new Set<string>();
+  const entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
+  const maxPages = 30;
+  const maxDepth = 3;
+  let truncated = false;
+
+  while (queue.length > 0 && visited.size < maxPages) {
+    const current = queue.shift();
+    if (!current) break;
+    if (visited.has(current.url)) continue;
+    visited.add(current.url);
+
+    try {
+      const response = await fetch(current.url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; FolioBox-Scorer/1.0)" },
+        signal: AbortSignal.timeout(8000),
+      });
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("text/html")) continue;
+
+      const html = await response.text();
+      const title = extractTitle(html);
+      const text = normalizeText(stripHtml(html)).slice(0, 4000);
+      entries.push({
+        unitNumber: entries.length + 1,
+        text: `${title ?? ""} ${text}`.trim(),
+        sourceHint: current.url,
+      });
+
+      if (current.depth >= maxDepth) continue;
+      const links = extractLinks(html, new URL(current.url), rootUrl.origin);
+      for (const link of links) {
+        if (visited.has(link)) continue;
+        if (queue.length + visited.size >= maxPages) {
+          truncated = true;
+          break;
+        }
+        queue.push({ url: link, depth: current.depth + 1 });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (queue.length > 0) {
+    truncated = true;
+  }
+
+  const scanResult = buildScanResult({
+    inputType: "link",
+    entries:
+      entries.length > 0
+        ? entries
+        : [{ unitNumber: 1, text: `作品集链接：${url}`, sourceHint: url }],
+  });
+
+  const coverage = buildCoverage({
+    scanResult,
+    isFullCoverage: !truncated,
+    includeVisualAnchors: false,
+  });
+
+  const processing: ScoreProcessingMeta = {
+    strategy: "mvp_link_crawl_scan_v1",
+    scanResult,
+    notes: truncated
+      ? ["当前链接抓取达到页面或深度上限，结果页需提示为有限覆盖。"]
+      : ["当前链接输入已完成同域名有限抓取。"],
+  };
+
+  return {
+    promptInput: buildPromptInputFromScan(scanResult),
+    scanResult,
+    coverage,
+    processing,
+  };
+}
+
+function extractImageScan(files: File[]) {
+  const entries = files.map((file, index) => ({
+    unitNumber: index + 1,
+    text: `${file.name} 第 ${index + 1} 张截图`,
+    sourceHint: file.name,
+  }));
+
+  const scanResult = buildScanResult({
+    inputType: "images",
+    entries,
+  });
+
+  const coverage = buildCoverage({
+    scanResult,
+    isFullCoverage: true,
+    includeVisualAnchors: true,
+    maxVisualAnchors: files.length,
+  });
+
+  const processing: ScoreProcessingMeta = {
+    strategy: "mvp_image_sequence_scan_v1",
+    scanResult,
+    notes: [
+      "截图输入按上传顺序全部纳入评分范围。",
+      "当前视觉评分直接基于全部上传截图完成。",
+    ],
+  };
+
+  return {
+    promptInput: buildPromptInputFromScan(scanResult),
+    scanResult,
+    coverage,
+    processing,
+  };
+}
+
 async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
   const inputs: ImageInput[] = [];
-  for (const file of files.slice(0, 10)) { // cap at 10 images
+  for (const file of files) {
     const buffer = await file.arrayBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
     const mimeType = file.type as ImageInput["mimeType"];
@@ -116,11 +402,70 @@ async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
   return inputs;
 }
 
-// ─── POST handler ─────────────────────────────────────────────────────────────
+function getAnonymousSessionId(req: NextRequest) {
+  return req.cookies.get(SCORE_ANONYMOUS_SESSION_COOKIE)?.value ?? null;
+}
+
+function getRequestIpHash(req: NextRequest) {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const realIp = req.headers.get("x-real-ip");
+  const userAgent = req.headers.get("user-agent") ?? "";
+  const rawIp = forwardedFor?.split(",")[0]?.trim() || realIp?.trim() || "";
+
+  if (!rawIp) {
+    return null;
+  }
+
+  return createHash("sha256")
+    .update(`${rawIp}|${userAgent}`)
+    .digest("hex");
+}
+
+function enhanceCoverage(
+  coverage: ScoreCoverage,
+  scoreOutput: ScoreOutput
+): ScoreCoverage {
+  return {
+    ...coverage,
+    detectedProjects: scoreOutput.detectedProjectCount ?? coverage.detectedProjects,
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
+    const anonymousSessionId =
+      session?.user?.id ? null : getAnonymousSessionId(req) ?? randomUUID();
+    const requestIpHash = session?.user?.id ? null : getRequestIpHash(req);
+
+    if (!session?.user?.id && anonymousSessionId) {
+      const recentAnonymousCount = await db.portfolioScore.count({
+        where: {
+          OR: [
+            { anonymousSessionId },
+            ...(requestIpHash ? [{ requestIpHash }] : []),
+          ],
+          createdAt: {
+            gte: new Date(Date.now() - ANONYMOUS_SCORE_WINDOW_MS),
+          },
+        },
+      });
+
+      if (recentAnonymousCount >= ANONYMOUS_SCORE_LIMIT) {
+        const limitedResponse = NextResponse.json(
+          { error: "当前匿名评分次数已用完，请登录后继续查看完整结果与后续整理流程" },
+          { status: 429 }
+        );
+        limitedResponse.cookies.set(SCORE_ANONYMOUS_SESSION_COOKIE, anonymousSessionId, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 30 * 24 * 60 * 60,
+        });
+        return limitedResponse;
+      }
+    }
 
     const formData = await req.formData();
     const inputType = formData.get("inputType") as string;
@@ -129,22 +474,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "无效的输入类型" }, { status: 400 });
     }
 
-    let contentForLLM = "";
     let inputUrl: string | null = null;
     let scoreOutput: ScoreOutput;
+    let coverage: ScoreCoverage;
+    let processing: ScoreProcessingMeta;
+    let trackExtras: {
+      fileSizeBytes?: number;
+      pageCount?: number;
+      itemCount?: number;
+      metadata?: Record<string, unknown>;
+    } = {};
 
     if (inputType === "link") {
       const url = formData.get("inputUrl") as string;
       if (!url) return NextResponse.json({ error: "请提供链接" }, { status: 400 });
 
-      // SSRF protection: only allow public HTTP/HTTPS URLs
       try {
         const parsed = new URL(url);
         if (!["http:", "https:"].includes(parsed.protocol)) {
           return NextResponse.json({ error: "链接格式无效" }, { status: 400 });
         }
         const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "::1"];
-        if (blocked.some((h) => parsed.hostname === h || parsed.hostname.endsWith(".local"))) {
+        if (blocked.some((host) => parsed.hostname === host || parsed.hostname.endsWith(".local"))) {
           return NextResponse.json({ error: "链接格式无效" }, { status: 400 });
         }
       } catch {
@@ -152,40 +503,29 @@ export async function POST(req: NextRequest) {
       }
 
       inputUrl = url;
+      const linkScan = await extractLinkScan(url);
+      coverage = linkScan.coverage;
+      processing = linkScan.processing;
+      trackExtras = {
+        itemCount: linkScan.scanResult.totalUnits,
+        metadata: { inputUrl: url },
+      };
 
-      // Attempt to fetch page text for scoring
-      try {
-        const pageRes = await fetch(url, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; FolioBox-Scorer/1.0)" },
-          signal: AbortSignal.timeout(8000),
-        });
-        const html = await pageRes.text();
-        // Strip tags, collapse whitespace
-        const text = html
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 12000);
-        contentForLLM = `作品集链接：${url}\n\n页面文本内容：\n${text}`;
-      } catch {
-        // Fallback: tell LLM only the URL (degraded but still useful)
-        contentForLLM = `作品集链接：${url}\n\n（无法抓取页面内容，请根据 URL 域名和结构推断作品集类型，给出通用结构性建议，并在 summaryPoints 中提示用户改用 PDF 或截图以获得更准确评分。）`;
-      }
-
-      const prompt = buildScoringPrompt(contentForLLM, "链接");
-      scoreOutput = await llm.generateStructured(prompt, ScoreOutputSchema, {
-        task: "portfolio_score",
-        temperature: 0.2,
-        maxTokens: 1500,
-        track: {
-          userId: session?.user?.id ?? null,
-          inputType: "link",
-          metadata: { inputUrl },
-        },
-      });
-
+      scoreOutput = await llm.generateStructured(
+        buildScoringPrompt(linkScan.promptInput, "链接"),
+        ScoreOutputSchema,
+        {
+          task: "portfolio_score",
+          temperature: 0.2,
+          maxTokens: 1800,
+          track: {
+            userId: session?.user?.id ?? null,
+            inputType: "link",
+            itemCount: linkScan.scanResult.totalUnits,
+            metadata: { inputUrl: url },
+          },
+        }
+      );
     } else if (inputType === "pdf") {
       const file = formData.get("file") as File | null;
       if (!file) return NextResponse.json({ error: "请上传 PDF" }, { status: 400 });
@@ -196,41 +536,85 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      let pdfPayload: { text: string; pageCount: number | null };
+      let pdfScan;
       try {
-        pdfPayload = await extractPdfText(file);
+        pdfScan = await extractPdfScan(file);
       } catch {
         return NextResponse.json({ error: "PDF 解析失败，请确认文件未加密" }, { status: 422 });
       }
 
-      contentForLLM = `PDF 文件名：${file.name}\n\n提取文本内容：\n${pdfPayload.text}`;
-      const prompt = buildScoringPrompt(contentForLLM, "PDF");
-      scoreOutput = await llm.generateStructured(prompt, ScoreOutputSchema, {
-        task: "portfolio_score",
-        temperature: 0.2,
-        maxTokens: 1500,
-        track: {
-          userId: session?.user?.id ?? null,
-          inputType: "pdf",
-          fileSizeBytes: file.size,
-          pageCount: pdfPayload.pageCount,
-          metadata: {
-            fileName: file.name,
-            mimeType: file.type,
-          },
+      coverage = pdfScan.coverage;
+      processing = pdfScan.processing;
+      trackExtras = {
+        fileSizeBytes: file.size,
+        pageCount: pdfScan.scanResult.totalUnits,
+        itemCount: pdfScan.visualAnchorImages.length,
+        metadata: {
+          fileName: file.name,
+          mimeType: file.type,
+          visualAnchorUnits: pdfScan.coverage.visualAnchorUnits,
+          visualAnchorCount: pdfScan.visualAnchorImages.length,
         },
-      });
+      };
 
+      if (pdfScan.visualAnchorImages.length > 0) {
+        scoreOutput = await llm.generateStructuredWithImages(
+          buildScoringPrompt(pdfScan.promptInput, "PDF"),
+          pdfScan.visualAnchorImages,
+          ScoreOutputSchema,
+          {
+            task: "portfolio_score",
+            temperature: 0.2,
+            maxTokens: 1800,
+            track: {
+              userId: session?.user?.id ?? null,
+              inputType: "pdf",
+              fileSizeBytes: file.size,
+              pageCount: pdfScan.scanResult.totalUnits,
+              itemCount: pdfScan.visualAnchorImages.length,
+              metadata: {
+                fileName: file.name,
+                mimeType: file.type,
+                visualAnchorUnits: pdfScan.coverage.visualAnchorUnits,
+                visualAnchorCount: pdfScan.visualAnchorImages.length,
+              },
+            },
+          }
+        );
+      } else {
+        scoreOutput = await llm.generateStructured(
+          buildScoringPrompt(pdfScan.promptInput, "PDF"),
+          ScoreOutputSchema,
+          {
+            task: "portfolio_score",
+            temperature: 0.2,
+            maxTokens: 1800,
+            track: {
+              userId: session?.user?.id ?? null,
+              inputType: "pdf",
+              fileSizeBytes: file.size,
+              pageCount: pdfScan.scanResult.totalUnits,
+              metadata: {
+                fileName: file.name,
+                mimeType: file.type,
+                visualAnchorFallback: "text_only",
+              },
+            },
+          }
+        );
+      }
     } else {
-      // images — use vision model
       const files = formData.getAll("files") as File[];
-      if (files.length === 0) return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+      if (files.length === 0) {
+        return NextResponse.json({ error: "请上传图片" }, { status: 400 });
+      }
       if (files.length > MAX_SCORE_IMAGES) {
         return NextResponse.json(
           { error: `评分入口最多上传 ${MAX_SCORE_IMAGES} 张截图` },
           { status: 400 }
         );
       }
+
       const totalImageSize = files.reduce((sum, file) => sum + file.size, 0);
       if (totalImageSize > MAX_SCORE_UPLOAD_SIZE) {
         return NextResponse.json(
@@ -241,46 +625,74 @@ export async function POST(req: NextRequest) {
 
       const images = await filesToImageInputs(files);
       if (images.length === 0) {
-        return NextResponse.json({ error: "图片格式不支持，请上传 JPG / PNG / WebP" }, { status: 400 });
+        return NextResponse.json(
+          { error: "图片格式不支持，请上传 JPG / PNG / WebP" },
+          { status: 400 }
+        );
       }
 
-      const prompt = buildScoringPrompt(
-        `用户上传了 ${images.length} 张作品集截图，请仔细观察每张图片的内容进行评分。`,
-        "截图"
-      );
-      scoreOutput = await llm.generateStructuredWithImages(prompt, images, ScoreOutputSchema, {
-        task: "portfolio_score",
-        temperature: 0.2,
-        maxTokens: 1500,
-        track: {
-          userId: session?.user?.id ?? null,
-          inputType: "images",
-          fileSizeBytes: totalImageSize,
-          itemCount: images.length,
-          metadata: {
-            uploadedFileCount: files.length,
+      const imageScan = extractImageScan(files);
+      coverage = imageScan.coverage;
+      processing = imageScan.processing;
+      trackExtras = {
+        fileSizeBytes: totalImageSize,
+        itemCount: images.length,
+        metadata: { uploadedFileCount: files.length },
+      };
+
+      scoreOutput = await llm.generateStructuredWithImages(
+        buildScoringPrompt(imageScan.promptInput, "截图"),
+        images,
+        ScoreOutputSchema,
+        {
+          task: "portfolio_score",
+          temperature: 0.2,
+          maxTokens: 1800,
+          track: {
+            userId: session?.user?.id ?? null,
+            inputType: "images",
+            fileSizeBytes: totalImageSize,
+            itemCount: images.length,
+            metadata: {
+              uploadedFileCount: files.length,
+            },
           },
-        },
-      });
+        }
+      );
     }
 
-    // Persist to DB
+    const finalCoverage = enhanceCoverage(coverage, scoreOutput);
+
     const record = await db.portfolioScore.create({
       data: {
         userId: session?.user?.id ?? null,
+        anonymousSessionId,
+        requestIpHash,
         inputType: inputType === "link" ? "LINK" : inputType === "pdf" ? "PDF" : "IMAGES",
         inputUrl,
         totalScore: scoreOutput.totalScore,
         level: getPortfolioScoreLevelFromTotalScore(scoreOutput.totalScore),
-        dimensionScores: scoreOutput.dimensionScores,
+        dimensionScores: scoreOutput.dimensionScores as unknown as Prisma.InputJsonValue,
+        coverageJson: finalCoverage as unknown as Prisma.InputJsonValue,
+        processingJson: processing as unknown as Prisma.InputJsonValue,
         summaryPoints: scoreOutput.summaryPoints,
         recommendedActions: scoreOutput.recommendedActions,
       },
     });
 
-    return NextResponse.json({ id: record.id });
-  } catch (err) {
-    console.error("Score API error:", err);
+    const response = NextResponse.json({ id: record.id });
+    if (!session?.user?.id && anonymousSessionId) {
+      response.cookies.set(SCORE_ANONYMOUS_SESSION_COOKIE, anonymousSessionId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+    }
+    return response;
+  } catch (error) {
+    console.error("Score API error:", error);
     return NextResponse.json({ error: "服务器错误，请稍后重试" }, { status: 500 });
   }
 }

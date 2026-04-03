@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ImageIcon, Info, Link2, Loader2, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ function isFigmaUrl(url: string) {
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<Method>("figma");
   const [loading, setLoading] = useState(false);
@@ -55,6 +56,8 @@ export default function NewProjectPage() {
           : "未上传",
     };
   }, [method, figmaUrl, imageFiles.length]);
+  const fromScore = searchParams.get("from") === "score";
+  const scoreId = searchParams.get("sid");
 
   function toggleTag(tag: string) {
     setTags((prev) =>
@@ -140,6 +143,15 @@ export default function NewProjectPage() {
         title="导入项目"
         description="先选择导入方式，再补充最小项目信息，最后进入素材确认页继续整理作品集。"
       />
+
+      {fromScore ? (
+        <div className="mt-6">
+          <InlineTip>
+            你是从评分结果进入这里的。下一步建议先导入一个真实项目，再把这次评分里提到的问题带入后续整理流程。
+            {scoreId ? " 当前评分结果会保留在工作台里，后面可以随时回看。" : ""}
+          </InlineTip>
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <ProgressHint current={step} total={STEP_TOTAL} label="导入向导" />

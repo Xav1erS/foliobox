@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
+  FolderOpen,
   User,
   Star,
   PlusCircle,
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV_ITEMS = [
   { href: "/dashboard", label: "工作台首页", icon: LayoutDashboard },
+  { href: "/projects", label: "我的项目", icon: FolderOpen },
   { href: "/profile", label: "设计师档案", icon: User },
 ];
 

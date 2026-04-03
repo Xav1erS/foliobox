@@ -9,10 +9,17 @@ const MAX_IMAGES = 20;
 
 type Tab = "link" | "pdf" | "images";
 
+const PROCESSING_STEPS: Record<Tab, string[]> = {
+  link: ["校验链接", "理解站点结构", "生成评分结果"],
+  pdf: ["校验文件", "扫描整份 PDF", "生成评分结果"],
+  images: ["校验截图", "理解整体顺序", "生成评分结果"],
+};
+
 export function ScoreClient() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("link");
   const [loading, setLoading] = useState(false);
+  const [processingStep, setProcessingStep] = useState(0);
   const [error, setError] = useState("");
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
@@ -32,6 +39,26 @@ export function ScoreClient() {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imageFiles]);
+
+  useEffect(() => {
+    if (!loading) {
+      setProcessingStep(0);
+      return;
+    }
+
+    setProcessingStep(1);
+    let currentStep = 1;
+    const steps = PROCESSING_STEPS[tab];
+    const timer = window.setInterval(() => {
+      currentStep = Math.min(currentStep + 1, steps.length);
+      setProcessingStep(currentStep);
+      if (currentStep >= steps.length) {
+        window.clearInterval(timer);
+      }
+    }, 1600);
+
+    return () => window.clearInterval(timer);
+  }, [loading, tab]);
 
   function switchTab(t: Tab) {
     setTab(t);
@@ -194,6 +221,23 @@ export function ScoreClient() {
     ((tab === "link" && url.trim()) ||
       (tab === "pdf" && pdfFile) ||
       (tab === "images" && imageFiles.length > 0));
+  const activeSteps = PROCESSING_STEPS[tab];
+  const inputSummary =
+    tab === "link"
+      ? "当前会优先扫描同域页面结构"
+      : tab === "pdf"
+        ? pdfFile
+          ? `${pdfFile.name} · 将先扫描整份 PDF，再补充关键视觉页`
+          : "当前会先扫描整份 PDF，再补充关键视觉页"
+        : imageFiles.length > 0
+          ? `共 ${imageFiles.length} 张截图 · 将按上传顺序整体理解`
+          : "当前会按上传顺序整体理解所有截图";
+  const processingDescription =
+    tab === "pdf"
+      ? "页数较多的 PDF 会稍慢一些，但系统不会默认只判断前几页。"
+      : tab === "link"
+        ? "我们会先理解整站结构，再整理成可评分的摘要。"
+        : "我们会先理解整体顺序，再按 8 个维度生成评分结果。";
 
   return (
     <>
@@ -206,9 +250,9 @@ export function ScoreClient() {
             给我的作品集打分
           </h1>
           <p className="mt-4 text-base leading-relaxed text-white/55">
-            上传现有作品集，AI 按 8 个维度出具评分报告，
+            上传现有作品集，系统会先理解整份输入结构，再按 8 个维度出具评分报告，
             <br className="hidden sm:block" />
-            60 秒内看到问题所在与改进建议。
+            不默认只判断前几页内容。
           </p>
         </div>
 
@@ -253,7 +297,7 @@ export function ScoreClient() {
                   className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white placeholder:text-white/25 outline-none transition-colors focus:border-white/25 focus:bg-white/[0.06]"
                 />
                 <p className="text-xs text-white/35">
-                  支持 Notion、Behance、个人网站、飞书文档等公开链接
+                  支持 Notion、Behance、个人网站、飞书文档等公开链接；系统会优先理解整站结构，而不是只抓首页。
                 </p>
               </div>
             )}
@@ -285,7 +329,7 @@ export function ScoreClient() {
                   />
                 </label>
                 <p className="text-xs text-white/30">
-                  当前评分入口支持最大 20MB 的 PDF，超过后请压缩再试。
+                  上传成功后会先扫描整份 PDF 的结构，再生成评分结果，不默认只看前几页。
                 </p>
               </div>
             )}
@@ -343,7 +387,7 @@ export function ScoreClient() {
                   </div>
                 ) : null}
                 <p className="text-xs text-white/30">
-                  如果截图总大小超过 20MB，建议先压缩后再评分。
+                  截图会按上传顺序整体理解；如果总大小超过 20MB，建议先压缩后再评分。
                 </p>
               </div>
             )}
@@ -358,7 +402,7 @@ export function ScoreClient() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  AI 评分中，请稍候…
+                  {activeSteps[Math.max(processingStep - 1, 0)]}…
                 </>
               ) : (
                 "开始评分"
@@ -382,6 +426,48 @@ export function ScoreClient() {
             <p className="mt-3 text-sm leading-6 text-white/55">
               我们正在按 8 个维度整理这份作品集的简版评分结果，完成后会直接进入聚焦结果页继续下一步。
             </p>
+            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4 text-left">
+              <p className="text-xs text-white/40">{inputSummary}</p>
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-white transition-all"
+                  style={{ width: `${(processingStep / activeSteps.length) * 100}%` }}
+                />
+              </div>
+              <div className="mt-4 space-y-3">
+                {activeSteps.map((step, index) => {
+                  const state =
+                    index + 1 < processingStep
+                      ? "done"
+                      : index + 1 === processingStep
+                        ? "active"
+                        : "pending";
+                  return (
+                    <div key={step} className="flex items-center gap-3">
+                      <span
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                          state === "done"
+                            ? "bg-white text-black"
+                            : state === "active"
+                              ? "border border-white/30 bg-white/10 text-white"
+                              : "border border-white/10 bg-white/[0.03] text-white/35"
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <span
+                        className={`text-sm ${
+                          state === "pending" ? "text-white/35" : "text-white/75"
+                        }`}
+                      >
+                        {step}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <p className="mt-4 text-xs leading-5 text-white/40">{processingDescription}</p>
           </div>
         </div>
       ) : null}

@@ -223,17 +223,24 @@ enum InvolvementLevel {
 model PortfolioScore {
   id                 String         @id @default(cuid())
   userId             String?
+  anonymousSessionId String?
+  requestIpHash      String?
   inputType          ScoreInputType
   inputUrl           String?
   totalScore         Int
   level              ScoreLevel
   dimensionScores    Json
+  coverageJson       Json?
+  processingJson     Json?
   summaryPoints      String[]
   recommendedActions String[]
   createdAt          DateTime       @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   llmUsageEvents LLMUsageEvent[]
+
+  @@index([anonymousSessionId, createdAt])
+  @@index([requestIpHash, createdAt])
 }
 
 enum ScoreInputType {
