@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -91,7 +90,7 @@ function ensurePdfParseWorkerSrc() {
       writeFileSync(PDF_PARSE_WORKER_PATH, workerSource);
     }
 
-    return pathToFileURL(PDF_PARSE_WORKER_PATH).href;
+    return PDF_PARSE_WORKER_PATH;
   } catch (error) {
     console.warn("Unable to prepare pdf.worker.mjs in /tmp:", error);
     return undefined;
