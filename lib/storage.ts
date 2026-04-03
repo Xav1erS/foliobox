@@ -1,7 +1,7 @@
 import { put, del, list } from "@vercel/blob";
 
 export type StorageFolder = "resumes" | "project-assets" | "exports" | "score-inputs";
-const PUBLIC_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+const BLOB_HOST_SUFFIX = ".blob.vercel-storage.com";
 
 /**
  * Upload a file to Vercel Blob storage.
@@ -10,11 +10,12 @@ const PUBLIC_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 export async function uploadFile(
   file: File | Blob,
   folder: StorageFolder,
-  filename: string
+  filename: string,
+  access: "public" | "private" = "public"
 ): Promise<string> {
   const pathname = `${folder}/${Date.now()}-${filename}`;
   const { url } = await put(pathname, file, {
-    access: "public",
+    access,
     addRandomSuffix: false,
   });
   return url;
@@ -38,8 +39,12 @@ export async function listFiles(folder: StorageFolder) {
 export function isBlobStorageUrl(value: string) {
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" && parsed.hostname.endsWith(PUBLIC_BLOB_HOST_SUFFIX);
+    return parsed.protocol === "https:" && parsed.hostname.endsWith(BLOB_HOST_SUFFIX);
   } catch {
     return false;
   }
+}
+
+export function buildPrivateBlobProxyUrl(source: string) {
+  return `/api/blob/file?source=${encodeURIComponent(source)}`;
 }

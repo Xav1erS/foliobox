@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getRequiredSession } from "@/lib/required-session";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { AssetsClient } from "./AssetsClient";
 
 export default async function AssetsPage({
@@ -36,7 +37,7 @@ export default async function AssetsPage({
         sourceType={project.sourceType}
         initialAssets={project.assets.map((a) => ({
           id: a.id,
-          imageUrl: a.imageUrl,
+          imageUrl: buildPrivateBlobProxyUrl(a.imageUrl),
           title: a.title ?? "",
           selected: a.selected,
           sortOrder: a.sortOrder,

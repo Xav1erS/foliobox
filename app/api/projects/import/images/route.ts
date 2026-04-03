@@ -9,6 +9,7 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 type UploadedImagePayload = {
   url: string;
+  pathname?: string;
   name: string;
   type: string;
   size: number;
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
     const uploadResults = isJson
       ? uploadedFiles!.map((file, i) => ({
           url: file.url,
+          pathname: file.pathname,
           index: i,
           name: file.name,
         }))
@@ -88,8 +90,9 @@ export async function POST(req: NextRequest) {
           files.map((file, i) => {
             const ext = file.name.split(".").pop() ?? "jpg";
             const filename = `${project.id}-${i}.${ext}`;
-            return uploadFile(file, "project-assets", filename).then((url) => ({
+            return uploadFile(file, "project-assets", filename, "private").then((url) => ({
               url,
+              pathname: undefined,
               index: i,
               name: file.name,
             }));
@@ -97,11 +100,11 @@ export async function POST(req: NextRequest) {
         );
 
     await db.projectAsset.createMany({
-      data: uploadResults.map(({ url, index, name: fileName }) => ({
+      data: uploadResults.map(({ url, pathname, index, name: fileName }) => ({
         projectId: project.id,
         assetType: "IMAGE",
         title: fileName.replace(/\.[^.]+$/, ""),
-        imageUrl: url,
+        imageUrl: pathname ?? url,
         sortOrder: index,
         selected: true,
         isCover: index === 0,

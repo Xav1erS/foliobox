@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
             throw new Error("Unauthorized");
           }
           return {
+            access: "private" as const,
             allowedContentTypes: ALLOWED_IMAGE_TYPES,
             maximumSizeInBytes: MAX_FILE_SIZE,
             addRandomSuffix: false,
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
 
         if (payload.folder === "score-inputs" && payload.kind === "score-image") {
           return {
+            access: "private" as const,
             allowedContentTypes: ALLOWED_IMAGE_TYPES,
             maximumSizeInBytes: MAX_FILE_SIZE,
             addRandomSuffix: false,
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
 
         if (payload.folder === "score-inputs" && payload.kind === "score-pdf") {
           return {
+            access: "private" as const,
             allowedContentTypes: ALLOWED_PDF_TYPES,
             maximumSizeInBytes: MAX_FILE_SIZE,
             addRandomSuffix: false,

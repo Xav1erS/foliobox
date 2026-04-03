@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getRequiredSession } from "@/lib/required-session";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { EditorClient } from "./EditorClient";
 
 export default async function EditorPage({
@@ -31,7 +32,11 @@ export default async function EditorPage({
 
   if (!draft || !project) notFound();
 
-  const assets = rawAssets.map((a) => ({ ...a, title: a.title ?? "" }));
+  const assets = rawAssets.map((a) => ({
+    ...a,
+    imageUrl: buildPrivateBlobProxyUrl(a.imageUrl),
+    title: a.title ?? "",
+  }));
 
   return (
     <EditorClient

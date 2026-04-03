@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 
 type Block = {
   id: string;
@@ -92,7 +93,12 @@ export default async function PrintPage({
   if (!draft) notFound();
 
   const assetMap: Record<string, { imageUrl: string; title: string }> = {};
-  for (const a of assets) assetMap[a.id] = { imageUrl: a.imageUrl, title: a.title ?? "" };
+  for (const a of assets) {
+    assetMap[a.id] = {
+      imageUrl: buildPrivateBlobProxyUrl(a.imageUrl),
+      title: a.title ?? "",
+    };
+  }
 
   const content = draft.contentJson as { pages?: Page[] };
   const pages = content?.pages ?? [];

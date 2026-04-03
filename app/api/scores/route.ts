@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
 import { isBlobStorageUrl } from "@/lib/storage";
+import { get } from "@vercel/blob";
 import {
   SCORE_ANONYMOUS_SESSION_COOKIE,
   type JudgementState,
@@ -85,6 +86,7 @@ const ScoreOutputSchema = z.object({
 type ScoreOutput = z.infer<typeof ScoreOutputSchema>;
 type UploadedInputFile = {
   url: string;
+  pathname?: string;
   name: string;
   size: number;
   type: string;
@@ -410,16 +412,18 @@ async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
 }
 
 async function downloadUploadedFile(file: UploadedInputFile): Promise<File> {
-  if (!isBlobStorageUrl(file.url)) {
+  const source = file.pathname || file.url;
+  const isPathname = !source.startsWith("http://") && !source.startsWith("https://");
+  if (!isPathname && !isBlobStorageUrl(source)) {
     throw new Error("invalid_blob_url");
   }
 
-  const response = await fetch(file.url);
-  if (!response.ok) {
+  const response = await get(source, { access: "private" });
+  if (!response || response.statusCode !== 200) {
     throw new Error("blob_fetch_failed");
   }
 
-  const buffer = await response.arrayBuffer();
+  const buffer = await new Response(response.stream).arrayBuffer();
   return new File([buffer], file.name, {
     type: file.type,
     lastModified: Date.now(),

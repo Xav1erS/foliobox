@@ -29,7 +29,7 @@ export async function uploadFilesFromBrowser(params: {
   const uploaded = await Promise.all(
     files.map(async (file) => {
       const blob = await upload(buildPathname(folder, file), file, {
-        access: "public",
+        access: "private",
         contentType: file.type,
         // Keep client uploads on the simpler direct-upload path for MVP.
         // The multipart endpoint introduced cross-origin 400s in production.

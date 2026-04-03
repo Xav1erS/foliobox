@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getRequiredSession } from "@/lib/required-session";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { OutlineClient } from "./OutlineClient";
 
 export default async function OutlinePage({
@@ -34,7 +35,11 @@ export default async function OutlinePage({
   if (!outline) notFound();
 
   const projectName = outline.projects[0]?.name ?? "";
-  const assets = rawAssets.map((a) => ({ ...a, title: a.title ?? "" }));
+  const assets = rawAssets.map((a) => ({
+    ...a,
+    imageUrl: buildPrivateBlobProxyUrl(a.imageUrl),
+    title: a.title ?? "",
+  }));
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
