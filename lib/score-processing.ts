@@ -154,7 +154,12 @@ function chooseVisualAnchorUnits(units: ScoreInputScanUnit[], maxCount: number) 
 
 export function buildScanResult(params: {
   inputType: ScoreInputTypePublic;
-  entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }>;
+  entries: Array<{
+    unitNumber: number;
+    text: string;
+    sourceHint?: string | null;
+    visualSummary?: string | null;
+  }>;
   estimatedInputTokens?: number;
 }): ScoreInputScanResult {
   const totalUnits = params.entries.length;
@@ -173,7 +178,7 @@ export function buildScanResult(params: {
       textDensity,
       visualDensity: getVisualDensity(textDensity),
       extractedTextSummary: summary,
-      visualSummary: null,
+      visualSummary: entry.visualSummary ?? null,
     };
   });
 
@@ -213,7 +218,8 @@ function buildPageSummaries(scanResult: ScoreInputScanResult) {
   return scanResult.units
     .map((unit) => {
       const summary = unit.extractedTextSummary ?? "当前单位缺少稳定文本摘要";
-      return `单位 ${unit.unitNumber} [${unit.unitType}]：${summary}`;
+      const visualSummary = unit.visualSummary ? `；视觉信号：${unit.visualSummary}` : "";
+      return `单位 ${unit.unitNumber} [${unit.unitType}]：${summary}${visualSummary}`;
     })
     .join("\n");
 }
@@ -228,7 +234,11 @@ function buildProjectSummaries(scanResult: ScoreInputScanResult) {
     .map((section, index) => {
       const unitSummaries = scanResult.units
         .filter((unit) => unit.sectionId === section.sectionId)
-        .map((unit) => unit.extractedTextSummary)
+        .map((unit) =>
+          unit.visualSummary
+            ? `${unit.extractedTextSummary ?? "当前单位缺少稳定文本摘要"}（${unit.visualSummary}）`
+            : unit.extractedTextSummary
+        )
         .filter(Boolean)
         .join("；");
 

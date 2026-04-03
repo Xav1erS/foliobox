@@ -79,6 +79,16 @@ export interface ScoreCoverage {
 
 export interface ScoreProcessingMeta {
   strategy: string;
+  parseProvider?: string | null;
+  parseProviderDisplayName?: string | null;
+  parseProviderRegion?: string | null;
+  parseProviderNetworkProfile?: string | null;
+  parseProviderStabilityTier?: string | null;
+  parseAttemptedProviders?: string[];
+  parseFallbackUsed?: boolean;
+  parseElapsedMs?: number | null;
+  parseEstimatedCostUsd?: number | null;
+  visualSourceAvailable?: boolean;
   scanResult: ScoreInputScanResult;
   notes: string[];
 }

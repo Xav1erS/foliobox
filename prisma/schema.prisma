@@ -80,6 +80,7 @@ model User {
   orders            Order[]
   userPlans         UserPlan[]
   llmUsageEvents    LLMUsageEvent[]
+  externalParseUsageEvents ExternalParseUsageEvent[]
 }
 
 model DesignerProfile {
@@ -238,6 +239,7 @@ model PortfolioScore {
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   llmUsageEvents LLMUsageEvent[]
+  externalParseUsageEvents ExternalParseUsageEvent[]
 
   @@index([anonymousSessionId, createdAt])
   @@index([requestIpHash, createdAt])
@@ -343,6 +345,28 @@ model LLMUsageEvent {
   @@index([projectId, createdAt])
   @@index([outlineId, createdAt])
   @@index([draftId, createdAt])
+  @@index([portfolioScoreId, createdAt])
+}
+
+model ExternalParseUsageEvent {
+  id               String   @id @default(cuid())
+  provider         String
+  success          Boolean  @default(true)
+  elapsedMs        Int
+  pageCount        Int?
+  estimatedCostUsd Float?
+  fileSizeBytes    Int?
+  errorMessage     String?  @db.Text
+  metadataJson     Json?
+  userId           String?
+  portfolioScoreId String?
+  createdAt        DateTime @default(now())
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  portfolioScore PortfolioScore? @relation(fields: [portfolioScoreId], references: [id], onDelete: SetNull)
+
+  @@index([provider, createdAt])
+  @@index([userId, createdAt])
   @@index([portfolioScoreId, createdAt])
 }
 

@@ -1,14 +1,15 @@
 # FolioBox — 工程交接文档
 
-面向 Claude Code / Codex 的工程上下文说明。产品规范唯一入口见 `private-docs/spec-system-v2/00_README_Document_Map_v2.md`。
+面向 Claude Code / Codex 的工程上下文说明。当前有效规范稳定入口见 `private-docs/CURRENT_SPEC.md`。
 
 ---
 
 ## 产品规范入口（v2）
 
-从现在开始，产品规范以 `private-docs/spec-system-v2/` 下的文档为唯一有效依据。
+从现在开始，产品规范以 `private-docs/CURRENT_SPEC.md` 为稳定入口，并以 `private-docs/spec-system-v2/` 下文档为唯一有效依据。
 
 文档权威顺序：
+- 稳定入口：`private-docs/CURRENT_SPEC.md`
 - 总入口与读取顺序：`private-docs/spec-system-v2/00_README_Document_Map_v2.md`
 - 产品范围与页面地图：`private-docs/spec-system-v2/01_FolioBox_MVP_Spec_Core_v2.md`
 - 当前版本页面归属、文案、CTA、壳层与行为冻结：`private-docs/spec-system-v2/02_Current_Freeze_v2.md`
@@ -16,17 +17,22 @@
 - 生成、配额、重试与成本控制：`private-docs/spec-system-v2/04_Generation_and_Cost_Control_v2.md`
 - 支付、套餐、权限与回跳：`private-docs/spec-system-v2/05_Billing_and_Entitlement_v2.md`
 - 工作台 IA、项目管理与状态流：`private-docs/spec-system-v2/06_Workspace_IA_v2.md`
+- 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v2/07_Quality_Engineering_v1.md`
+- 文档维护规则与冲突处理：`private-docs/spec-system-v2/99_Document_Maintenance_Rules.md`
 
 使用规则：
 - 主 spec `01_FolioBox_MVP_Spec_Core_v2.md` 只用于确认产品范围、主闭环与页面地图
 - Freeze `02_Current_Freeze_v2.md` 用于当前版本页面归属、文案、CTA、壳层与行为冻结
 - 专题规则分别以对应专题文档为准，不回到主 spec 重复判断
+- 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v1.md` 为准
+- 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules.md` 为准
 - `private-docs/archive-legacy/` 下的旧文档仅作历史参考，不作为当前实现依据
 - 如果旧文档、旧备注或本文其他段落与 v2 文档冲突，一律以 `private-docs/spec-system-v2/` 下文档为准
 
 执行要求：
-- 开始任何产品相关代码修改前，先阅读 `00_README_Document_Map_v2.md`
-- 再按任务命中范围读取 `01` 到 `06` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付或工作台 IA，必须读取对应专题文档
+- 开始任何产品相关代码修改前，先阅读 `private-docs/CURRENT_SPEC.md`
+- 再阅读 `00_README_Document_Map_v2.md`
+- 再按任务命中范围读取 `01` 到 `07` 和 `99` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付、工作台 IA、质量工程或文档维护规则，必须读取对应文档
 - 在开始修改代码前，先输出本次任务命中的文档清单
 - 在开始修改代码前，先明确说明：
   - 本次任务涉及哪几份文档
@@ -106,7 +112,7 @@ lib/
   utils.ts            # cn() 等工具
   llm/
     provider.ts       # LLMProvider 接口
-    openai.ts         # OpenAI 实现（gpt-4o primary，gpt-4o-mini lite）
+    openai.ts         # OpenAI 实现（具体模型与 task routing 以 04_Generation_and_Cost_Control_v2.md 和环境变量为准）
     index.ts          # 导出 llm 实例
   payment/
     index.ts          # PaymentProvider 接口 + getProvider() 工厂

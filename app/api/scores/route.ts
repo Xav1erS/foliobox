@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -9,81 +8,28 @@ import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
 import { isBlobStorageUrl } from "@/lib/storage";
 import { get } from "@vercel/blob";
+import { persistExternalParseUsageEvent } from "@/lib/external-parse-usage";
 import {
   SCORE_ANONYMOUS_SESSION_COOKIE,
   type JudgementState,
   type ScoreCoverage,
   type ScoreProcessingMeta,
 } from "@/lib/score-contract";
+import type {
+  ExternalParseUsageMeta,
+  PDFParseResult,
+} from "@/lib/pdf-parse/provider";
+import { getConfiguredPDFParseProviders } from "@/lib/pdf-parse/registry";
 import {
   buildCoverage,
   buildPromptInputFromScan,
   buildScanResult,
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
-const PDF_WORKER_GLOBAL_READY = import("@/vendor/pdf-parse/pdf.worker.mjs").catch((error) => {
-  console.warn("Unable to preload pdf.worker.mjs into the server runtime:", error);
-  return null;
-});
-
-const HAS_NATIVE_PDF_VISUAL_GLOBALS =
-  typeof globalThis.DOMMatrix !== "undefined" &&
-  typeof globalThis.ImageData !== "undefined" &&
-  typeof globalThis.Path2D !== "undefined";
-
-if (typeof globalThis.DOMMatrix === "undefined") {
-  class DOMMatrixStub {}
-  (globalThis as typeof globalThis & { DOMMatrix: typeof DOMMatrix }).DOMMatrix =
-    DOMMatrixStub as unknown as typeof DOMMatrix;
-}
-
-if (typeof globalThis.ImageData === "undefined") {
-  class ImageDataStub {}
-  (globalThis as typeof globalThis & { ImageData: typeof ImageData }).ImageData =
-    ImageDataStub as unknown as typeof ImageData;
-}
-
-if (typeof globalThis.Path2D === "undefined") {
-  class Path2DStub {}
-  (globalThis as typeof globalThis & { Path2D: typeof Path2D }).Path2D =
-    Path2DStub as unknown as typeof Path2D;
-}
-
-const require = createRequire(import.meta.url);
-type PDFParseInstance = {
-  getInfo: (options?: { parsePageInfo?: boolean }) => Promise<{ total?: number }>;
-  getText: (options?: { partial?: number[] }) => Promise<{ text: string }>;
-  getScreenshot: (options?: {
-    partial?: number[];
-    desiredWidth?: number;
-    imageBuffer?: boolean;
-  }) => Promise<{
-    pages: Array<{
-      data?: Uint8Array;
-      dataUrl?: string;
-      pageNumber: number;
-      width: number;
-      height: number;
-      scale: number;
-    }>;
-    total: number;
-  }>;
-  destroy: () => Promise<void>;
-};
-
-type PDFParseClass = {
-  new (params: { data: Buffer }): PDFParseInstance;
-  setWorker: (workerSrc?: string) => string;
-};
-
-const { PDFParse } = require("pdf-parse") as {
-  PDFParse: PDFParseClass;
-};
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
 const MAX_PDF_VISUAL_ANCHORS = 8;
-const PDF_VISUAL_ANCHOR_WIDTH = 800;
 const ANONYMOUS_SCORE_LIMIT = 3;
 const ANONYMOUS_SCORE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DIMENSION_SCORE_KEYS = [
@@ -347,137 +293,148 @@ ${content}
 }
 
 async function extractPdfScan(file: File) {
-  await PDF_WORKER_GLOBAL_READY;
+  const parseUsageEvents: ExternalParseUsageMeta[] = [];
+  const attemptedProviders: string[] = [];
+  const providers = getConfiguredPDFParseProviders();
+  let result: PDFParseResult | null = null;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const parser = new PDFParse({ data: buffer });
+  console.info("[pdf-parse] starting", {
+    fileName: file.name,
+    fileSizeBytes: file.size,
+    configuredProviders: providers.map((provider) => provider.name),
+  });
 
-  try {
-    const info = await parser.getInfo({ parsePageInfo: true });
-    const totalPages = info.total ?? 0;
-    let usedFullDocumentFallback = false;
-    let entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
+  for (const provider of providers) {
+    attemptedProviders.push(provider.name);
+    console.info("[pdf-parse] attempting_provider", {
+      provider: provider.name,
+      providerDisplayName: provider.profile.displayName,
+      providerRegion: provider.profile.region,
+      providerNetworkProfile: provider.profile.networkProfile,
+      providerStabilityTier: provider.profile.stabilityTier,
+      fileName: file.name,
+      fileSizeBytes: file.size,
+    });
 
     try {
-      for (let page = 1; page <= totalPages; page += 1) {
-        const pageText = await parser.getText({ partial: [page] });
-        entries.push({
-          unitNumber: page,
-          text: normalizeText(pageText.text ?? ""),
-          sourceHint: `PDF 第 ${page} 页`,
-        });
-      }
-    } catch (pageLevelError) {
-      console.warn("PDF page-level scan failed, falling back to full-document extraction:", pageLevelError);
-      usedFullDocumentFallback = true;
-      const fullText = await parser.getText();
-      entries = [
-        {
-          unitNumber: 1,
-          text: normalizeText(fullText.text ?? ""),
-          sourceHint:
-            totalPages > 0 ? `PDF 全文提取（共 ${totalPages} 页）` : "PDF 全文提取",
-        },
-      ];
-    }
-
-    const scanResult = buildScanResult({
-      inputType: "pdf",
-      entries,
-      estimatedInputTokens: Math.round(
-        entries.reduce((sum, entry) => sum + entry.text.length, 0) / 4
-      ),
-    });
-
-    const initialCoverage = buildCoverage({
-      scanResult,
-      isFullCoverage: true,
-      includeVisualAnchors: true,
-      maxVisualAnchors: MAX_PDF_VISUAL_ANCHORS,
-    });
-
-    const canRenderPdfVisualAnchors = HAS_NATIVE_PDF_VISUAL_GLOBALS;
-    const visualAnchorImages = canRenderPdfVisualAnchors
-      ? await extractPdfVisualAnchors(parser, initialCoverage.visualAnchorUnits)
-      : [];
-    const coverage =
-      visualAnchorImages.length > 0
-        ? initialCoverage
-        : {
-            ...initialCoverage,
-            scoringSources: initialCoverage.scoringSources.filter(
-              (source) => source !== "visual_anchor_pages"
-            ),
-            visualAnchorUnits: [],
-          };
-
-    const processing: ScoreProcessingMeta = {
-      strategy: "mvp_scan_compress_score_v1",
-      scanResult,
-      notes:
-        visualAnchorImages.length > 0
-          ? [
-              `PDF 已完成整份页级文本扫描，并补充 ${visualAnchorImages.length} 页视觉锚点用于正式评分。`,
-              "正式评分基于整体结构摘要、页面级摘要、项目级摘要和有限视觉锚点完成。",
-            ]
-          : usedFullDocumentFallback
-            ? [
-                "当前 PDF 的页级解析不稳定，系统已自动退回整份全文扫描模式。",
-                "正式评分基于整体结构摘要、全文摘要和项目级摘要完成。",
-              ]
-          : !canRenderPdfVisualAnchors
-            ? [
-                "当前运行环境暂不支持 PDF 页截图渲染，正式评分已自动降级为整份文本结构扫描模式。",
-                "正式评分基于整体结构摘要、页面级摘要和项目级摘要完成。",
-              ]
-          : [
-              "PDF 已完成整份页级文本扫描，但当前视觉锚点生成失败，正式评分暂只基于文本结构摘要。",
-              "正式评分基于整体结构摘要、页面级摘要和项目级摘要完成。",
-            ],
-    };
-
-    return {
-      promptInput: buildPromptInputFromScan(scanResult),
-      scanResult,
-      coverage,
-      processing,
-      visualAnchorImages,
-    };
-  } finally {
-    await parser.destroy();
-  }
-}
-
-async function extractPdfVisualAnchors(
-  parser: InstanceType<typeof PDFParse>,
-  visualAnchorUnits: number[]
-): Promise<ImageInput[]> {
-  if (visualAnchorUnits.length === 0) {
-    return [];
-  }
-
-  try {
-    const screenshotResult = await parser.getScreenshot({
-      partial: visualAnchorUnits,
-      desiredWidth: PDF_VISUAL_ANCHOR_WIDTH,
-      imageBuffer: true,
-    });
-
-    return screenshotResult.pages.reduce<ImageInput[]>((images, page) => {
-      if (!page.data || page.data.length === 0) {
-        return images;
-      }
-
-      images.push({
-        base64: Buffer.from(page.data).toString("base64"),
-        mimeType: "image/png",
+      result = await provider.parse(file);
+      parseUsageEvents.push({
+        provider: result.provider,
+        providerProfile: result.providerProfile,
+        success: true,
+        elapsedMs: result.parseElapsedMs,
+        pageCount: result.pageCount,
+        estimatedCostUsd: result.estimatedCostUsd,
+        fileSizeBytes: file.size,
+        metadata: result.metadata ?? null,
       });
-      return images;
-    }, []);
-  } catch (error) {
-    console.error("PDF visual anchor extraction failed:", error);
-    return [];
+      console.info("[pdf-parse] provider_succeeded", {
+        provider: result.provider,
+        providerDisplayName: result.providerProfile.displayName,
+        pageCount: result.pageCount,
+        visualSourceAvailable: result.visualSourceAvailable,
+        parseElapsedMs: result.parseElapsedMs,
+        estimatedCostUsd: result.estimatedCostUsd,
+      });
+      break;
+    } catch (error) {
+      console.error("[pdf-parse] provider_failed", {
+        provider: provider.name,
+        providerDisplayName: provider.profile.displayName,
+        errorMessage: error instanceof Error ? error.message : "Unknown parse error",
+        fileName: file.name,
+        fileSizeBytes: file.size,
+      });
+      parseUsageEvents.push({
+        provider: provider.name,
+        providerProfile: provider.profile,
+        success: false,
+        elapsedMs: 0,
+        pageCount: null,
+        estimatedCostUsd: null,
+        fileSizeBytes: file.size,
+        errorMessage: error instanceof Error ? error.message : "Unknown parse error",
+        metadata: {
+          stage: "provider_attempt",
+          providerProfile: provider.profile,
+        },
+      });
+    }
   }
+  if (!result) {
+    console.error("[pdf-parse] all_providers_failed", {
+      fileName: file.name,
+      fileSizeBytes: file.size,
+      attemptedProviders,
+    });
+    throw new Error("all_pdf_parse_providers_failed");
+  }
+  const parseFallbackUsed = result.provider !== providers[0]?.name;
+
+  console.info("[pdf-parse] selection_finalized", {
+    selectedProvider: result.provider,
+    selectedProviderDisplayName: result.providerProfile.displayName,
+    parseFallbackUsed,
+    attemptedProviders,
+    totalUnits: result.scanResult.totalUnits,
+    parseElapsedMs: result.parseElapsedMs,
+    visualSourceAvailable: result.visualSourceAvailable,
+    estimatedCostUsd: result.estimatedCostUsd,
+  });
+
+  const initialCoverage = buildCoverage({
+    scanResult: result.scanResult,
+    isFullCoverage: true,
+    includeVisualAnchors: result.visualSourceAvailable,
+    maxVisualAnchors: MAX_PDF_VISUAL_ANCHORS,
+  });
+
+  const coverage = result.visualSourceAvailable
+    ? initialCoverage
+    : {
+        ...initialCoverage,
+        scoringSources: initialCoverage.scoringSources.filter(
+          (source) => source !== "visual_anchor_pages"
+        ),
+        visualAnchorUnits: [],
+      };
+
+  const processing: ScoreProcessingMeta = {
+    strategy: "mvp_scan_compress_score_v2",
+    parseProvider: result.provider,
+    parseProviderDisplayName: result.providerProfile.displayName,
+    parseProviderRegion: result.providerProfile.region,
+    parseProviderNetworkProfile: result.providerProfile.networkProfile,
+    parseProviderStabilityTier: result.providerProfile.stabilityTier,
+    parseAttemptedProviders: attemptedProviders,
+    parseFallbackUsed,
+    parseElapsedMs: result.parseElapsedMs,
+    parseEstimatedCostUsd: result.estimatedCostUsd,
+    visualSourceAvailable: result.visualSourceAvailable,
+    scanResult: result.scanResult,
+    notes: parseFallbackUsed
+      ? [
+          "外部文档解析服务当前不可用，系统已自动退回本地 PDF 文本结构扫描。",
+          "本次评分继续基于整份输入的结构摘要、页面级摘要和项目级摘要完成。",
+        ]
+      : result.visualSourceAvailable
+        ? [
+            "PDF 已通过外部文档解析服务完成整份页级解析与结构化抽取。",
+            "本次评分基于整体结构摘要、页面级摘要、项目级摘要与可用视觉原料完成。",
+          ]
+        : [
+            "PDF 已通过外部文档解析服务完成整份页级解析，但当前视觉原料不足。",
+            "本次评分优先基于整体结构摘要、页面级摘要和项目级摘要完成，并在部分维度降低判断强度。",
+          ],
+  };
+
+  return {
+    promptInput: buildPromptInputFromScan(result.scanResult),
+    scanResult: result.scanResult,
+    coverage,
+    processing,
+    parseUsageEvents,
+  };
 }
 
 async function extractLinkScan(url: string) {
@@ -707,6 +664,7 @@ export async function POST(req: NextRequest) {
     let scoreOutput: ScoreOutput;
     let coverage: ScoreCoverage;
     let processing: ScoreProcessingMeta;
+    let externalParseUsageEvents: ExternalParseUsageMeta[] = [];
     let trackExtras: {
       fileSizeBytes?: number;
       pageCount?: number;
@@ -771,6 +729,20 @@ export async function POST(req: NextRequest) {
         pdfScan = await extractPdfScan(file);
       } catch (error) {
         console.error("PDF scan failed:", error);
+        await persistExternalParseUsageEvent({
+          usage: {
+            provider: "pdf_parse_fallback",
+            providerProfile: null,
+            success: false,
+            elapsedMs: 0,
+            pageCount: null,
+            estimatedCostUsd: null,
+            fileSizeBytes: file.size,
+            errorMessage: error instanceof Error ? error.message : "Unknown parse error",
+            metadata: { stage: "fallback_provider" },
+          },
+          userId: session?.user?.id ?? null,
+        });
         return NextResponse.json(
           { error: "PDF 解析失败，当前文件暂时无法完成结构扫描，请稍后重试或换一份导出版本" },
           { status: 422 }
@@ -779,64 +751,47 @@ export async function POST(req: NextRequest) {
 
       coverage = pdfScan.coverage;
       processing = pdfScan.processing;
+      externalParseUsageEvents = pdfScan.parseUsageEvents;
       trackExtras = {
         fileSizeBytes: file.size,
         pageCount: pdfScan.scanResult.totalUnits,
-        itemCount: pdfScan.visualAnchorImages.length,
+        itemCount: pdfScan.coverage.visualAnchorUnits.length,
         metadata: {
           fileName: file.name,
           mimeType: file.type,
+          parseProvider: pdfScan.processing.parseProvider,
+          parseFallbackUsed: pdfScan.processing.parseFallbackUsed,
+          parseElapsedMs: pdfScan.processing.parseElapsedMs,
+          visualSourceAvailable: pdfScan.processing.visualSourceAvailable,
           visualAnchorUnits: pdfScan.coverage.visualAnchorUnits,
-          visualAnchorCount: pdfScan.visualAnchorImages.length,
+          visualAnchorCount: pdfScan.coverage.visualAnchorUnits.length,
         },
       };
 
-      if (pdfScan.visualAnchorImages.length > 0) {
-        scoreOutput = await llm.generateStructuredWithImages(
-          buildScoringPrompt(pdfScan.promptInput, "PDF"),
-          pdfScan.visualAnchorImages,
-          ScoreOutputSchemaForLLM,
-          {
-            task: "portfolio_score",
-            temperature: 0.2,
-            maxTokens: 1800,
-            track: {
-              userId: session?.user?.id ?? null,
-              inputType: "pdf",
-              fileSizeBytes: file.size,
-              pageCount: pdfScan.scanResult.totalUnits,
-              itemCount: pdfScan.visualAnchorImages.length,
-              metadata: {
-                fileName: file.name,
-                mimeType: file.type,
-                visualAnchorUnits: pdfScan.coverage.visualAnchorUnits,
-                visualAnchorCount: pdfScan.visualAnchorImages.length,
-              },
+      scoreOutput = await llm.generateStructured(
+        buildScoringPrompt(pdfScan.promptInput, "PDF"),
+        ScoreOutputSchemaForLLM,
+        {
+          task: "portfolio_score",
+          temperature: 0.2,
+          maxTokens: 1800,
+          track: {
+            userId: session?.user?.id ?? null,
+            inputType: "pdf",
+            fileSizeBytes: file.size,
+            pageCount: pdfScan.scanResult.totalUnits,
+            itemCount: pdfScan.coverage.visualAnchorUnits.length,
+            metadata: {
+              fileName: file.name,
+              mimeType: file.type,
+              parseProvider: pdfScan.processing.parseProvider,
+              parseFallbackUsed: pdfScan.processing.parseFallbackUsed,
+              visualSourceAvailable: pdfScan.processing.visualSourceAvailable,
+              visualAnchorUnits: pdfScan.coverage.visualAnchorUnits,
             },
-          }
-        );
-      } else {
-        scoreOutput = await llm.generateStructured(
-          buildScoringPrompt(pdfScan.promptInput, "PDF"),
-          ScoreOutputSchemaForLLM,
-          {
-            task: "portfolio_score",
-            temperature: 0.2,
-            maxTokens: 1800,
-            track: {
-              userId: session?.user?.id ?? null,
-              inputType: "pdf",
-              fileSizeBytes: file.size,
-              pageCount: pdfScan.scanResult.totalUnits,
-              metadata: {
-                fileName: file.name,
-                mimeType: file.type,
-                visualAnchorFallback: "text_only",
-              },
-            },
-          }
-        );
-      }
+          },
+        }
+      );
     } else {
       const uploadedFiles = (isJson ? body?.files : null) as UploadedInputFile[] | null;
       const files = isJson
@@ -916,6 +871,16 @@ export async function POST(req: NextRequest) {
         recommendedActions: scoreOutput.recommendedActions,
       },
     });
+
+    await Promise.all(
+      externalParseUsageEvents.map((usage) =>
+        persistExternalParseUsageEvent({
+          usage,
+          portfolioScoreId: record.id,
+          userId: session?.user?.id ?? null,
+        })
+      )
+    );
 
     const response = NextResponse.json({ id: record.id });
     if (!session?.user?.id && anonymousSessionId) {

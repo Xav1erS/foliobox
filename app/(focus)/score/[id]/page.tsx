@@ -9,6 +9,7 @@ import {
   SCORE_ANONYMOUS_SESSION_COOKIE,
   type JudgementState,
   type ScoreCoverage,
+  type ScoreProcessingMeta,
 } from "@/lib/score-contract";
 import {
   canAccessPortfolioScore,
@@ -145,6 +146,11 @@ export default async function ScoreResultPage({
     scoringSources: [],
     visualAnchorUnits: [],
   }) as unknown) as ScoreCoverage;
+  const processing = ((score.processingJson ?? {
+    strategy: "unknown",
+    notes: [],
+    scanResult: coverage,
+  }) as unknown) as ScoreProcessingMeta;
   const resolvedLevel = resolvePortfolioScoreLevel(score.totalScore, score.level);
   const level = PORTFOLIO_SCORE_LEVEL_CONFIG[resolvedLevel];
   let planType: Awaited<ReturnType<typeof getUserPlan>> = "FREE";
@@ -305,10 +311,46 @@ export default async function ScoreResultPage({
             <p className="mt-4 text-xs leading-5 text-white/45">
               本次结论基于整份输入的结构理解完成，并结合有限视觉证据补充，不是仅基于前几页内容得出。
             </p>
+            {processing.parseProvider ? (
+              <p className="mt-2 text-xs leading-5 text-white/35">
+                当前解析链路：
+                {processing.parseProviderDisplayName ??
+                  (processing.parseProvider === "mistral_ocr"
+                    ? "外部文档解析服务"
+                    : "本地 PDF 解析 fallback")}
+                {processing.parseFallbackUsed ? "（已启用降级）" : ""}
+                {typeof processing.parseEstimatedCostUsd === "number"
+                  ? ` · 解析成本估算 $${processing.parseEstimatedCostUsd.toFixed(4)}`
+                  : ""}
+              </p>
+            ) : null}
+            {processing.parseProviderRegion || processing.parseProviderNetworkProfile || processing.parseProviderStabilityTier ? (
+              <p className="mt-2 text-xs leading-5 text-white/35">
+                {processing.parseProviderRegion ? `区域：${processing.parseProviderRegion}` : null}
+                {processing.parseProviderRegion && processing.parseProviderNetworkProfile ? " · " : null}
+                {processing.parseProviderNetworkProfile
+                  ? `链路画像：${processing.parseProviderNetworkProfile}`
+                  : null}
+                {(processing.parseProviderRegion || processing.parseProviderNetworkProfile) &&
+                processing.parseProviderStabilityTier
+                  ? " · "
+                  : null}
+                {processing.parseProviderStabilityTier
+                  ? `稳定性分层：${processing.parseProviderStabilityTier}`
+                  : null}
+              </p>
+            ) : null}
             {coverage.visualAnchorUnits.length > 0 ? (
               <p className="mt-2 text-xs leading-5 text-white/35">
                 本次补充查看了第 {coverage.visualAnchorUnits.join("、")} 页的视觉锚点。
               </p>
+            ) : null}
+            {processing.notes.length > 0 ? (
+              <ul className="mt-3 space-y-2 text-xs leading-5 text-white/40">
+                {processing.notes.slice(0, 2).map((note, index) => (
+                  <li key={index}>{note}</li>
+                ))}
+              </ul>
             ) : null}
           </section>
 
