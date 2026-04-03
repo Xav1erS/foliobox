@@ -25,6 +25,7 @@ import {
 } from "@/lib/score-next-step";
 import { StepHeader } from "@/components/app/StepHeader";
 import { PermissionGate } from "@/components/app/PermissionGate";
+import { ScoreResultPrimaryAction } from "@/components/focus/ScoreResultPrimaryAction";
 
 interface DimensionScore {
   score: number;
@@ -54,6 +55,10 @@ const DIMENSIONS: { key: keyof DimensionScores; label: string; weight: number }[
   { key: "jobFit", label: "投递适配度", weight: 5 },
 ];
 
+const FREE_SUMMARY_LIMIT = 2;
+const FULL_SUMMARY_LIMIT = 5;
+const FULL_ACTION_LIMIT = 5;
+
 function coverageUnitLabel(inputType: ScoreCoverage["inputType"]) {
   if (inputType === "images") return "张";
   if (inputType === "link") return "页";
@@ -72,6 +77,13 @@ function scoreColor(score: number) {
   if (score >= 70) return "bg-amber-500/70";
   if (score >= 50) return "bg-orange-500/70";
   return "bg-red-500/70";
+}
+
+function scoreTextColor(score: number) {
+  if (score >= 85) return "text-emerald-300";
+  if (score >= 70) return "text-amber-300";
+  if (score >= 50) return "text-orange-300";
+  return "text-red-300";
 }
 
 function judgementLabel(state: JudgementState) {
@@ -97,6 +109,31 @@ function judgementSummary(dims: DimensionScores) {
     limited: values.filter((dim) => dim.judgementState === "limited_judgement").length,
     insufficient: values.filter((dim) => dim.judgementState === "insufficient_evidence").length,
   };
+}
+
+function sortPriorityDimensions(dims: DimensionScores) {
+  return [...DIMENSIONS].sort((a, b) => {
+    const aDim = dims[a.key];
+    const bDim = dims[b.key];
+    const stateRank = (state: JudgementState) =>
+      state === "full_judgement" ? 0 : state === "limited_judgement" ? 1 : 2;
+    const byState = stateRank(aDim.judgementState) - stateRank(bDim.judgementState);
+    if (byState !== 0) return byState;
+    return aDim.score - bDim.score;
+  });
+}
+
+function resultConclusion(levelLabel: string, totalScore: number) {
+  if (totalScore >= 85) {
+    return `这份作品集当前已经${levelLabel}，重点是继续确认细节，而不是重做整份内容。`;
+  }
+  if (totalScore >= 70) {
+    return `这份作品集当前${levelLabel}，但还有几处关键问题值得先局部优化。`;
+  }
+  if (totalScore >= 50) {
+    return `这份作品集当前${levelLabel}，更适合先带着问题继续整理，再进入下一轮投递。`;
+  }
+  return `这份作品集当前${levelLabel}，建议先回到项目表达和结构本身补齐核心信息。`;
 }
 
 export default async function ScoreResultPage({
@@ -182,7 +219,8 @@ export default async function ScoreResultPage({
   const canViewFull = planType !== "FREE";
   const isLoggedIn = !!session?.user?.id;
   const loginHref = `/login?next=${encodeURIComponent(`/score/${id}`)}`;
-  const previewDimensions = DIMENSIONS.slice(0, 3);
+  const priorityDimensions = sortPriorityDimensions(dims);
+  const previewDimensions = priorityDimensions.slice(0, 3);
   const judgementCounts = judgementSummary(dims);
   const profileReady = isProfileReadyForGeneration(profile);
   const nextStep = getScoreNextStep({
@@ -192,6 +230,16 @@ export default async function ScoreResultPage({
     isLoggedIn,
     profileReady,
   });
+  const mainIssuePoints = score.summaryPoints.slice(
+    0,
+    canViewFull ? FULL_SUMMARY_LIMIT : FREE_SUMMARY_LIMIT
+  );
+  const actionItems = score.recommendedActions.slice(0, FULL_ACTION_LIMIT);
+  const heroTitle = canViewFull ? nextStep.primaryLabel : "解锁完整结果";
+  const levelConclusion = resultConclusion(level.label, score.totalScore);
+  const paywallTitle = "解锁完整结果，继续这次评分任务";
+  const paywallDescription =
+    "你当前看到的是简版结果。解锁后会立刻获得完整 8 维分析、3–5 条核心问题摘要、3–5 条可执行改进建议，并可把本次评分继续带入整理流程。";
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
@@ -204,71 +252,128 @@ export default async function ScoreResultPage({
         status={canViewFull ? "完整结果" : "免费简版结果"}
       />
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="mt-10 space-y-6">
         <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
-          <p className="text-xs uppercase tracking-[0.18em] text-white/35">综合得分</p>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-7xl font-bold leading-none text-white">{score.totalScore}</span>
-            <span className="mb-2 text-2xl text-white/30">/100</span>
-          </div>
-          <div className="mt-5">
-            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${level.badgeClassName}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${level.indicatorClassName}`} />
-              {level.label}
-            </span>
-          </div>
-          <p className="mt-4 text-sm leading-6 text-white/55">{level.description}</p>
+          <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-white/35">结果结论</p>
+              <div className="mt-4 flex items-end gap-3">
+                <span className="text-7xl font-bold leading-none text-white">{score.totalScore}</span>
+                <span className="mb-2 text-2xl text-white/30">/100</span>
+              </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${level.badgeClassName}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${level.indicatorClassName}`} />
+                  {level.label}
+                </span>
+                <span className="text-xs text-white/35">{level.rangeLabel}</span>
+              </div>
+              <p className="mt-5 text-lg font-medium leading-8 text-white">{levelConclusion}</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{level.description}</p>
+              <div className="mt-8">
+                <ScoreResultPrimaryAction
+                  canViewFull={canViewFull}
+                  href={nextStep.primaryHref}
+                  label={heroTitle}
+                  loginHref={canViewFull || isLoggedIn ? undefined : loginHref}
+                />
+              </div>
+            </div>
 
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">下一步</p>
-            <h2 className="mt-3 text-lg font-semibold text-white">{nextStep.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-white/55">{nextStep.description}</p>
-            {!canViewFull ? (
-              <p className="mt-3 text-xs leading-5 text-white/40">
-                当前免费态已开放：综合得分、主要问题摘要、覆盖范围说明，以及 3 个维度预览。
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">一句话结论</p>
+              <p className="mt-3 text-sm leading-6 text-white/65">
+                {canViewFull
+                  ? "你现在看到的是完整评分结果，重点不是继续读报告，而是带着这次判断进入下一步整理。"
+                  : "你现在看到的是简版结果，用来先判断这份作品集现在能不能投，以及最该先改什么。"}
               </p>
-            ) : null}
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-5">
-            <h2 className="text-sm font-semibold text-white/80">主要问题摘要</h2>
-            <ul className="mt-4 space-y-3">
-              {score.summaryPoints.slice(0, 5).map((point, index) => (
-                <li key={index} className="flex gap-2.5 text-sm text-white/60">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/70" />
-                  {point}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href={nextStep.primaryHref}
-              className="inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-            >
-              {nextStep.primaryLabel}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            {nextStep.secondaryHref ? (
-              <Link
-                href={nextStep.secondaryHref}
-                className="inline-flex h-12 items-center gap-2 rounded-xl border border-white/10 px-5 text-sm text-white/70 transition-colors hover:border-white/20 hover:text-white"
-              >
-                {nextStep.secondaryLabel}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : null}
-            {!canViewFull ? (
-              <span className="inline-flex h-12 items-center rounded-xl border border-white/10 px-4 text-sm text-white/45">
-                完整 8 维分析与改进建议需解锁后查看
-              </span>
-            ) : null}
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">当前开放内容</p>
+                <p className="mt-3 text-sm leading-6 text-white/55">
+                  {canViewFull
+                    ? "完整 8 维分析、3–5 条问题摘要、3–5 条改进建议，以及将本次评分继续带入整理流程。"
+                    : "总分、等级、一句话结论、3 个优先维度预览、1–2 条核心问题摘要和覆盖范围说明。"}
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
-        <div className="space-y-6">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold text-white/80">判断依据</h2>
+                {!canViewFull ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/45">
+                    简版结果
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-5 space-y-4">
+                {(canViewFull ? DIMENSIONS : previewDimensions).map(({ key, label, weight }) => {
+                  const dim = dims[key];
+                  if (!dim) return null;
+                  const weighted = Math.round((dim.score * weight) / 100);
+                  const isReference =
+                    dim.judgementState === "limited_judgement" ||
+                    dim.judgementState === "insufficient_evidence";
+                  return (
+                    <div key={key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-white/85">{label}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${judgementClassName(
+                                dim.judgementState
+                              )}`}
+                            >
+                              {judgementLabel(dim.judgementState)}
+                            </span>
+                            <span className={`text-xs ${scoreTextColor(dim.score)}`}>
+                              {isReference ? "参考分" : "判断分"} {weighted}/{weight}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className={`h-full rounded-full ${scoreColor(dim.score)}`}
+                          style={{ width: `${dim.score}%` }}
+                        />
+                      </div>
+                      {canViewFull ? (
+                        <p className="mt-3 text-xs leading-5 text-white/50">{dim.comment}</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+              {!canViewFull ? (
+                <p className="mt-5 text-xs leading-5 text-white/45">
+                  免费版先展示 3 个最优先维度预览。若维度为“判断有限”或“证据不足”，当前分数仅作为参考，不代表确定结论。
+                </p>
+              ) : null}
+            </section>
+
+            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/80">
+                {canViewFull ? "问题摘要" : "核心问题摘要"}
+              </h2>
+              <ul className="mt-4 space-y-3">
+                {mainIssuePoints.map((point, index) => (
+                  <li key={index} className="flex gap-2.5 text-sm text-white/60">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/70" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
             <h2 className="text-sm font-semibold text-white/80">本次评分覆盖范围</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -352,106 +457,125 @@ export default async function ScoreResultPage({
                 ))}
               </ul>
             ) : null}
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-sm font-semibold text-white/80">判断状态</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/60">完整判断</p>
-                <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.full}</p>
-              </div>
-              <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300/70">判断有限</p>
-                <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.limited}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">证据不足</p>
-                <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.insufficient}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-xs leading-5 text-white/45">
-              如果某个维度显示“判断有限”或“证据不足”，表示系统已尽量避免用缺少证据的内容做过强结论。
-            </p>
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold text-white/80">8 维评分</h2>
-              {!canViewFull ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/45">
-                  <Lock className="h-3 w-3" />
-                  完整版已锁定
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-5 space-y-4">
-              {(canViewFull ? DIMENSIONS : previewDimensions).map(({ key, label, weight }) => {
-                const dim = dims[key];
-                if (!dim) return null;
-                const weighted = Math.round((dim.score * weight) / 100);
-                return (
-                  <div key={key}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm text-white/75">{label}</span>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] ${judgementClassName(
-                            dim.judgementState
-                          )}`}
-                        >
-                          {judgementLabel(dim.judgementState)}
-                        </span>
-                        <span className="font-mono text-xs text-white/40">
-                          {weighted}/{weight}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div className={`h-full rounded-full ${scoreColor(dim.score)}`} style={{ width: `${dim.score}%` }} />
-                    </div>
-                    {canViewFull ? (
-                      <p className="mt-2 text-xs leading-5 text-white/45">{dim.comment}</p>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            {!canViewFull ? (
-              <p className="mt-5 text-xs leading-5 text-white/45">
-                免费态先开放 3 个高优先级维度预览。登录或解锁后，可继续查看完整 8 维细项与逐项建议。
-              </p>
-            ) : null}
-          </section>
-
-          <PermissionGate
-            allowed={canViewFull}
-            loginHref={isLoggedIn ? undefined : loginHref}
-            scene="score_detail"
-            title={isLoggedIn ? "解锁完整结果，继续当前评分任务" : "登录后查看完整评分结果"}
-            description={
-              isLoggedIn
-                ? "你已经拿到了免费简版结果。解锁后可查看完整 8 维细项、改进建议，并继续把这份作品集整理成第一版。"
-                : "当前展示的是免费简版结果。登录后可继续查看完整分析，并把这份作品集带入后续整理流程。"
-            }
-            actionLabel={isLoggedIn ? "解锁完整结果" : "登录后继续"}
-          >
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-sm font-semibold text-white/80">改进建议</h2>
-              <ul className="mt-4 space-y-3">
-                {score.recommendedActions.map((action, index) => (
-                  <li key={index} className="flex gap-2.5 text-sm text-white/60">
-                    <span className="mt-0.5 shrink-0 font-mono text-xs text-emerald-400/70">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    {action}
-                  </li>
-                ))}
-              </ul>
             </section>
-          </PermissionGate>
-        </div>
+
+            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-sm font-semibold text-white/80">判断状态</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/60">完整判断</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.full}</p>
+                </div>
+                <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300/70">判断有限</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.limited}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">证据不足</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.insufficient}</p>
+                </div>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-white/45">
+                如果某个维度显示“判断有限”或“证据不足”，当前页面会先显示判断状态，再展示参考分，避免把证据不足直接表现成低分。
+              </p>
+            </section>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <p className="text-xs uppercase tracking-[0.18em] text-white/35">下一步动作</p>
+            <h2 className="mt-4 text-2xl font-semibold text-white">{nextStep.title}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{nextStep.description}</p>
+
+            {canViewFull ? (
+              <>
+                <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <h3 className="text-sm font-semibold text-white/80">改进建议</h3>
+                  <ul className="mt-4 space-y-3">
+                    {actionItems.map((action, index) => (
+                      <li key={index} className="flex gap-2.5 text-sm text-white/60">
+                        <span className="mt-0.5 shrink-0 font-mono text-xs text-emerald-400/70">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {nextStep.secondaryHref ? (
+                  <Link
+                    href={nextStep.secondaryHref}
+                    className="mt-5 inline-flex items-center gap-2 text-sm text-white/55 transition-colors hover:text-white"
+                  >
+                    {nextStep.secondaryLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </>
+            ) : (
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <h3 className="text-sm font-semibold text-white/80">为什么当前是简版结果</h3>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    免费版先帮助你快速判断这份作品集当前能不能投，以及最该优先修改的少数问题。完整 8 维分析、完整问题摘要和改进建议需要解锁后查看。
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <h3 className="text-sm font-semibold text-white/80">解锁后立刻获得什么</h3>
+                  <ul className="mt-3 space-y-2 text-sm text-white/55">
+                    <li>完整 8 维分析与判断状态说明</li>
+                    <li>3–5 条更完整的问题摘要</li>
+                    <li>3–5 条可执行改进建议</li>
+                    <li>把这次评分继续带入整理作品集流程</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-5">
+                  <p className="text-xs uppercase tracking-[0.18em] text-amber-300/70">默认推荐 Pro</p>
+                  <p className="mt-3 text-sm leading-6 text-white/60">
+                    Pro 会立刻开放完整评分结果，并允许你把本次判断继续带入整理流程，而不是停留在简版报告里。
+                  </p>
+                </div>
+                <PermissionGate
+                  allowed={false}
+                  loginHref={isLoggedIn ? undefined : loginHref}
+                  scene="score_detail"
+                  title={paywallTitle}
+                  description={paywallDescription}
+                  actionLabel={isLoggedIn ? "解锁完整结果" : "登录后解锁完整结果"}
+                >
+                  <></>
+                </PermissionGate>
+                {nextStep.secondaryHref ? (
+                  <Link
+                    href={nextStep.secondaryHref}
+                    className="inline-flex items-center gap-2 text-sm text-white/55 transition-colors hover:text-white"
+                  >
+                    {nextStep.secondaryLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {!canViewFull ? (
+            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <div className="flex items-center gap-2 text-white/70">
+                <Lock className="h-4 w-4" />
+                <h2 className="text-sm font-semibold">完整结果已锁定</h2>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-white/55">
+                解锁后可继续查看完整 8 维、更多问题摘要和可执行改进建议，并把这次评分继续带入工作台整理流程。
+              </p>
+              <div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-white/45">
+                <p>完整 8 维评分</p>
+                <p>3–5 条问题摘要</p>
+                <p>3–5 条改进建议</p>
+              </div>
+            </section>
+          ) : null}
+        </section>
       </div>
     </div>
   );
