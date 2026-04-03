@@ -30,6 +30,8 @@ const ClaudeMessagesResponseSchema = z.object({
     z.object({
       type: z.string(),
       text: z.string().optional(),
+      name: z.string().optional(),
+      input: z.unknown().optional(),
     })
   ),
   usage: z
@@ -61,15 +63,6 @@ function getFetch() {
     } as RequestInit & { dispatcher: ProxyAgent })) as typeof fetch;
 }
 
-function extractJsonBlock(raw: string) {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) {
-    throw new Error("claude_pdf_invalid_json");
-  }
-  return raw.slice(first, last + 1);
-}
-
 function getPerMillionCost(raw: string) {
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : null;
@@ -89,13 +82,11 @@ function buildPrompt() {
   return [
     "请阅读整份 PDF 作品集，并按页返回极简结构化结果。",
     "要求：",
-    "1. 输出必须是 JSON 对象，不能带 markdown 代码块。",
-    "2. JSON 结构必须为：",
-    '{ "pages": [ { "pageNumber": 1, "text": "...", "visualSummary": "..." } ] }',
-    "3. text 需要概括当前页的主要文字内容与信息点，尽量保留角色、项目、结果等关键信息。",
-    "4. visualSummary 只在当前页存在明显视觉结构时填写，例如标题层级、表格、图表、强视觉主元素；没有就填 null。",
-    "5. 必须覆盖整份 PDF 的每一页，pageNumber 从 1 开始连续编号。",
-    "6. 每页 text 保持简洁，控制在 120 字以内。",
+    "1. 必须调用指定工具返回结构化结果，不要输出 markdown 代码块。",
+    "2. text 需要概括当前页的主要文字内容与信息点，尽量保留角色、项目、结果等关键信息。",
+    "3. visualSummary 只在当前页存在明显视觉结构时填写，例如标题层级、表格、图表、强视觉主元素；没有就填 null。",
+    "4. 必须覆盖整份 PDF 的每一页，pageNumber 从 1 开始连续编号。",
+    "5. 每页 text 保持简洁，控制在 120 字以内。",
   ].join("\n");
 }
 
@@ -128,6 +119,39 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
         model: ANTHROPIC_PDF_MODEL,
         max_tokens: 4096,
         temperature: 0,
+        tool_choice: {
+          type: "tool",
+          name: "submit_pdf_pages",
+        },
+        tools: [
+          {
+            name: "submit_pdf_pages",
+            description: "Return a compact page-by-page structured summary for the full PDF.",
+            input_schema: {
+              type: "object",
+              properties: {
+                pages: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      pageNumber: { type: "integer", minimum: 1 },
+                      text: { type: "string" },
+                      visualSummary: {
+                        anyOf: [{ type: "string" }, { type: "null" }],
+                      },
+                    },
+                    required: ["pageNumber", "text", "visualSummary"],
+                    additionalProperties: false,
+                  },
+                  minItems: 1,
+                },
+              },
+              required: ["pages"],
+              additionalProperties: false,
+            },
+          },
+        ],
         messages: [
           {
             role: "user",
@@ -157,12 +181,13 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
     }
 
     const parsed = ClaudeMessagesResponseSchema.parse(await response.json());
-    const rawText = parsed.content
-      .filter((item) => item.type === "text" && typeof item.text === "string")
-      .map((item) => item.text ?? "")
-      .join("\n");
-    const jsonText = extractJsonBlock(rawText);
-    const result = ClaudeParseResultSchema.parse(JSON.parse(jsonText));
+    const toolUse = parsed.content.find(
+      (item) => item.type === "tool_use" && item.name === "submit_pdf_pages"
+    );
+    if (!toolUse?.input) {
+      throw new Error("claude_pdf_missing_tool_use");
+    }
+    const result = ClaudeParseResultSchema.parse(toolUse.input);
 
     const scanResult = buildScanResult({
       inputType: "pdf",

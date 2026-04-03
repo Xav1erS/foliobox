@@ -87,9 +87,16 @@ function normalizeDimensionScoreEntry(value: unknown) {
   }
 
   const candidate = value as Record<string, unknown>;
+  const rawScore = candidate.score;
+  const numericScore =
+    typeof rawScore === "number"
+      ? rawScore
+      : typeof rawScore === "string"
+        ? Number(rawScore)
+        : NaN;
 
   return {
-    score: candidate.score,
+    score: Number.isFinite(numericScore) ? Math.max(0, Math.min(100, numericScore)) : rawScore,
     comment: candidate.comment ?? candidate.summary ?? candidate.reason ?? candidate.note ?? "",
     judgementState:
       candidate.judgementState ??
@@ -168,10 +175,23 @@ function normalizeDimensionScores(value: unknown) {
   return value;
 }
 
+function normalizeBoundedNumber(value: unknown, min: number, max: number) {
+  const numeric =
+    typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+
+  if (!Number.isFinite(numeric)) {
+    return value;
+  }
+
+  return Math.max(min, Math.min(max, numeric));
+}
+
 const ScoreOutputSchema: z.ZodType<ScoreOutput, z.ZodTypeDef, unknown> = z.object({
-  totalScore: z.number().min(0).max(100),
+  totalScore: z.preprocess((value) => normalizeBoundedNumber(value, 0, 100), z.number().min(0).max(100)),
   level: z.enum(["ready", "needs_improvement", "draft", "not_ready"]),
-  detectedProjectCount: z.number().int().min(0).max(20).optional(),
+  detectedProjectCount: z
+    .preprocess((value) => normalizeBoundedNumber(value, 0, 20), z.number().int().min(0).max(20))
+    .optional(),
   dimensionScores: z.preprocess(
     normalizeDimensionScores,
     z.object({
