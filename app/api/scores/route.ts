@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import * as path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -46,28 +48,49 @@ if (typeof globalThis.Path2D === "undefined") {
 }
 
 const require = createRequire(import.meta.url);
-const { PDFParse } = require("pdf-parse") as {
-  PDFParse: new (params: { data: Buffer }) => {
-    getInfo: (options?: { parsePageInfo?: boolean }) => Promise<{ total?: number }>;
-    getText: (options?: { partial?: number[] }) => Promise<{ text: string }>;
-    getScreenshot: (options?: {
-      partial?: number[];
-      desiredWidth?: number;
-      imageBuffer?: boolean;
-    }) => Promise<{
-      pages: Array<{
-        data?: Uint8Array;
-        dataUrl?: string;
-        pageNumber: number;
-        width: number;
-        height: number;
-        scale: number;
-      }>;
-      total: number;
+type PDFParseInstance = {
+  getInfo: (options?: { parsePageInfo?: boolean }) => Promise<{ total?: number }>;
+  getText: (options?: { partial?: number[] }) => Promise<{ text: string }>;
+  getScreenshot: (options?: {
+    partial?: number[];
+    desiredWidth?: number;
+    imageBuffer?: boolean;
+  }) => Promise<{
+    pages: Array<{
+      data?: Uint8Array;
+      dataUrl?: string;
+      pageNumber: number;
+      width: number;
+      height: number;
+      scale: number;
     }>;
-    destroy: () => Promise<void>;
-  };
+    total: number;
+  }>;
+  destroy: () => Promise<void>;
 };
+
+type PDFParseClass = {
+  new (params: { data: Buffer }): PDFParseInstance;
+  setWorker: (workerSrc?: string) => string;
+};
+
+const { PDFParse } = require("pdf-parse") as {
+  PDFParse: PDFParseClass;
+};
+
+const PDF_PARSE_WORKER_PATH = path.join(
+  process.cwd(),
+  "node_modules",
+  "pdf-parse",
+  "dist",
+  "pdf-parse",
+  "cjs",
+  "pdf.worker.mjs"
+);
+
+if (existsSync(PDF_PARSE_WORKER_PATH)) {
+  PDFParse.setWorker(PDF_PARSE_WORKER_PATH);
+}
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
