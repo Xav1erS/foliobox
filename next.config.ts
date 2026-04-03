@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["nodemailer"],
   outputFileTracingIncludes: {
-    "/api/scores": ["./node_modules/pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs"],
+    "/api/scores": ["./vendor/pdf-parse/pdf.worker.mjs"],
   },
   images: {
     remotePatterns: [

@@ -80,11 +80,8 @@ const { PDFParse } = require("pdf-parse") as {
 
 const PDF_PARSE_WORKER_PATH = path.join(
   process.cwd(),
-  "node_modules",
+  "vendor",
   "pdf-parse",
-  "dist",
-  "pdf-parse",
-  "cjs",
   "pdf.worker.mjs"
 );
 
