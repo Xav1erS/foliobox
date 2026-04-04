@@ -40,7 +40,7 @@ export function SectionFrame({
         <span
           key={position}
           className={cn(
-            "pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border border-white/18 bg-black",
+            "pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 border border-white/18 bg-black",
             position
           )}
         />

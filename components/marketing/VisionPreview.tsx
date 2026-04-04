@@ -6,7 +6,7 @@ export function VisionPreview() {
   return (
     <section id="vision-preview" className="px-6 py-24">
       <div className="mx-auto max-w-[1200px]">
-        <SectionFrame className="rounded-[32px] border border-white/10 bg-white/[0.03]">
+        <SectionFrame className="border border-white/10 bg-white/[0.02]">
           <div className="grid gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 lg:py-14">
             <div>
               <p className="mb-4 text-xs uppercase tracking-[0.26em] text-white/35">
@@ -24,12 +24,12 @@ export function VisionPreview() {
             </div>
 
             <div className="flex flex-col justify-between gap-6">
-              <div className="rounded-[28px] border border-white/10 bg-black/30 px-5 py-5">
+              <div className="border border-white/10 bg-black/30 px-5 py-5">
                 <div className="grid gap-5 lg:grid-cols-[1fr_220px] lg:items-center">
                   <p className="text-sm leading-7 text-white/58">
                     作品集只是入口。后面我还想慢慢补上简历一致性、岗位匹配、面试讲述这些更难也更真实的部分。
                   </p>
-                  <div className="rounded-[22px] border border-white/8 bg-white/[0.02] p-3">
+                  <div className="border border-white/8 bg-white/[0.02] p-3">
                     <IsometricWireframe className="mx-auto max-w-[200px]" />
                   </div>
                 </div>
@@ -38,13 +38,13 @@ export function VisionPreview() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
                   href="/vision"
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                  className="inline-flex h-11 items-center justify-center border border-white bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
                 >
                   看看我想把它做成什么
                 </Link>
                 <Link
                   href="/editorial/developers-note"
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 px-5 text-sm font-medium text-white transition-colors hover:border-white/28 hover:bg-white/[0.05]"
+                  className="inline-flex h-11 items-center justify-center border border-white/14 px-5 text-sm font-medium text-white transition-colors hover:border-white/28 hover:bg-white/[0.05]"
                 >
                   先读开发者说
                 </Link>
