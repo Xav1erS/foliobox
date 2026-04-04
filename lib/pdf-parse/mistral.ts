@@ -1,16 +1,20 @@
 import { z } from "zod";
 import { buildScanResult } from "@/lib/score-processing";
 import type { PDFParseProvider, PDFParseResult } from "@/lib/pdf-parse/provider";
+import { isRunningOnVercel } from "@/lib/runtime-target";
 
+const IS_VERCEL = isRunningOnVercel();
 const MISTRAL_BASE_URL = process.env.MISTRAL_BASE_URL?.replace(/\/+$/, "") || "https://api.mistral.ai";
 const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest";
 const MISTRAL_OCR_TIMEOUT_MS = Math.max(
   1_000,
-  Number(process.env.MISTRAL_OCR_TIMEOUT_MS || "60000") || 60_000
+  Number(process.env.MISTRAL_OCR_TIMEOUT_MS || (IS_VERCEL ? "15000" : "60000")) ||
+    (IS_VERCEL ? 15_000 : 60_000)
 );
 const MISTRAL_OCR_MAX_RETRIES = Math.max(
   0,
-  Number(process.env.MISTRAL_OCR_MAX_RETRIES || "2") || 2
+  Number(process.env.MISTRAL_OCR_MAX_RETRIES || (IS_VERCEL ? "0" : "2")) ||
+    (IS_VERCEL ? 0 : 2)
 );
 const MISTRAL_OCR_RETRY_DELAY_MS = Math.max(
   0,

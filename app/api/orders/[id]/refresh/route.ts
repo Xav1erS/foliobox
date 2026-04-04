@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getProvider } from "@/lib/payment";
+import {
+  getPaymentProviderUnavailableMessage,
+  getProvider,
+  isPaymentProviderEnabled,
+} from "@/lib/payment";
 
 export async function POST(
   _req: Request,
@@ -27,6 +31,13 @@ export async function POST(
   }
 
   const paymentProvider = getProvider(order.provider);
+  if (!isPaymentProviderEnabled(order.provider, paymentProvider)) {
+    return NextResponse.json(
+      { error: getPaymentProviderUnavailableMessage(order.provider), status: order.status },
+      { status: 503 }
+    );
+  }
+
   const result = await paymentProvider.queryOrder(order.providerOrderId);
 
   if (result.status === "paid") {

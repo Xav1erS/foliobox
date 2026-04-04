@@ -36,6 +36,7 @@ function parseArgs(argv) {
     file: "",
     runs: 3,
     baseUrl: process.env.MEASURE_SCORE_BASE_URL || "https://www.foliobox.art",
+    cookie: process.env.MEASURE_SCORE_COOKIE || "",
     keepUploaded: false,
     output: "",
   };
@@ -45,6 +46,7 @@ function parseArgs(argv) {
     if (current === "--file") args.file = argv[index + 1] ?? "";
     if (current === "--runs") args.runs = Number(argv[index + 1] ?? "3");
     if (current === "--base-url") args.baseUrl = argv[index + 1] ?? args.baseUrl;
+    if (current === "--cookie") args.cookie = argv[index + 1] ?? "";
     if (current === "--output") args.output = argv[index + 1] ?? "";
     if (current === "--keep-uploaded") args.keepUploaded = true;
   }
@@ -126,12 +128,13 @@ async function uploadPrivatePdf(filePath) {
   };
 }
 
-async function createScore(baseUrl, uploadedFile) {
+async function createScore(baseUrl, uploadedFile, cookieHeader = "") {
   const startedAt = Date.now();
   const response = await fetch(`${baseUrl}/api/scores`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     },
     body: JSON.stringify({
       inputType: "pdf",
@@ -168,11 +171,11 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
 loadEnvFile(path.join(projectRoot, ".env"));
 loadEnvFile(path.join(projectRoot, ".env.local"));
 
-const { file, runs, baseUrl, keepUploaded, output } = parseArgs(process.argv.slice(2));
+const { file, runs, baseUrl, cookie, keepUploaded, output } = parseArgs(process.argv.slice(2));
 
 if (!file) {
   console.error(
-    "Usage: npm run measure:score-stability -- --file /abs/path/file.pdf [--runs 3] [--base-url https://www.foliobox.art]"
+    "Usage: npm run measure:score-stability -- --file /abs/path/file.pdf [--runs 3] [--base-url https://www.foliobox.art] [--cookie 'name=value; ...']"
   );
   process.exit(1);
 }
@@ -187,6 +190,7 @@ console.info("Starting score stability measurement", {
   fileSizeMB: Number((fileStats.size / 1024 / 1024).toFixed(2)),
   runs,
   baseUrl,
+  usingProvidedCookie: Boolean(cookie),
   uploadedPathname: uploadedFile.pathname,
 });
 
@@ -194,7 +198,7 @@ const runResults = [];
 
 try {
   for (let runIndex = 0; runIndex < runs; runIndex += 1) {
-    const submitResult = await createScore(baseUrl, uploadedFile);
+    const submitResult = await createScore(baseUrl, uploadedFile, cookie);
 
     if (!submitResult.ok || !submitResult.payload?.id) {
       const failedRun = {

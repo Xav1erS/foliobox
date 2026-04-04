@@ -2,7 +2,11 @@ import { z } from "zod";
 import { ProxyAgent } from "undici";
 import { buildScanResult } from "@/lib/score-processing";
 import type { PDFParseProvider, PDFParseResult } from "@/lib/pdf-parse/provider";
+import { isRunningOnVercel } from "@/lib/runtime-target";
 
+const CLAUDE_TIMEOUT_MS = Number(
+  process.env.ANTHROPIC_PDF_TIMEOUT_MS || (isRunningOnVercel() ? "20000" : "90000")
+) || (isRunningOnVercel() ? 20_000 : 90_000);
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL?.replace(/\/+$/, "") || "https://api.anthropic.com";
 const ANTHROPIC_PDF_MODEL = process.env.ANTHROPIC_PDF_MODEL || "claude-3-5-haiku-latest";
@@ -322,7 +326,7 @@ export class ClaudePDFParseProvider implements PDFParseProvider {
           },
         ],
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS),
     });
 
     if (!response.ok) {

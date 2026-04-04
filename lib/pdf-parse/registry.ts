@@ -3,13 +3,16 @@ import { AzureDocumentIntelligencePDFParseProvider } from "@/lib/pdf-parse/azure
 import { ClaudePDFParseProvider } from "@/lib/pdf-parse/claude";
 import { MistralPDFParseProvider } from "@/lib/pdf-parse/mistral";
 import { LocalPDFParseProvider } from "@/lib/pdf-parse/local";
+import { isRunningOnVercel } from "@/lib/runtime-target";
 
-const DEFAULT_PROVIDER_CHAIN: PDFParseProviderName[] = [
-  "mistral_ocr",
-  "pdf_parse_fallback",
-  "claude_pdf",
-  "azure_doc_intelligence",
-];
+const DEFAULT_PROVIDER_CHAIN: PDFParseProviderName[] = isRunningOnVercel()
+  ? ["mistral_ocr", "pdf_parse_fallback"]
+  : [
+      "mistral_ocr",
+      "pdf_parse_fallback",
+      "claude_pdf",
+      "azure_doc_intelligence",
+    ];
 
 function parseProviderName(value: string): PDFParseProviderName | null {
   if (

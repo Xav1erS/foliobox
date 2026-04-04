@@ -3,6 +3,7 @@ import type { PaymentProvider, CreateOrderParams } from "./index";
 // TODO: Replace this stub with real Alipay SDK integration.
 // Requires Alipay app private key, Alipay public key, and App ID from Alipay Open Platform.
 export const alipayProvider: PaymentProvider = {
+  integrationMode: "stub",
   async createOrder(params: CreateOrderParams) {
     return {
       providerOrderId: `alipay_stub_${params.orderId}`,

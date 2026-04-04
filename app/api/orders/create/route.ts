@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PLAN_AMOUNTS } from "@/lib/entitlement";
+import {
+  getPaymentProviderUnavailableMessage,
+  getProvider,
+  isPaymentProviderEnabled,
+} from "@/lib/payment";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -21,6 +26,14 @@ export async function POST(req: Request) {
   }
   if (!["wechat_pay", "alipay"].includes(provider)) {
     return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+  }
+
+  const paymentProvider = getProvider(provider);
+  if (!isPaymentProviderEnabled(provider, paymentProvider)) {
+    return NextResponse.json(
+      { error: getPaymentProviderUnavailableMessage(provider) },
+      { status: 503 }
+    );
   }
 
   const amount = PLAN_AMOUNTS[planType];

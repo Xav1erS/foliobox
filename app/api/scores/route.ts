@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
-import { isBlobStorageUrl } from "@/lib/storage";
+import { deleteFiles, isBlobStorageUrl } from "@/lib/storage";
 import { get } from "@vercel/blob";
 import { persistExternalParseUsageEvent } from "@/lib/external-parse-usage";
 import {
@@ -31,12 +31,21 @@ import {
   SCORE_DIMENSION_KEYS,
   type ScoreDimensionKey,
 } from "@/lib/score-math";
+import { isRunningOnVercel } from "@/lib/runtime-target";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
 const MAX_PDF_VISUAL_ANCHORS = 8;
 const ANONYMOUS_SCORE_LIMIT = 3;
 const ANONYMOUS_SCORE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const IS_VERCEL = isRunningOnVercel();
+const MAX_LINK_PAGES = IS_VERCEL ? 10 : 30;
+const MAX_LINK_DEPTH = IS_VERCEL ? 2 : 3;
+const LINK_FETCH_TIMEOUT_MS = IS_VERCEL ? 4_000 : 8_000;
+const LINK_CRAWL_BUDGET_MS = IS_VERCEL ? 15_000 : 45_000;
 const DIMENSION_KEY_ALIASES: Record<ScoreDimensionKey, string[]> = {
   firstScreenProfessionalism: ["firstScreenProfessionalism", "首屏专业感", "首屏专业性", "首屏印象"],
   scannability: ["scannability", "可扫描性", "信息可扫描性", "扫描性"],
@@ -456,11 +465,15 @@ async function extractLinkScan(url: string) {
   const queue: Array<{ url: string; depth: number }> = [{ url: rootUrl.toString(), depth: 0 }];
   const visited = new Set<string>();
   const entries: Array<{ unitNumber: number; text: string; sourceHint?: string | null }> = [];
-  const maxPages = 30;
-  const maxDepth = 3;
+  const crawlStartedAt = Date.now();
   let truncated = false;
 
-  while (queue.length > 0 && visited.size < maxPages) {
+  while (queue.length > 0 && visited.size < MAX_LINK_PAGES) {
+    if (Date.now() - crawlStartedAt >= LINK_CRAWL_BUDGET_MS) {
+      truncated = true;
+      break;
+    }
+
     const current = queue.shift();
     if (!current) break;
     if (visited.has(current.url)) continue;
@@ -469,7 +482,7 @@ async function extractLinkScan(url: string) {
     try {
       const response = await fetch(current.url, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; FolioBox-Scorer/1.0)" },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(LINK_FETCH_TIMEOUT_MS),
       });
       const contentType = response.headers.get("content-type") ?? "";
       if (!contentType.includes("text/html")) continue;
@@ -483,11 +496,11 @@ async function extractLinkScan(url: string) {
         sourceHint: current.url,
       });
 
-      if (current.depth >= maxDepth) continue;
+      if (current.depth >= MAX_LINK_DEPTH) continue;
       const links = extractLinks(html, new URL(current.url), rootUrl.origin);
       for (const link of links) {
         if (visited.has(link)) continue;
-        if (queue.length + visited.size >= maxPages) {
+        if (queue.length + visited.size >= MAX_LINK_PAGES) {
           truncated = true;
           break;
         }
@@ -604,6 +617,12 @@ function getAnonymousSessionId(req: NextRequest) {
   return req.cookies.get(SCORE_ANONYMOUS_SESSION_COOKIE)?.value ?? null;
 }
 
+function getUploadedInputSources(files: UploadedInputFile[] | null | undefined) {
+  return (files ?? [])
+    .map((file) => file.pathname || file.url)
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
 function getRequestIpHash(req: NextRequest) {
   const forwardedFor = req.headers.get("x-forwarded-for");
   const realIp = req.headers.get("x-real-ip");
@@ -630,6 +649,8 @@ function enhanceCoverage(
 }
 
 export async function POST(req: NextRequest) {
+  let uploadedSourcesToCleanup: string[] = [];
+
   try {
     const session = await auth();
     const anonymousSessionId =
@@ -729,6 +750,7 @@ export async function POST(req: NextRequest) {
       );
     } else if (inputType === "pdf") {
       const uploadedFile = (isJson ? body?.file : null) as UploadedInputFile | null;
+      uploadedSourcesToCleanup = uploadedFile ? getUploadedInputSources([uploadedFile]) : [];
       const file = isJson ? (uploadedFile ? await downloadUploadedFile(uploadedFile) : null) : ((formData?.get("file") as File | null) ?? null);
       if (!file) return NextResponse.json({ error: "请上传 PDF" }, { status: 400 });
       if (file.size > MAX_SCORE_UPLOAD_SIZE) {
@@ -808,6 +830,7 @@ export async function POST(req: NextRequest) {
       );
     } else {
       const uploadedFiles = (isJson ? body?.files : null) as UploadedInputFile[] | null;
+      uploadedSourcesToCleanup = getUploadedInputSources(uploadedFiles);
       const files = isJson
         ? await Promise.all((uploadedFiles ?? []).map((file) => downloadUploadedFile(file)))
         : ((formData?.getAll("files") as File[]) ?? []);
@@ -911,5 +934,11 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Score API error:", error);
     return NextResponse.json({ error: "服务器错误，请稍后重试" }, { status: 500 });
+  } finally {
+    if (uploadedSourcesToCleanup.length > 0) {
+      await deleteFiles(uploadedSourcesToCleanup).catch((cleanupError) => {
+        console.error("Score upload cleanup error:", cleanupError);
+      });
+    }
   }
 }

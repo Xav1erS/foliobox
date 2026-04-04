@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { wechatProvider } from "@/lib/payment/wechat";
+import {
+  getPaymentProviderUnavailableMessage,
+  isPaymentProviderEnabled,
+} from "@/lib/payment";
 
 export async function POST(req: Request) {
+  if (!isPaymentProviderEnabled("wechat_pay", wechatProvider)) {
+    return NextResponse.json(
+      { error: getPaymentProviderUnavailableMessage("wechat_pay") },
+      { status: 503 }
+    );
+  }
+
   const body = await req.text();
   let payload: unknown;
   try {

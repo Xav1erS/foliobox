@@ -22,10 +22,26 @@ export async function uploadFile(
 }
 
 /**
- * Delete a file from Vercel Blob storage by URL.
+ * Delete a file from Vercel Blob storage by URL or pathname.
  */
-export async function deleteFile(url: string): Promise<void> {
-  await del(url);
+export async function deleteFile(source: string): Promise<void> {
+  await del(source);
+}
+
+export async function deleteFiles(sources: string[]): Promise<void> {
+  const normalized = Array.from(
+    new Set(
+      sources
+        .map((source) => source.trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (normalized.length === 0) {
+    return;
+  }
+
+  await del(normalized);
 }
 
 /**

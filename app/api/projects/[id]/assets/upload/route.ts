@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { uploadFile } from "@/lib/storage";
+import { deleteFiles, uploadFile } from "@/lib/storage";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGES = 20;
@@ -71,42 +71,52 @@ export async function POST(
 
   // Get current max sortOrder to append after existing assets
   const existing = await db.projectAsset.count({ where: { projectId: id } });
+  let uploadedSources: string[] = [];
 
-  const uploadResults = isJson
-    ? uploadedFiles!.map((file, i) => ({
-        url: file.url,
-        pathname: file.pathname,
-        index: existing + i,
-        name: file.name,
-      }))
-    : await Promise.all(
-        files.map((file, i) => {
-          const ext = file.name.split(".").pop() ?? "jpg";
-          const filename = `${id}-extra-${Date.now()}-${i}.${ext}`;
-          return uploadFile(file, "project-assets", filename, "private").then((url) => ({
-            url,
-            pathname: undefined,
-            index: existing + i,
-            name: file.name,
-          }));
-        })
-      );
+  try {
+    const uploadResults = isJson
+      ? uploadedFiles!.map((file, i) => ({
+          url: file.url,
+          pathname: file.pathname,
+          index: existing + i,
+          name: file.name,
+        }))
+      : await Promise.all(
+          files.map((file, i) => {
+            const ext = file.name.split(".").pop() ?? "jpg";
+            const filename = `${id}-extra-${Date.now()}-${i}.${ext}`;
+            return uploadFile(file, "project-assets", filename, "private").then((url) => ({
+              url,
+              pathname: undefined,
+              index: existing + i,
+              name: file.name,
+            }));
+          })
+        );
+    uploadedSources = uploadResults.map(({ pathname, url }) => pathname ?? url);
 
-  await db.projectAsset.createMany({
-    data: uploadResults.map(({ url, pathname, index, name: fileName }) => ({
-      projectId: id,
-      assetType: "IMAGE",
-      title: fileName.replace(/\.[^.]+$/, ""),
-      imageUrl: pathname ?? url,
-      sortOrder: index,
-      selected: true,
-      isCover: existing === 0 && index === 0,
-    })),
-  });
+    await db.projectAsset.createMany({
+      data: uploadResults.map(({ url, pathname, index, name: fileName }) => ({
+        projectId: id,
+        assetType: "IMAGE",
+        title: fileName.replace(/\.[^.]+$/, ""),
+        imageUrl: pathname ?? url,
+        sortOrder: index,
+        selected: true,
+        isCover: existing === 0 && index === 0,
+      })),
+    });
 
-  if (project.importStatus !== "IMPORTED") {
-    await db.project.update({ where: { id }, data: { importStatus: "IMPORTED" } });
+    if (project.importStatus !== "IMPORTED") {
+      await db.project.update({ where: { id }, data: { importStatus: "IMPORTED" } });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    await deleteFiles(uploadedSources).catch((cleanupError) => {
+      console.error("Project asset upload cleanup error:", cleanupError);
+    });
+    console.error("Project asset upload error:", error);
+    return NextResponse.json({ error: "图片上传失败，请重试" }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }

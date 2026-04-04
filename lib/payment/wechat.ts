@@ -3,6 +3,7 @@ import type { PaymentProvider, CreateOrderParams } from "./index";
 // TODO: Replace this stub with real WeChat Pay SDK integration.
 // Requires merchant certificate, API v3 key, and APPID from WeChat Pay console.
 export const wechatProvider: PaymentProvider = {
+  integrationMode: "stub",
   async createOrder(params: CreateOrderParams) {
     return {
       providerOrderId: `wechat_stub_${params.orderId}`,

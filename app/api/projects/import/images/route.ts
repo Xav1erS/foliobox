@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { uploadFile } from "@/lib/storage";
+import { deleteFiles, uploadFile } from "@/lib/storage";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGES = 20;
@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
   });
 
   // Upload all images in parallel, then create asset records
+  let uploadedSources: string[] = [];
+
   try {
     const uploadResults = isJson
       ? uploadedFiles!.map((file, i) => ({
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest) {
             }));
           })
         );
+    uploadedSources = uploadResults.map(({ pathname, url }) => pathname ?? url);
 
     await db.projectAsset.createMany({
       data: uploadResults.map(({ url, pathname, index, name: fileName }) => ({
@@ -118,12 +121,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ projectId: project.id }, { status: 201 });
   } catch (err) {
-    // Mark project as failed if upload errors
-    // TODO: clean up successfully uploaded Blob files on partial failure
+    // Mark project as failed and clean up successfully uploaded Blob files on partial failure.
     await db.project.update({
       where: { id: project.id },
       data: { importStatus: "FAILED" },
     }).catch(() => null);
+    await deleteFiles(uploadedSources).catch((cleanupError) => {
+      console.error("Image import cleanup error:", cleanupError);
+    });
     console.error("Image import error:", err);
     return NextResponse.json({ error: "图片上传失败，请重试" }, { status: 500 });
   }

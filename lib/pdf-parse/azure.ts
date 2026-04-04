@@ -1,7 +1,18 @@
 import { z } from "zod";
 import { buildScanResult } from "@/lib/score-processing";
 import type { PDFParseProvider, PDFParseResult } from "@/lib/pdf-parse/provider";
+import { isRunningOnVercel } from "@/lib/runtime-target";
 
+const IS_VERCEL = isRunningOnVercel();
+const AZURE_DOCINTEL_SUBMIT_TIMEOUT_MS = Number(
+  process.env.AZURE_DOCINTEL_SUBMIT_TIMEOUT_MS || (IS_VERCEL ? "20000" : "60000")
+) || (IS_VERCEL ? 20_000 : 60_000);
+const AZURE_DOCINTEL_POLL_TIMEOUT_MS = Number(
+  process.env.AZURE_DOCINTEL_POLL_TIMEOUT_MS || (IS_VERCEL ? "10000" : "30000")
+) || (IS_VERCEL ? 10_000 : 30_000);
+const AZURE_DOCINTEL_POLL_DEADLINE_MS = Number(
+  process.env.AZURE_DOCINTEL_POLL_DEADLINE_MS || (IS_VERCEL ? "30000" : "90000")
+) || (IS_VERCEL ? 30_000 : 90_000);
 const AZURE_DOCINTEL_ENDPOINT = process.env.AZURE_DOCINTEL_ENDPOINT?.replace(/\/+$/, "") || "";
 const AZURE_DOCINTEL_API_KEY = process.env.AZURE_DOCINTEL_API_KEY || "";
 const AZURE_DOCINTEL_MODEL_ID = process.env.AZURE_DOCINTEL_MODEL_ID || "prebuilt-layout";
@@ -95,7 +106,7 @@ function summarizePageVisualSignals(params: {
 }
 
 async function pollAnalyzeResult(operationLocation: string) {
-  const deadline = Date.now() + 90_000;
+  const deadline = Date.now() + AZURE_DOCINTEL_POLL_DEADLINE_MS;
 
   while (Date.now() < deadline) {
     const response = await fetch(operationLocation, {
@@ -103,7 +114,7 @@ async function pollAnalyzeResult(operationLocation: string) {
       headers: {
         "Ocp-Apim-Subscription-Key": AZURE_DOCINTEL_API_KEY,
       },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(AZURE_DOCINTEL_POLL_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -167,7 +178,7 @@ export class AzureDocumentIntelligencePDFParseProvider implements PDFParseProvid
       body: JSON.stringify({
         base64Source,
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(AZURE_DOCINTEL_SUBMIT_TIMEOUT_MS),
     });
 
     if (!(response.ok || response.status === 202)) {

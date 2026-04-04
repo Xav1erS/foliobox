@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { alipayProvider } from "@/lib/payment/alipay";
+import {
+  getPaymentProviderUnavailableMessage,
+  isPaymentProviderEnabled,
+} from "@/lib/payment";
 
 export async function POST(req: Request) {
+  if (!isPaymentProviderEnabled("alipay", alipayProvider)) {
+    return NextResponse.json(
+      { error: getPaymentProviderUnavailableMessage("alipay") },
+      { status: 503 }
+    );
+  }
+
   const body = await req.text();
   let payload: unknown;
   try {
