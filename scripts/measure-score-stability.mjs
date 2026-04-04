@@ -142,7 +142,7 @@ async function createScore(baseUrl, uploadedFile, cookieHeader = "") {
     }),
   });
 
-  const cookieHeader = getCookieHeader(response);
+  const responseCookieHeader = getCookieHeader(response);
   const payload = await response.json().catch(() => ({}));
 
   return {
@@ -150,7 +150,7 @@ async function createScore(baseUrl, uploadedFile, cookieHeader = "") {
     status: response.status,
     elapsedMs: Date.now() - startedAt,
     payload,
-    cookieHeader,
+    cookieHeader: responseCookieHeader || cookieHeader,
   };
 }
 

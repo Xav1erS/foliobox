@@ -23,55 +23,55 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.8)_100%)]" />
 
       {/* Above-fold content */}
-      <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-center px-6 pb-10 text-center">
+      <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-start px-5 pb-10 pt-16 text-center sm:px-6 sm:pt-20 md:justify-center md:pt-0">
         {/* Badge */}
-        <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-1.5 text-xs text-white/70">
+        <div className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] text-white/70 sm:mb-8 sm:px-4 sm:text-xs">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          OpenAI 驱动 · 面向产品 / UX 设计师
+          <span className="whitespace-nowrap">OpenAI 驱动 · 面向产品 / UX 设计师</span>
         </div>
 
         {/* Heading */}
-        <h1
-          className="mx-auto text-5xl font-bold leading-[1.1] tracking-tight text-white md:text-6xl lg:text-[72px]"
-          style={{ maxWidth: 860 }}
-        >
-          把零散项目整理成
-          <br />
-          <span className="text-white/40">拿得出手的</span>作品集
+        <h1 className="mx-auto max-w-[320px] text-[52px] font-bold leading-[0.96] tracking-[-0.05em] text-white sm:max-w-[640px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[860px] lg:text-[72px] lg:leading-[1.1]">
+          <span className="block whitespace-nowrap sm:inline">
+            把零散项目整理成
+          </span>
+          <br className="hidden sm:block" />
+          <span className="mt-2 block whitespace-nowrap sm:mt-0 sm:inline">
+            <span className="text-white/40">拿得出手的</span>作品集
+          </span>
         </h1>
 
         <p
-          className="mx-auto mt-6 text-lg leading-relaxed text-white/60"
-          style={{ maxWidth: 560 }}
+          className="mx-auto mt-6 max-w-[340px] text-base leading-8 text-white/60 sm:max-w-[560px] sm:text-lg sm:leading-relaxed"
         >
-          导入设计稿和个人简历，补充项目关键信息，由 AI 帮你整理结构、生成第一版作品集初稿。
+          导入设计稿和简历，补充项目关键信息，由 AI 帮你整理结构、生成第一版作品集初稿。
           <br />
           20 分钟内完成第一版，不靠模板堆砌，也不做廉价感包装。
         </p>
 
         {/* Trust clarification */}
-        <p className="mx-auto mt-3 text-sm text-white/40" style={{ maxWidth: 480 }}>
+        <p className="mx-auto mt-3 max-w-[330px] text-sm leading-7 text-white/40 sm:max-w-[480px] sm:leading-normal">
           不是纯模板拼接，也不是完全交给 AI。先由 AI 完成第一版，再由你继续修改。
         </p>
 
         {/* CTAs */}
-        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
+        <div className="mt-9 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row">
           <Link
             href={primaryAction.href}
-            className="flex h-12 min-w-[200px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            className="flex h-12 min-w-[220px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:min-w-[200px]"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-12 min-w-[200px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
+            className="flex h-12 min-w-[220px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white sm:min-w-[200px]"
           >
             {secondaryAction.label}
           </Link>
         </div>
 
         {/* Trust line */}
-        <div className="mt-10 flex items-center gap-4 text-xs text-white/30">
+        <div className="mt-9 flex max-w-[320px] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/30 sm:mt-10 sm:max-w-none sm:flex-nowrap">
           <span>支持 Figma 导入</span>
           <span className="h-px w-4 bg-white/15" />
           <span>支持图片上传</span>
