@@ -6,8 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
 import type { ImageInput } from "@/lib/llm/provider";
-import { deleteFiles, isBlobStorageUrl } from "@/lib/storage";
-import { get } from "@vercel/blob";
+import { deleteFiles, getPrivateBlob, isBlobStorageUrl } from "@/lib/storage";
 import { persistExternalParseUsageEvent } from "@/lib/external-parse-usage";
 import {
   SCORE_ANONYMOUS_SESSION_COOKIE,
@@ -27,7 +26,9 @@ import {
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
 import {
+  computeDimensionScoreSum,
   computeTotalScoreFromDimensions,
+  normalizeDimensionScoresForComputation,
   SCORE_DIMENSION_KEYS,
   type ScoreDimensionKey,
 } from "@/lib/score-math";
@@ -311,6 +312,7 @@ ${content}
   - authenticity
   - jobFit
 - 每个 dimensionScores[key] 都必须返回：score、comment、judgementState
+- dimensionScores[key].score 必须是 0-100 的百分制原始判断分，不要直接返回 15 / 20 / 5 这类按维度满分计算后的分值
 - summaryPoints: 3-5 条高层问题摘要（中文，每条不超过 30 字）
 - recommendedActions: 3-5 条改进建议（中文，每条不超过 30 字，可操作）`;
 }
@@ -595,16 +597,18 @@ async function filesToImageInputs(files: File[]): Promise<ImageInput[]> {
 }
 
 async function downloadUploadedFile(file: UploadedInputFile): Promise<File> {
-  const source = file.pathname || file.url;
-  const isPathname = !source.startsWith("http://") && !source.startsWith("https://");
-  if (!isPathname && !isBlobStorageUrl(source)) {
+  const sources = [file.pathname, file.url].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0
+  );
+  const invalidUrl = sources.some(
+    (source) =>
+      (source.startsWith("http://") || source.startsWith("https://")) && !isBlobStorageUrl(source)
+  );
+  if (invalidUrl) {
     throw new Error("invalid_blob_url");
   }
 
-  const response = await get(source, { access: "private" });
-  if (!response || response.statusCode !== 200) {
-    throw new Error("blob_fetch_failed");
-  }
+  const response = await getPrivateBlob(sources);
 
   const buffer = await new Response(response.stream).arrayBuffer();
   return new File([buffer], file.name, {
@@ -645,6 +649,22 @@ function enhanceCoverage(
   return {
     ...coverage,
     detectedProjects: scoreOutput.detectedProjectCount ?? coverage.detectedProjects,
+  };
+}
+
+function normalizeScoreOutputDimensions(scoreOutput: ScoreOutput) {
+  const normalizedDimensions = normalizeDimensionScoresForComputation(
+    scoreOutput.dimensionScores,
+    scoreOutput.totalScore
+  );
+
+  const wasNormalized =
+    computeDimensionScoreSum(normalizedDimensions) !==
+    computeDimensionScoreSum(scoreOutput.dimensionScores);
+
+  return {
+    normalizedDimensions,
+    wasNormalized,
   };
 }
 
@@ -890,8 +910,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const recalculatedTotalScore = computeTotalScoreFromDimensions(scoreOutput.dimensionScores);
-    const finalCoverage = enhanceCoverage(coverage, scoreOutput);
+    const { normalizedDimensions, wasNormalized } = normalizeScoreOutputDimensions(scoreOutput);
+    if (wasNormalized) {
+      console.info("[score] normalized_contribution_style_dimensions", {
+        reportedTotalScore: scoreOutput.totalScore,
+        rawDimensionScoreSum: computeDimensionScoreSum(scoreOutput.dimensionScores),
+      });
+    }
+
+    const recalculatedTotalScore = computeTotalScoreFromDimensions(normalizedDimensions);
+    const finalCoverage = enhanceCoverage(coverage, {
+      ...scoreOutput,
+      dimensionScores: normalizedDimensions,
+    });
 
     const record = await db.portfolioScore.create({
       data: {
@@ -902,7 +933,7 @@ export async function POST(req: NextRequest) {
         inputUrl,
         totalScore: recalculatedTotalScore,
         level: getPortfolioScoreLevelFromTotalScore(recalculatedTotalScore),
-        dimensionScores: scoreOutput.dimensionScores as unknown as Prisma.InputJsonValue,
+        dimensionScores: normalizedDimensions as unknown as Prisma.InputJsonValue,
         coverageJson: finalCoverage as unknown as Prisma.InputJsonValue,
         processingJson: processing as unknown as Prisma.InputJsonValue,
         summaryPoints: scoreOutput.summaryPoints,

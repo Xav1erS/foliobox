@@ -1,7 +1,8 @@
-import { put, del, list } from "@vercel/blob";
+import { put, del, list, get } from "@vercel/blob";
 
 export type StorageFolder = "resumes" | "project-assets" | "exports" | "score-inputs";
 const BLOB_HOST_SUFFIX = ".blob.vercel-storage.com";
+const PRIVATE_BLOB_RETRY_DELAYS_MS = [150, 400, 900];
 
 /**
  * Upload a file to Vercel Blob storage.
@@ -50,6 +51,58 @@ export async function deleteFiles(sources: string[]): Promise<void> {
 export async function listFiles(folder: StorageFolder) {
   const { blobs } = await list({ prefix: `${folder}/` });
   return blobs;
+}
+
+function getBlobToken() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  return token ? token : undefined;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function getPrivateBlob(sourceOrSources: string | string[]) {
+  const sources = Array.from(
+    new Set(
+      (Array.isArray(sourceOrSources) ? sourceOrSources : [sourceOrSources])
+        .map((source) => source.trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (sources.length === 0) {
+    throw new Error("blob_fetch_failed");
+  }
+
+  let lastError: unknown = new Error("blob_fetch_failed");
+
+  for (const source of sources) {
+    for (let attempt = 0; attempt <= PRIVATE_BLOB_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        const result = await get(source, {
+          access: "private",
+          useCache: false,
+          ...(getBlobToken() ? { token: getBlobToken() } : {}),
+        });
+
+        if (result && result.statusCode === 200) {
+          return result;
+        }
+
+        lastError = new Error("blob_fetch_failed");
+      } catch (error) {
+        lastError = error;
+      }
+
+      const delayMs = PRIVATE_BLOB_RETRY_DELAYS_MS[attempt];
+      if (typeof delayMs === "number") {
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("blob_fetch_failed");
 }
 
 export function isBlobStorageUrl(value: string) {

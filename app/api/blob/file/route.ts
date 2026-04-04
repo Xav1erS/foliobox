@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { get } from "@vercel/blob";
-import { isBlobStorageUrl } from "@/lib/storage";
+import { getPrivateBlob, isBlobStorageUrl } from "@/lib/storage";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -19,17 +18,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid blob source" }, { status: 400 });
   }
 
-  const result = await get(source, { access: "private" });
-  if (!result || result.statusCode !== 200) {
+  try {
+    const result = await getPrivateBlob(source);
+
+    return new NextResponse(result.stream, {
+      headers: {
+        "content-type": result.blob.contentType,
+        "content-disposition": result.blob.contentDisposition,
+        "cache-control": result.blob.cacheControl,
+        etag: result.blob.etag,
+      },
+    });
+  } catch {
     return NextResponse.json({ error: "Blob not found" }, { status: 404 });
   }
-
-  return new NextResponse(result.stream, {
-    headers: {
-      "content-type": result.blob.contentType,
-      "content-disposition": result.blob.contentDisposition,
-      "cache-control": result.blob.cacheControl,
-      etag: result.blob.etag,
-    },
-  });
 }

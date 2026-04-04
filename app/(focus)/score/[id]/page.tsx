@@ -22,6 +22,7 @@ import {
 import {
   computeTotalScoreFromDimensions,
   computeWeightedDimensionScore,
+  normalizeDimensionScoresForComputation,
   SCORE_DIMENSION_WEIGHTS,
 } from "@/lib/score-math";
 import {
@@ -179,7 +180,10 @@ export default async function ScoreResultPage({
     redirect(`/login?next=${encodeURIComponent(`/score/${id}`)}`);
   }
 
-  const dims = score.dimensionScores as unknown as DimensionScores;
+  const dims = normalizeDimensionScoresForComputation(
+    score.dimensionScores as unknown as DimensionScores,
+    score.totalScore
+  ) as DimensionScores;
   const displayTotalScore = computeTotalScoreFromDimensions(dims);
   const coverage = ((score.coverageJson ?? {
     inputType: score.inputType.toLowerCase(),

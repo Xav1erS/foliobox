@@ -12,7 +12,10 @@ import {
   PORTFOLIO_SCORE_LEVEL_CONFIG,
   resolvePortfolioScoreLevel,
 } from "@/lib/portfolio-score-level";
-import { computeTotalScoreFromDimensions } from "@/lib/score-math";
+import {
+  computeTotalScoreFromDimensions,
+  normalizeDimensionScoresForComputation,
+} from "@/lib/score-math";
 import {
   getScoreNextStep,
   isProfileReadyForGeneration,
@@ -99,12 +102,18 @@ export default async function DashboardPage({
 
   const latestScoreDisplayTotal = latestScore
     ? computeTotalScoreFromDimensions(
-        latestScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0]
+        normalizeDimensionScoresForComputation(
+          latestScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0],
+          latestScore.totalScore
+        )
       )
     : null;
   const focusedScoreDisplayTotal = focusedScore
     ? computeTotalScoreFromDimensions(
-        focusedScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0]
+        normalizeDimensionScoresForComputation(
+          focusedScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0],
+          focusedScore.totalScore
+        )
       )
     : null;
   const latestScoreLevel =
