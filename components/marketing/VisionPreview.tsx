@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { IsometricWireframe } from "@/components/marketing/IsometricWireframe";
+import { SectionFrame } from "@/components/marketing/SectionFrame";
 
 export function VisionPreview() {
   return (
     <section id="vision-preview" className="px-6 py-24">
       <div className="mx-auto max-w-[1200px]">
-        <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.03]">
+        <SectionFrame className="rounded-[32px] border border-white/10 bg-white/[0.03]">
           <div className="grid gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 lg:py-14">
             <div>
               <p className="mb-4 text-xs uppercase tracking-[0.26em] text-white/35">
@@ -23,9 +25,14 @@ export function VisionPreview() {
 
             <div className="flex flex-col justify-between gap-6">
               <div className="rounded-[28px] border border-white/10 bg-black/30 px-5 py-5">
-                <p className="text-sm leading-7 text-white/58">
-                  作品集只是入口。后面我还想慢慢补上简历一致性、岗位匹配、面试讲述这些更难也更真实的部分。
-                </p>
+                <div className="grid gap-5 lg:grid-cols-[1fr_220px] lg:items-center">
+                  <p className="text-sm leading-7 text-white/58">
+                    作品集只是入口。后面我还想慢慢补上简历一致性、岗位匹配、面试讲述这些更难也更真实的部分。
+                  </p>
+                  <div className="rounded-[22px] border border-white/8 bg-white/[0.02] p-3">
+                    <IsometricWireframe className="mx-auto max-w-[200px]" />
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -44,7 +51,7 @@ export function VisionPreview() {
               </div>
             </div>
           </div>
-        </div>
+        </SectionFrame>
       </div>
     </section>
   );

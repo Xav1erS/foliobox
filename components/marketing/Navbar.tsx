@@ -77,7 +77,7 @@ export function Navbar({
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="whitespace-nowrap text-xs font-semibold leading-tight tracking-tight text-white sm:text-sm">
-          集盒 FolioBox
+          集盒FolioBox
         </Link>
 
         {/* Nav links */}
@@ -126,7 +126,7 @@ export function Navbar({
             <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-none">
               <DialogHeader className="border-b border-white/10 px-5 py-4 text-left">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-white">
-                  集盒 FolioBox
+                  集盒FolioBox
                 </DialogTitle>
               </DialogHeader>
 

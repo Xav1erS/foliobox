@@ -6,7 +6,7 @@ export function Footer() {
       <div className="mx-auto" style={{ maxWidth: 1200 }}>
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div>
-            <p className="text-sm font-semibold text-white">集盒 FolioBox</p>
+            <p className="text-sm font-semibold text-white">集盒FolioBox</p>
             <p className="mt-0.5 text-xs text-white/25">
               把零散项目整理成拿得出手的作品集
             </p>
