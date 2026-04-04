@@ -35,14 +35,14 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         {/* Heading */}
         <h1 className="mx-auto max-w-[320px] font-bold text-white sm:max-w-[720px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[900px] lg:text-[72px] lg:leading-[1.06]">
           <span className="text-[36px] leading-[0.98] tracking-[-0.05em] sm:hidden">
-            <span className="block">我想先陪你</span>
-            <span className="mt-1.5 block text-white/45">把第一版作品集</span>
+            <span className="block">先把第一版</span>
+            <span className="mt-1.5 block text-white/45">作品集</span>
             <span className="mt-1.5 block">整理出来</span>
           </span>
           <span className="hidden sm:block">
-            我想先陪你
+            先把第一版
             <br />
-            把<span className="text-white/40">第一版作品集</span>整理出来
+            <span className="text-white/40">作品集</span>整理出来
           </span>
         </h1>
 
@@ -56,7 +56,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
         {/* Trust clarification */}
         <p className="mx-auto mt-3 max-w-[340px] text-sm leading-7 text-white/40 sm:max-w-[560px] sm:leading-normal">
-          作品集只是入口。我更想继续帮你把项目表达、简历线索和求职叙事慢慢整理到同一条主线里。
+          作品集只是入口。等第一版先立起来，再继续整理项目表达、简历线索和求职叙事。
         </p>
 
         {/* CTAs */}
