@@ -4,6 +4,18 @@ import type { PDFParseProvider, PDFParseResult } from "@/lib/pdf-parse/provider"
 
 const MISTRAL_BASE_URL = process.env.MISTRAL_BASE_URL?.replace(/\/+$/, "") || "https://api.mistral.ai";
 const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest";
+const MISTRAL_OCR_TIMEOUT_MS = Math.max(
+  1_000,
+  Number(process.env.MISTRAL_OCR_TIMEOUT_MS || "60000") || 60_000
+);
+const MISTRAL_OCR_MAX_RETRIES = Math.max(
+  0,
+  Number(process.env.MISTRAL_OCR_MAX_RETRIES || "2") || 2
+);
+const MISTRAL_OCR_RETRY_DELAY_MS = Math.max(
+  0,
+  Number(process.env.MISTRAL_OCR_RETRY_DELAY_MS || "1500") || 1_500
+);
 const MISTRAL_PROVIDER_DISPLAY_NAME = process.env.MISTRAL_PROVIDER_DISPLAY_NAME || "Mistral OCR";
 const MISTRAL_PROVIDER_REGION = process.env.MISTRAL_PROVIDER_REGION || "global";
 const MISTRAL_PROVIDER_NETWORK_PROFILE =
@@ -32,6 +44,56 @@ function getEstimatedCostPerPage() {
   if (!raw) return null;
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableMistralError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("timeout") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("mistral_ocr_failed:408:") ||
+    message.includes("mistral_ocr_failed:409:") ||
+    message.includes("mistral_ocr_failed:425:") ||
+    message.includes("mistral_ocr_failed:429:") ||
+    message.includes("mistral_ocr_failed:500:") ||
+    message.includes("mistral_ocr_failed:502:") ||
+    message.includes("mistral_ocr_failed:503:") ||
+    message.includes("mistral_ocr_failed:504:")
+  );
+}
+
+async function requestMistralOCR(base64Pdf: string, apiKey: string) {
+  const response = await fetch(`${MISTRAL_BASE_URL}/v1/ocr`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MISTRAL_OCR_MODEL,
+      document: {
+        type: "document_url",
+        document_url: `data:application/pdf;base64,${base64Pdf}`,
+      },
+      include_image_base64: false,
+    }),
+    signal: AbortSignal.timeout(MISTRAL_OCR_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`mistral_ocr_failed:${response.status}:${raw.slice(0, 500)}`);
+  }
+
+  return response.json();
 }
 
 function summarizeVisualSignals(page: {
@@ -72,30 +134,43 @@ export class MistralPDFParseProvider implements PDFParseProvider {
     const startedAt = Date.now();
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64Pdf = buffer.toString("base64");
+    const attempts: Array<{ attempt: number; success: boolean; error?: string | null }> = [];
+    let json: unknown = null;
+    let lastError: unknown = null;
 
-    const response = await fetch(`${MISTRAL_BASE_URL}/v1/ocr`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MISTRAL_OCR_MODEL,
-        document: {
-          type: "document_url",
-          document_url: `data:application/pdf;base64,${base64Pdf}`,
-        },
-        include_image_base64: false,
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    for (let attempt = 0; attempt <= MISTRAL_OCR_MAX_RETRIES; attempt += 1) {
+      try {
+        json = await requestMistralOCR(base64Pdf, apiKey);
+        attempts.push({ attempt: attempt + 1, success: true });
+        break;
+      } catch (error) {
+        lastError = error;
+        attempts.push({
+          attempt: attempt + 1,
+          success: false,
+          error: error instanceof Error ? error.message : "unknown_error",
+        });
 
-    if (!response.ok) {
-      const raw = await response.text();
-      throw new Error(`mistral_ocr_failed:${response.status}:${raw.slice(0, 500)}`);
+        if (attempt >= MISTRAL_OCR_MAX_RETRIES || !isRetryableMistralError(error)) {
+          throw new Error(
+            error instanceof Error
+              ? `mistral_ocr_retries_exhausted:${error.message}`
+              : "mistral_ocr_retries_exhausted:unknown_error"
+          );
+        }
+
+        await sleep(MISTRAL_OCR_RETRY_DELAY_MS * (attempt + 1));
+      }
     }
 
-    const json = await response.json();
+    if (!json) {
+      throw new Error(
+        lastError instanceof Error
+          ? `mistral_ocr_retries_exhausted:${lastError.message}`
+          : "mistral_ocr_retries_exhausted:unknown_error"
+      );
+    }
+
     const parsed = MistralOCRResponseSchema.parse(json);
     const entries = parsed.pages.map((page, index) => ({
       unitNumber: (page.index ?? index) + 1,
@@ -127,6 +202,7 @@ export class MistralPDFParseProvider implements PDFParseProvider {
       metadata: {
         model: parsed.model ?? MISTRAL_OCR_MODEL,
         usageInfo: parsed.usage_info ?? null,
+        attempts,
         providerProfile: this.profile,
       },
     };

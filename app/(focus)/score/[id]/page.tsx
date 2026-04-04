@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getUserPlan } from "@/lib/entitlement";
@@ -19,6 +19,11 @@ import {
   PORTFOLIO_SCORE_LEVEL_CONFIG,
   resolvePortfolioScoreLevel,
 } from "@/lib/portfolio-score-level";
+import {
+  computeTotalScoreFromDimensions,
+  computeWeightedDimensionScore,
+  SCORE_DIMENSION_WEIGHTS,
+} from "@/lib/score-math";
 import {
   getScoreNextStep,
   isProfileReadyForGeneration,
@@ -45,14 +50,14 @@ interface DimensionScores {
 }
 
 const DIMENSIONS: { key: keyof DimensionScores; label: string; weight: number }[] = [
-  { key: "firstScreenProfessionalism", label: "首屏专业感", weight: 15 },
-  { key: "roleClarity", label: "角色清晰度", weight: 15 },
-  { key: "scannability", label: "可扫描性", weight: 15 },
-  { key: "problemDefinition", label: "问题定义与设计判断", weight: 20 },
-  { key: "resultEvidence", label: "结果与价值证明", weight: 15 },
-  { key: "projectSelection", label: "项目选择质量", weight: 10 },
-  { key: "authenticity", label: "真实性与可信度", weight: 5 },
-  { key: "jobFit", label: "投递适配度", weight: 5 },
+  { key: "firstScreenProfessionalism", label: "首屏专业感", weight: SCORE_DIMENSION_WEIGHTS.firstScreenProfessionalism },
+  { key: "roleClarity", label: "角色清晰度", weight: SCORE_DIMENSION_WEIGHTS.roleClarity },
+  { key: "scannability", label: "可扫描性", weight: SCORE_DIMENSION_WEIGHTS.scannability },
+  { key: "problemDefinition", label: "问题定义与设计判断", weight: SCORE_DIMENSION_WEIGHTS.problemDefinition },
+  { key: "resultEvidence", label: "结果与价值证明", weight: SCORE_DIMENSION_WEIGHTS.resultEvidence },
+  { key: "projectSelection", label: "项目选择质量", weight: SCORE_DIMENSION_WEIGHTS.projectSelection },
+  { key: "authenticity", label: "真实性与可信度", weight: SCORE_DIMENSION_WEIGHTS.authenticity },
+  { key: "jobFit", label: "投递适配度", weight: SCORE_DIMENSION_WEIGHTS.jobFit },
 ];
 
 const FREE_SUMMARY_LIMIT = 2;
@@ -175,6 +180,7 @@ export default async function ScoreResultPage({
   }
 
   const dims = score.dimensionScores as unknown as DimensionScores;
+  const displayTotalScore = computeTotalScoreFromDimensions(dims);
   const coverage = ((score.coverageJson ?? {
     inputType: score.inputType.toLowerCase(),
     totalUnits: 0,
@@ -188,7 +194,7 @@ export default async function ScoreResultPage({
     notes: [],
     scanResult: coverage,
   }) as unknown) as ScoreProcessingMeta;
-  const resolvedLevel = resolvePortfolioScoreLevel(score.totalScore, score.level);
+  const resolvedLevel = resolvePortfolioScoreLevel(displayTotalScore, score.level);
   const level = PORTFOLIO_SCORE_LEVEL_CONFIG[resolvedLevel];
   let planType: Awaited<ReturnType<typeof getUserPlan>> = "FREE";
   let profile: {
@@ -235,11 +241,24 @@ export default async function ScoreResultPage({
     canViewFull ? FULL_SUMMARY_LIMIT : FREE_SUMMARY_LIMIT
   );
   const actionItems = score.recommendedActions.slice(0, FULL_ACTION_LIMIT);
-  const heroTitle = canViewFull ? nextStep.primaryLabel : "解锁完整结果";
-  const levelConclusion = resultConclusion(level.label, score.totalScore);
+  const isDegradedParse = Boolean(processing.parseFallbackUsed);
+  const heroTitle = canViewFull
+    ? nextStep.primaryLabel
+    : isDegradedParse
+    ? "重新评分"
+    : isLoggedIn
+    ? "解锁完整结果"
+    : "登录后继续解锁";
+  const levelConclusion = resultConclusion(level.label, displayTotalScore);
   const paywallTitle = "解锁完整结果，继续这次评分任务";
-  const paywallDescription =
-    "你当前看到的是简版结果。解锁后会立刻获得完整 8 维分析、3–5 条核心问题摘要、3–5 条可执行改进建议，并可把本次评分继续带入整理流程。";
+  const paywallDescription = isDegradedParse
+    ? "你当前看到的是降级解析后的简版结果。解锁不会修复本次解析质量，建议先重新评分；如仍需继续，也可解锁查看完整 8 维分析、问题摘要与改进建议。"
+    : "你当前看到的是简版结果。解锁后会立刻获得完整 8 维分析、3–5 条核心问题摘要、3–5 条可执行改进建议，并可把本次评分继续带入整理流程。";
+  const nextStepTitle = isDegradedParse ? "先重新评分，确认这次结果是否可靠" : nextStep.title;
+  const nextStepDescription = isDegradedParse
+    ? "这次 PDF 评分已退回本地文本结构扫描，当前结果更适合用来发现大致问题方向。建议先重新评分，确认外部文档解析恢复正常后，再决定是否继续解锁或进入整理。"
+    : nextStep.description;
+  const paywallActionLabel = isLoggedIn ? "解锁完整结果" : "登录后继续解锁流程";
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
@@ -250,6 +269,7 @@ export default async function ScoreResultPage({
         title="评分结果"
         description="先看这份作品集当前是否拿得出手，再决定是否解锁完整分析或继续整理。"
         status={canViewFull ? "完整结果" : "免费简版结果"}
+        statusTone={canViewFull ? "success" : "muted"}
       />
 
       <div className="mt-10 space-y-6">
@@ -257,8 +277,21 @@ export default async function ScoreResultPage({
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/35">结果结论</p>
+              {isDegradedParse ? (
+                <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">
+                    当前结果为降级解析结果
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/70">
+                    外部 PDF 解析本次超时或不可用，系统已退回本地文本结构扫描。当前分数、识别项目数和判断状态都仅供参考，可能低估作品集的真实质量。
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-amber-200/80">
+                    建议稍后重新评分确认，再决定是否解锁完整结果或继续整理。
+                  </p>
+                </div>
+              ) : null}
               <div className="mt-4 flex items-end gap-3">
-                <span className="text-7xl font-bold leading-none text-white">{score.totalScore}</span>
+                <span className="text-7xl font-bold leading-none text-white">{displayTotalScore}</span>
                 <span className="mb-2 text-2xl text-white/30">/100</span>
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -270,20 +303,37 @@ export default async function ScoreResultPage({
               </div>
               <p className="mt-5 text-lg font-medium leading-8 text-white">{levelConclusion}</p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{level.description}</p>
+              {isDegradedParse ? (
+                <p className="mt-3 text-xs leading-5 text-amber-200/80">
+                  当前综合分仅用于快速定位问题，不建议直接把本次结果视为最终结论。
+                </p>
+              ) : null}
               <div className="mt-8">
-                <ScoreResultPrimaryAction
-                  canViewFull={canViewFull}
-                  href={nextStep.primaryHref}
-                  label={heroTitle}
-                  loginHref={canViewFull || isLoggedIn ? undefined : loginHref}
-                />
+                {isDegradedParse ? (
+                  <Link
+                    href="/score"
+                    className="inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                  >
+                    {heroTitle}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <ScoreResultPrimaryAction
+                    canViewFull={canViewFull}
+                    href={nextStep.primaryHref}
+                    label={heroTitle}
+                    loginHref={canViewFull || isLoggedIn ? undefined : loginHref}
+                  />
+                )}
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">一句话结论</p>
               <p className="mt-3 text-sm leading-6 text-white/65">
-                {canViewFull
+                {isDegradedParse
+                  ? "你现在看到的是降级解析后的结果，用来先判断当前问题大致集中在哪些位置。建议优先重试评分，再决定是否继续后续动作。"
+                  : canViewFull
                   ? "你现在看到的是完整评分结果，重点不是继续读报告，而是带着这次判断进入下一步整理。"
                   : "你现在看到的是简版结果，用来先判断这份作品集现在能不能投，以及最该先改什么。"}
               </p>
@@ -314,7 +364,7 @@ export default async function ScoreResultPage({
                 {(canViewFull ? DIMENSIONS : previewDimensions).map(({ key, label, weight }) => {
                   const dim = dims[key];
                   if (!dim) return null;
-                  const weighted = Math.round((dim.score * weight) / 100);
+                  const weighted = computeWeightedDimensionScore(dim.score, weight);
                   const isReference =
                     dim.judgementState === "limited_judgement" ||
                     dim.judgementState === "insufficient_evidence";
@@ -385,7 +435,11 @@ export default async function ScoreResultPage({
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">覆盖状态</p>
                 <p className="mt-2 text-lg font-semibold text-white">
-                  {coverage.isFullCoverage ? "已覆盖整份输入" : "当前为有限覆盖"}
+                  {coverage.isFullCoverage
+                    ? isDegradedParse
+                      ? "整份已扫描，但当前为降级解析"
+                      : "已覆盖整份输入"
+                    : "当前为有限覆盖"}
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -414,7 +468,9 @@ export default async function ScoreResultPage({
               ))}
             </div>
             <p className="mt-4 text-xs leading-5 text-white/45">
-              本次结论基于整份输入的结构理解完成，并结合有限视觉证据补充，不是仅基于前几页内容得出。
+              {isDegradedParse
+                ? "本次结论基于整份输入的本地文本结构扫描完成，当前未成功使用外部文档解析服务，因此可信度低于正常完整解析结果。"
+                : "本次结论基于整份输入的结构理解完成，并结合有限视觉证据补充，不是仅基于前几页内容得出。"}
             </p>
             {processing.parseProvider ? (
               <p className="mt-2 text-xs leading-5 text-white/35">
@@ -475,18 +531,23 @@ export default async function ScoreResultPage({
                   <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.insufficient}</p>
                 </div>
               </div>
-              <p className="mt-4 text-xs leading-5 text-white/45">
-                如果某个维度显示“判断有限”或“证据不足”，当前页面会先显示判断状态，再展示参考分，避免把证据不足直接表现成低分。
+            <p className="mt-4 text-xs leading-5 text-white/45">
+              如果某个维度显示“判断有限”或“证据不足”，当前页面会先显示判断状态，再展示参考分，避免把证据不足直接表现成低分。
+            </p>
+            {isDegradedParse ? (
+              <p className="mt-2 text-xs leading-5 text-amber-200/80">
+                本次降级解析会进一步提高“判断有限 / 证据不足”的出现概率，请优先参考判断状态而不是单独看分数。
               </p>
-            </section>
+            ) : null}
+          </section>
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
             <p className="text-xs uppercase tracking-[0.18em] text-white/35">下一步动作</p>
-            <h2 className="mt-4 text-2xl font-semibold text-white">{nextStep.title}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{nextStep.description}</p>
+            <h2 className="mt-4 text-2xl font-semibold text-white">{nextStepTitle}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{nextStepDescription}</p>
 
             {canViewFull ? (
               <>
@@ -518,11 +579,18 @@ export default async function ScoreResultPage({
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
                   <h3 className="text-sm font-semibold text-white/80">为什么当前是简版结果</h3>
                   <p className="mt-3 text-sm leading-6 text-white/55">
-                    免费版先帮助你快速判断这份作品集当前能不能投，以及最该优先修改的少数问题。完整 8 维分析、完整问题摘要和改进建议需要解锁后查看。
+                    {isDegradedParse
+                      ? "当前这次评分同时处于免费简版结果和降级解析状态。免费版只先帮助你快速定位问题，而这次解析又未成功命中外部文档服务，所以更适合作为参考结果。"
+                      : "免费版先帮助你快速判断这份作品集当前能不能投，以及最该优先修改的少数问题。完整 8 维分析、完整问题摘要和改进建议需要解锁后查看。"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                  <h3 className="text-sm font-semibold text-white/80">解锁后立刻获得什么</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-white/80">解锁后立刻获得什么</h3>
+                    <span className="rounded-full border border-amber-500/15 bg-amber-500/5 px-2.5 py-1 text-[11px] text-amber-200/80">
+                      默认推荐 Pro
+                    </span>
+                  </div>
                   <ul className="mt-3 space-y-2 text-sm text-white/55">
                     <li>完整 8 维分析与判断状态说明</li>
                     <li>3–5 条更完整的问题摘要</li>
@@ -530,19 +598,28 @@ export default async function ScoreResultPage({
                     <li>把这次评分继续带入整理作品集流程</li>
                   </ul>
                 </div>
-                <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-5">
-                  <p className="text-xs uppercase tracking-[0.18em] text-amber-300/70">默认推荐 Pro</p>
-                  <p className="mt-3 text-sm leading-6 text-white/60">
-                    Pro 会立刻开放完整评分结果，并允许你把本次判断继续带入整理流程，而不是停留在简版报告里。
-                  </p>
-                </div>
+                {isDegradedParse ? (
+                  <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-5">
+                    <h3 className="text-sm font-semibold text-white/80">这次结果还缺什么</h3>
+                    <p className="mt-3 text-sm leading-6 text-white/55">
+                      这次未成功命中外部 PDF 解析服务，解锁后虽然能看到更多内容，但不会自动修复当前解析质量。更可信的做法是先重新评分，再决定是否解锁。
+                    </p>
+                    <Link
+                      href="/score"
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-200 transition-colors hover:text-white"
+                    >
+                      重新评分
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                ) : null}
                 <PermissionGate
                   allowed={false}
                   loginHref={isLoggedIn ? undefined : loginHref}
                   scene="score_detail"
                   title={paywallTitle}
                   description={paywallDescription}
-                  actionLabel={isLoggedIn ? "解锁完整结果" : "登录后解锁完整结果"}
+                  actionLabel={paywallActionLabel}
                 >
                   <></>
                 </PermissionGate>
@@ -559,22 +636,6 @@ export default async function ScoreResultPage({
             )}
           </section>
 
-          {!canViewFull ? (
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-              <div className="flex items-center gap-2 text-white/70">
-                <Lock className="h-4 w-4" />
-                <h2 className="text-sm font-semibold">完整结果已锁定</h2>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-white/55">
-                解锁后可继续查看完整 8 维、更多问题摘要和可执行改进建议，并把这次评分继续带入工作台整理流程。
-              </p>
-              <div className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-white/45">
-                <p>完整 8 维评分</p>
-                <p>3–5 条问题摘要</p>
-                <p>3–5 条改进建议</p>
-              </div>
-            </section>
-          ) : null}
         </section>
       </div>
     </div>

@@ -12,6 +12,7 @@
     "db:generate": "prisma generate",
     "measure:pdf-score": "node scripts/measure-pdf-score.mjs",
     "measure:pdf-vision": "node scripts/measure-pdf-vision.mjs",
+    "measure:score-stability": "node scripts/measure-score-stability.mjs",
     "test:llm": "node scripts/test-openai.mjs",
     "postinstall": "prisma generate",
     "test": "vitest run"

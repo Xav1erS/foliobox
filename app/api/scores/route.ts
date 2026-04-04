@@ -26,24 +26,18 @@ import {
   buildScanResult,
 } from "@/lib/score-processing";
 import { getPortfolioScoreLevelFromTotalScore } from "@/lib/portfolio-score-level";
+import {
+  computeTotalScoreFromDimensions,
+  SCORE_DIMENSION_KEYS,
+  type ScoreDimensionKey,
+} from "@/lib/score-math";
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_SCORE_IMAGES = 20;
 const MAX_PDF_VISUAL_ANCHORS = 8;
 const ANONYMOUS_SCORE_LIMIT = 3;
 const ANONYMOUS_SCORE_WINDOW_MS = 24 * 60 * 60 * 1000;
-const DIMENSION_SCORE_KEYS = [
-  "firstScreenProfessionalism",
-  "scannability",
-  "projectSelection",
-  "roleClarity",
-  "problemDefinition",
-  "resultEvidence",
-  "authenticity",
-  "jobFit",
-] as const;
-
-const DIMENSION_KEY_ALIASES: Record<(typeof DIMENSION_SCORE_KEYS)[number], string[]> = {
+const DIMENSION_KEY_ALIASES: Record<ScoreDimensionKey, string[]> = {
   firstScreenProfessionalism: ["firstScreenProfessionalism", "首屏专业感", "首屏专业性", "首屏印象"],
   scannability: ["scannability", "可扫描性", "信息可扫描性", "扫描性"],
   projectSelection: ["projectSelection", "项目选择质量", "项目选择", "项目质量"],
@@ -76,7 +70,7 @@ type ScoreOutput = {
   totalScore: number;
   level: "ready" | "needs_improvement" | "draft" | "not_ready";
   detectedProjectCount?: number;
-  dimensionScores: Record<(typeof DIMENSION_SCORE_KEYS)[number], DimensionScore>;
+  dimensionScores: Record<ScoreDimensionKey, DimensionScore>;
   summaryPoints: string[];
   recommendedActions: string[];
 };
@@ -111,7 +105,7 @@ function findDimensionKey(rawKey: unknown, fallbackIndex: number) {
   if (typeof rawKey === "string") {
     const normalized = rawKey.trim().toLowerCase();
 
-    for (const key of DIMENSION_SCORE_KEYS) {
+    for (const key of SCORE_DIMENSION_KEYS) {
       if (
         key.toLowerCase() === normalized ||
         DIMENSION_KEY_ALIASES[key].some((alias) => alias.toLowerCase() === normalized)
@@ -121,7 +115,7 @@ function findDimensionKey(rawKey: unknown, fallbackIndex: number) {
     }
   }
 
-  return DIMENSION_SCORE_KEYS[fallbackIndex] ?? null;
+  return SCORE_DIMENSION_KEYS[fallbackIndex] ?? null;
 }
 
 function normalizeDimensionScores(value: unknown) {
@@ -153,7 +147,7 @@ function normalizeDimensionScores(value: unknown) {
     const candidate = value as Record<string, unknown>;
     const normalized: Record<string, unknown> = {};
 
-    for (const key of DIMENSION_SCORE_KEYS) {
+    for (const key of SCORE_DIMENSION_KEYS) {
       const directValue = candidate[key];
       if (directValue !== undefined) {
         normalized[key] = normalizeDimensionScoreEntry(directValue);
@@ -873,6 +867,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const recalculatedTotalScore = computeTotalScoreFromDimensions(scoreOutput.dimensionScores);
     const finalCoverage = enhanceCoverage(coverage, scoreOutput);
 
     const record = await db.portfolioScore.create({
@@ -882,8 +877,8 @@ export async function POST(req: NextRequest) {
         requestIpHash,
         inputType: inputType === "link" ? "LINK" : inputType === "pdf" ? "PDF" : "IMAGES",
         inputUrl,
-        totalScore: scoreOutput.totalScore,
-        level: getPortfolioScoreLevelFromTotalScore(scoreOutput.totalScore),
+        totalScore: recalculatedTotalScore,
+        level: getPortfolioScoreLevelFromTotalScore(recalculatedTotalScore),
         dimensionScores: scoreOutput.dimensionScores as unknown as Prisma.InputJsonValue,
         coverageJson: finalCoverage as unknown as Prisma.InputJsonValue,
         processingJson: processing as unknown as Prisma.InputJsonValue,

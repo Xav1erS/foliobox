@@ -12,6 +12,7 @@ import {
   PORTFOLIO_SCORE_LEVEL_CONFIG,
   resolvePortfolioScoreLevel,
 } from "@/lib/portfolio-score-level";
+import { computeTotalScoreFromDimensions } from "@/lib/score-math";
 import {
   getScoreNextStep,
   isProfileReadyForGeneration,
@@ -96,12 +97,24 @@ export default async function DashboardPage({
     }),
   ]);
 
-  const latestScoreLevel = latestScore
-    ? resolvePortfolioScoreLevel(latestScore.totalScore, latestScore.level)
+  const latestScoreDisplayTotal = latestScore
+    ? computeTotalScoreFromDimensions(
+        latestScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0]
+      )
     : null;
-  const focusedScoreLevel = focusedScore
-    ? resolvePortfolioScoreLevel(focusedScore.totalScore, focusedScore.level)
+  const focusedScoreDisplayTotal = focusedScore
+    ? computeTotalScoreFromDimensions(
+        focusedScore.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0]
+      )
     : null;
+  const latestScoreLevel =
+    latestScore && latestScoreDisplayTotal !== null
+      ? resolvePortfolioScoreLevel(latestScoreDisplayTotal, latestScore.level)
+      : null;
+  const focusedScoreLevel =
+    focusedScore && focusedScoreDisplayTotal !== null
+      ? resolvePortfolioScoreLevel(focusedScoreDisplayTotal, focusedScore.level)
+      : null;
   const currentPlan = userPlan?.planType ?? "FREE";
   const planCopy = PLAN_COPY[currentPlan] ?? PLAN_COPY.FREE;
   const profileReady = isProfileReadyForGeneration(profile);
@@ -154,12 +167,12 @@ export default async function DashboardPage({
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
                 {focusedScore ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-3xl font-semibold tracking-tight text-neutral-900">
-                        {focusedScore.totalScore}
-                      </span>
-                      <span className="text-sm text-neutral-400">/100</span>
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-3xl font-semibold tracking-tight text-neutral-900">
+                          {focusedScoreDisplayTotal}
+                        </span>
+                        <span className="text-sm text-neutral-400">/100</span>
                       {focusedScoreLevel ? (
                         <Badge variant="outline">
                           {PORTFOLIO_SCORE_LEVEL_CONFIG[focusedScoreLevel].label}
@@ -321,7 +334,9 @@ export default async function DashboardPage({
                 {latestScore ? (
                   <div className="space-y-4">
                     <div className="flex items-end gap-3">
-                      <span className="text-5xl font-semibold tracking-tight text-neutral-900">{latestScore.totalScore}</span>
+                      <span className="text-5xl font-semibold tracking-tight text-neutral-900">
+                        {latestScoreDisplayTotal}
+                      </span>
                       <span className="pb-1 text-sm text-neutral-400">/100</span>
                     </div>
                     <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">

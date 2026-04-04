@@ -12,7 +12,7 @@ export function getNavbarPrimaryAction(isLoggedIn: boolean): MarketingAction {
 export function getNavbarSecondaryAction(isLoggedIn: boolean): MarketingAction {
   return isLoggedIn
     ? { href: "/projects/new", label: "继续整理作品集" }
-    : { href: "/pricing", label: "查看价格方案" };
+    : { href: "/login", label: "登录" };
 }
 
 export function getHeroPrimaryAction(isLoggedIn: boolean): MarketingAction {

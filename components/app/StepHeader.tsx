@@ -8,6 +8,7 @@ export function StepHeader({
   title,
   description,
   status,
+  statusTone = "default",
 }: {
   backHref?: string;
   backLabel?: string;
@@ -15,7 +16,15 @@ export function StepHeader({
   title: string;
   description?: string;
   status?: string;
+  statusTone?: "default" | "muted" | "success";
 }) {
+  const statusClassName =
+    statusTone === "success"
+      ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.08)]"
+      : statusTone === "muted"
+      ? "border-white/10 bg-white/[0.03] text-white/50"
+      : "border-white/10 bg-white/5 text-white/60";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -31,7 +40,7 @@ export function StepHeader({
           <span />
         )}
         {status ? (
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/60">
+          <span className={`rounded-full border px-3 py-1 text-[11px] ${statusClassName}`}>
             {status}
           </span>
         ) : null}

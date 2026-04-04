@@ -7,16 +7,22 @@ import {
   canAccessPortfolioScore,
   claimPortfolioScoreForUser,
 } from "@/lib/score-access";
+import { resolvePortfolioScoreLevel } from "@/lib/portfolio-score-level";
+import { computeTotalScoreFromDimensions } from "@/lib/score-math";
 
 function serializeScore(score: Awaited<ReturnType<typeof db.portfolioScore.findUnique>>) {
   if (!score) return null;
+
+  const recalculatedTotalScore = computeTotalScoreFromDimensions(
+    score.dimensionScores as Parameters<typeof computeTotalScoreFromDimensions>[0]
+  );
 
   return {
     id: score.id,
     inputType: score.inputType,
     inputUrl: score.inputUrl,
-    totalScore: score.totalScore,
-    level: score.level,
+    totalScore: recalculatedTotalScore,
+    level: resolvePortfolioScoreLevel(recalculatedTotalScore, score.level),
     dimensionScores: score.dimensionScores,
     coverage: score.coverageJson,
     processing: score.processingJson,
