@@ -17,7 +17,7 @@ export function SectionFrame({
   noGrid?: boolean;
 }) {
   return (
-    <div className={cn("relative overflow-hidden", className)}>
+    <div className={cn("relative overflow-visible", className)}>
       {!noGrid && (
         <div
           className={cn(
@@ -35,15 +35,15 @@ export function SectionFrame({
       )}
       {!noCorners && (
         <>
-          <div className="pointer-events-none absolute inset-y-0 left-6 w-px bg-white/[0.08] sm:left-8" />
-          <div className="pointer-events-none absolute inset-y-0 right-6 w-px bg-white/[0.06] sm:right-8" />
-          <div className="pointer-events-none absolute left-6 right-6 top-6 h-px bg-white/[0.08] sm:left-8 sm:right-8 sm:top-8" />
-          <div className="pointer-events-none absolute left-6 right-6 bottom-6 h-px bg-white/[0.06] sm:left-8 sm:right-8 sm:bottom-8" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-white/[0.08]" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-white/[0.06]" />
+          <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-white/[0.08]" />
+          <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-white/[0.06]" />
           {[
-            "left-6 top-6 sm:left-8 sm:top-8",
-            "right-6 top-6 sm:right-8 sm:top-8",
-            "left-6 bottom-6 sm:left-8 sm:bottom-8",
-            "right-6 bottom-6 sm:right-8 sm:bottom-8",
+            "left-0 top-0",
+            "right-0 top-0",
+            "left-0 bottom-0",
+            "right-0 bottom-0",
           ].map((position) => (
             <span
               key={position}
@@ -55,7 +55,7 @@ export function SectionFrame({
           ))}
         </>
       )}
-      <div className={cn("relative", contentClassName)}>{children}</div>
+      <div className={cn("relative overflow-hidden", contentClassName)}>{children}</div>
     </div>
   );
 }

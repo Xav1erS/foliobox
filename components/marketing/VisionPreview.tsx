@@ -1,11 +1,13 @@
-import Link from "next/link";
+import { IndexedRowList } from "@/components/marketing/IndexedRowList";
 import { IsometricWireframe } from "@/components/marketing/IsometricWireframe";
+import { RectActionLink } from "@/components/marketing/RectActionLink";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 
 const futureItems = [
-  { id: "01", label: "简历对齐", status: "未来方向" },
-  { id: "02", label: "岗位定向", status: "未来方向" },
-  { id: "03", label: "面试讲述", status: "未来方向" },
-  { id: "04", label: "同一工作台", status: "长期方向" },
+  { id: "01", title: "简历对齐", rightLabel: "未来方向" },
+  { id: "02", title: "岗位定向", rightLabel: "未来方向" },
+  { id: "03", title: "面试讲述", rightLabel: "未来方向" },
+  { id: "04", title: "同一工作台", rightLabel: "长期方向" },
 ];
 
 export function VisionPreview() {
@@ -16,9 +18,7 @@ export function VisionPreview() {
 
           {/* Left: text + future items + CTA */}
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-              长期方向
-            </p>
+            <SectionEyebrow label="长期方向" />
             <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.6rem]">
               不只想做一个<br />
               作品集工具
@@ -31,41 +31,15 @@ export function VisionPreview() {
               作品集只是入口。后面我还想慢慢补上简历一致性、岗位匹配和面试讲述。
             </p>
 
-            {/* Future items row list */}
-            <div className="mt-8 border-t border-white/10">
-              {futureItems.map((item, i) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center justify-between py-3 ${
-                    i < futureItems.length - 1 ? "border-b border-white/[0.07]" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-[11px] tracking-[0.2em] text-white/25">
-                      {item.id}
-                    </span>
-                    <span className="text-sm text-white/65">{item.label}</span>
-                  </div>
-                  <span className="border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.15em] text-white/30">
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <IndexedRowList items={futureItems} className="mt-8" itemClassName="py-3" />
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/vision"
-                className="inline-flex h-11 items-center justify-center border border-white bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-              >
+              <RectActionLink href="/vision" variant="solid">
                 看看我想把它做成什么
-              </Link>
-              <Link
-                href="/editorial/developers-note"
-                className="inline-flex h-11 items-center justify-center border border-white/15 px-5 text-sm text-white/65 transition-colors hover:border-white/28 hover:text-white"
-              >
+              </RectActionLink>
+              <RectActionLink href="/editorial/developers-note">
                 先读开发者说
-              </Link>
+              </RectActionLink>
             </div>
           </div>
 

@@ -1,8 +1,11 @@
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { Footer } from "@/components/marketing/Footer";
+import { IndexedFeatureGrid } from "@/components/marketing/IndexedFeatureGrid";
+import { IndexedRowList } from "@/components/marketing/IndexedRowList";
 import { IsometricWireframe } from "@/components/marketing/IsometricWireframe";
 import { Navbar } from "@/components/marketing/Navbar";
+import { RectActionLink } from "@/components/marketing/RectActionLink";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 import { SectionFrame } from "@/components/marketing/SectionFrame";
 import { getNavbarPrimaryAction } from "@/lib/marketing-cta";
 
@@ -38,10 +41,10 @@ const futureDirections = [
 ];
 
 const coreProblems = [
-  "不知道该从哪个项目开始整理",
-  "不知道自己的角色和判断该怎么讲",
-  "不知道作品集、简历和面试里的说法怎么对齐",
-  "不知道面对目标岗位时，到底该强调什么",
+  { id: "01", title: "不知道该从哪个项目开始整理" },
+  { id: "02", title: "不知道自己的角色和判断该怎么讲" },
+  { id: "03", title: "不知道作品集、简历和面试里的说法怎么对齐" },
+  { id: "04", title: "不知道面对目标岗位时，到底该强调什么" },
 ];
 
 const includedPromiseItems = [
@@ -88,15 +91,7 @@ export default async function VisionPage() {
 
         <div className="relative mx-auto max-w-6xl px-5 pb-16 sm:px-6 sm:pb-20">
           {/* Section label */}
-          <div className="mb-8 flex items-center gap-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-              公开愿景
-            </p>
-            <span className="h-px w-8 bg-white/15" />
-            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/20">
-              集盒FolioBox
-            </p>
-          </div>
+          <SectionEyebrow label="公开愿景" secondaryLabel="集盒FolioBox" className="mb-8" />
 
           {/* Title */}
           <h1 className="text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
@@ -139,18 +134,12 @@ export default async function VisionPage() {
 
           {/* CTAs */}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href={primaryCta.href}
-              className="inline-flex h-12 items-center justify-center border border-white bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-            >
+            <RectActionLink href={primaryCta.href} variant="solid" size="lg">
               {primaryCta.label}
-            </Link>
-            <Link
-              href="/editorial/developers-note"
-              className="inline-flex h-12 items-center justify-center border border-white/15 px-6 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white"
-            >
+            </RectActionLink>
+            <RectActionLink href="/editorial/developers-note" size="lg">
               先读开发者说
-            </Link>
+            </RectActionLink>
           </div>
         </div>
       </section>
@@ -164,9 +153,7 @@ export default async function VisionPage() {
 
             {/* Left */}
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-                为什么不只做工具
-              </p>
+              <SectionEyebrow label="为什么不只做工具" />
               <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
                 作品集从来不是<br />
                 问题的全部。
@@ -184,19 +171,7 @@ export default async function VisionPage() {
 
             {/* Right: 4 problems as row list */}
             <div className="border-t border-white/10 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-              {coreProblems.map((problem, i) => (
-                <div
-                  key={problem}
-                  className={`flex gap-5 py-5 ${
-                    i < coreProblems.length - 1 ? "border-b border-white/[0.07]" : ""
-                  }`}
-                >
-                  <span className="mt-0.5 shrink-0 font-mono text-[11px] tracking-[0.2em] text-white/25">
-                    0{i + 1}
-                  </span>
-                  <p className="text-sm leading-[1.85] text-white/70 sm:text-base">{problem}</p>
-                </div>
-              ))}
+              <IndexedRowList items={coreProblems} className="border-t-0" />
             </div>
           </div>
         </div>
@@ -211,9 +186,7 @@ export default async function VisionPage() {
           {/* Header */}
           <div className="mb-10 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-                长期方向
-              </p>
+              <SectionEyebrow label="长期方向" />
               <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
                 如果它继续往前走，<br />
                 我最想补的不是更多模板。
@@ -225,32 +198,7 @@ export default async function VisionPage() {
             </p>
           </div>
 
-          {/* 4-item grid */}
-          <div className="grid border border-white/10 sm:grid-cols-2">
-            {futureDirections.map((item, i) => (
-              <article
-                key={item.title}
-                className={`px-5 py-6 sm:px-6 sm:py-7 ${
-                  i >= 2 ? "border-t border-white/[0.07]" : ""
-                } ${i % 2 === 1 ? "sm:border-l sm:border-white/[0.07]" : ""}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.15em] text-white/30">
-                    {item.status}
-                  </span>
-                  <span className="font-mono text-[11px] tracking-[0.25em] text-white/20">
-                    {item.id}
-                  </span>
-                </div>
-                <h3 className="mt-4 text-[1.05rem] font-semibold leading-[1.35] tracking-[-0.02em] text-white sm:text-xl">
-                  {item.title}
-                </h3>
-                <p className="mt-3 text-sm leading-[1.85] text-white/60 sm:text-base">
-                  {item.description}
-                </p>
-              </article>
-            ))}
-          </div>
+          <IndexedFeatureGrid items={futureDirections} />
 
           {/* Vision diagram */}
           <div className="mt-8 border border-white/10 p-5 sm:p-7">
@@ -274,9 +222,7 @@ export default async function VisionPage() {
 
             {/* Left */}
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-                为什么会有它
-              </p>
+              <SectionEyebrow label="为什么会有它" />
               <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
                 不是因为我想做<br />
                 一个工具，而是因为<br />
@@ -286,6 +232,7 @@ export default async function VisionPage() {
               <SectionFrame
                 className="mt-8 border border-white/10 bg-black/25"
                 noGrid
+                noCorners
               >
                 <div className="px-5 py-5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/25">
@@ -327,9 +274,7 @@ export default async function VisionPage() {
 
             {/* Left */}
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-                首批用户
-              </p>
+              <SectionEyebrow label="首批用户" />
               <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.6rem]">
                 给首批用户的<br />
                 一个承诺
@@ -399,9 +344,7 @@ export default async function VisionPage() {
       ───────────────────────────────────────── */}
       <section className="border-t border-white/10 px-5 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
-            接下来
-          </p>
+          <SectionEyebrow label="接下来" className="justify-center" />
           <h2 className="mt-6 text-[1.9rem] font-semibold leading-[1.1] tracking-[-0.04em] text-white sm:text-[2.8rem]">
             集盒FolioBox 现在还很早。<br />
             但我希望它以后能变成<br />
@@ -411,18 +354,12 @@ export default async function VisionPage() {
             现在，它先从作品集整理开始。以后，如果这条路值得继续走下去，我希望它能帮更多设计师把求职表达这件事也一起整理清楚。
           </p>
           <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href={primaryCta.href}
-              className="inline-flex h-12 items-center justify-center border border-white bg-white px-7 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-            >
+            <RectActionLink href={primaryCta.href} variant="solid" size="lg">
               {primaryCta.label}
-            </Link>
-            <Link
-              href="/editorial/developers-note"
-              className="inline-flex h-12 items-center justify-center border border-white/15 px-7 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white"
-            >
+            </RectActionLink>
+            <RectActionLink href="/editorial/developers-note" size="lg">
               读一页开发者说
-            </Link>
+            </RectActionLink>
           </div>
         </div>
       </section>
