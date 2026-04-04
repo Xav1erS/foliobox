@@ -18,6 +18,7 @@
 - 支付、套餐、权限与回跳：`private-docs/spec-system-v2/05_Billing_and_Entitlement_v2.md`
 - 工作台 IA、项目管理与状态流：`private-docs/spec-system-v2/06_Workspace_IA_v2.md`
 - 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v2/07_Quality_Engineering_v1.md`
+- 整站体验基线、文案语气、CTA 与视觉达标线：`private-docs/spec-system-v2/08_Experience_Baseline_v1.md`
 - 文档维护规则与冲突处理：`private-docs/spec-system-v2/99_Document_Maintenance_Rules.md`
 
 使用规则：
@@ -25,14 +26,17 @@
 - Freeze `02_Current_Freeze_v2.md` 用于当前版本页面归属、文案、CTA、壳层与行为冻结
 - 专题规则分别以对应专题文档为准，不回到主 spec 重复判断
 - 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v1.md` 为准
+- 跨页面共享的体验基线、文案语气、CTA 规则与桌面端 / 移动端达标线统一以 `08_Experience_Baseline_v1.md` 为准
 - 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules.md` 为准
 - `private-docs/archive-legacy/` 下的旧文档仅作历史参考，不作为当前实现依据
 - 如果旧文档、旧备注或本文其他段落与 v2 文档冲突，一律以 `private-docs/spec-system-v2/` 下文档为准
+- 用户可见页面的体验判断，如无更具体规则，优先查 `08_Experience_Baseline_v1.md`，不要仅凭个人审美临场判断
 
 执行要求：
 - 开始任何产品相关代码修改前，先阅读 `private-docs/CURRENT_SPEC.md`
 - 再阅读 `00_README_Document_Map_v2.md`
 - 再按任务命中范围读取 `01` 到 `07` 和 `99` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付、工作台 IA、质量工程或文档维护规则，必须读取对应文档
+- 若任务涉及用户可见页面的视觉、文案、CTA、桌面端 / 移动端体验判断，必须额外读取 `08_Experience_Baseline_v1.md`
 - 在开始修改代码前，先输出本次任务命中的文档清单
 - 在开始修改代码前，先明确说明：
   - 本次任务涉及哪几份文档
@@ -116,6 +120,9 @@ npm run db:generate  # 重新生成 Prisma Client（schema 改完后运行）
 - agent 可以承担 Git / GitHub 执行工作，包括建分支、提交、推送、开 PR、整理 PR 说明
 - 用户主要负责确认目标、验收结果、决定是否合并；agent 负责把流程整理清楚
 - 完成代码修改后，默认进行与任务相称的验证，并向用户说明验证结果、剩余风险和未执行项
+- 面向用户可见的 UI 页面，视觉质量与功能完成度同等重要，不将“功能已通但界面粗糙”视为可交付状态
+- 当前产品面向 UI / UX 设计师用户，agent 在处理 Landing、评分入口、评分结果、价格页、Dashboard、项目工作流、案例展示等关键页面时，应同时关注视觉专业感、排版层级、留白、节奏、组件一致性与 CTA 权重，而不是只修功能逻辑
+- 面向用户的文案默认采用“设计师对设计师”的语气：有人情味、真诚、克制、不夸大承诺，不使用居高临下的专家腔或过度营销话术；应更接近“我知道这件事很难，我们先一起把第一版做出来”
 
 ### 工具使用偏好
 

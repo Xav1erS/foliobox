@@ -7,10 +7,10 @@ export function EditorialCTA({ cta }: { cta: EditorialCTAModel }) {
       <div className="mx-auto max-w-4xl rounded-[32px] border border-white/10 bg-white/[0.04] px-6 py-10 text-center sm:px-10">
         <p className="text-xs uppercase tracking-[0.24em] text-white/30">继续下一步</p>
         <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          先看清问题，再决定怎么改
+          先体验当前版本，再决定要不要继续往前走
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-white/58">
-          如果你也在整理作品集，不一定要先从排版开始。先做一次评分，看看问题到底出在哪，再决定要不要继续重做。
+          如果你也在整理作品集，不一定要先从排版开始。先做一次评分，看看问题到底出在哪，再决定要不要继续整理、继续修改，或者看看集盒FolioBox 以后会长成什么样。
         </p>
         <div className="mt-8">
           <Link

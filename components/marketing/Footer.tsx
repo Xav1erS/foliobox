@@ -13,6 +13,7 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-6 text-xs text-white/25">
+            <Link href="/vision" className="hover:text-white/50 transition-colors">长期方向</Link>
             <Link href="/privacy" className="hover:text-white/50 transition-colors">隐私政策</Link>
             <Link href="/terms" className="hover:text-white/50 transition-colors">服务条款</Link>
             <span>© {new Date().getFullYear()} 集盒FolioBox</span>

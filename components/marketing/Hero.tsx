@@ -31,12 +31,16 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </div>
 
         {/* Heading */}
-        <h1 className="mx-auto max-w-[320px] text-[52px] font-bold leading-[0.96] tracking-[-0.05em] text-white sm:max-w-[640px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[860px] lg:text-[72px] lg:leading-[1.1]">
-          <span className="block whitespace-nowrap sm:inline">
-            把零散项目整理成
+        <h1 className="mx-auto max-w-[320px] font-bold text-white sm:max-w-[640px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[860px] lg:text-[72px] lg:leading-[1.1]">
+          <span className="text-[38px] leading-[0.98] tracking-[-0.05em] sm:hidden">
+            <span className="block">把零散项目</span>
+            <span className="mt-1.5 block">整理成</span>
+            <span className="mt-1.5 block text-white/40">拿得出手的</span>
+            <span className="mt-1.5 block">作品集</span>
           </span>
-          <br className="hidden sm:block" />
-          <span className="mt-2 block whitespace-nowrap sm:mt-0 sm:inline">
+          <span className="hidden sm:block">
+            把零散项目整理成
+            <br />
             <span className="text-white/40">拿得出手的</span>作品集
           </span>
         </h1>

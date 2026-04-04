@@ -17,7 +17,7 @@ import {
   getNavbarSecondaryAction,
 } from "@/lib/marketing-cta";
 
-type NavbarPage = "home" | "pricing" | "score" | "editorial" | "legal";
+type NavbarPage = "home" | "pricing" | "score" | "editorial" | "vision" | "legal";
 
 export function Navbar({
   isLoggedIn = false,
@@ -43,6 +43,11 @@ export function Navbar({
         label: "开发者说",
         href: "/editorial/developers-note",
       },
+      {
+        key: "vision",
+        label: "长期方向",
+        href: "/vision",
+      },
     ],
     []
   );
@@ -57,6 +62,8 @@ export function Navbar({
         return "pricing";
       case "editorial":
         return "editorial";
+      case "vision":
+        return "vision";
       case "score":
       case "legal":
         return null;
@@ -67,9 +74,9 @@ export function Navbar({
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
+      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-4 sm:px-6">
         {/* Logo */}
-        <Link href="/" className="text-sm font-semibold tracking-tight text-white">
+        <Link href="/" className="whitespace-nowrap text-xs font-semibold leading-tight tracking-tight text-white sm:text-sm">
           集盒 FolioBox
         </Link>
 
@@ -100,9 +107,10 @@ export function Navbar({
           </Link>
           <Link
             href={primaryCta.href}
-            className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 sm:px-4 sm:text-sm"
           >
-            {primaryCta.label} →
+            <span className="sm:hidden">{isLoggedIn ? "工作台" : "先打分"}</span>
+            <span className="hidden sm:inline">{primaryCta.label} →</span>
           </Link>
 
           <Dialog>

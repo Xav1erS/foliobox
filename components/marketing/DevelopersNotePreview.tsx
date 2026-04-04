@@ -23,7 +23,7 @@ export function DevelopersNotePreview({
 
               <div className="mt-8 rounded-[28px] border border-white/10 bg-black/30 px-5 py-5">
                 <p className="text-sm leading-7 text-white/58">
-                  我们不想用一个更花哨的模板替你遮住内容问题，而是想帮你把真正值得看的东西整理出来。
+                  我不想只做一个更花哨的模板工具，而是想继续往前走，帮你把作品集、简历和求职表达慢慢整理到同一条主线里。
                 </p>
               </div>
             </div>
