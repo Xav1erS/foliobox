@@ -20,10 +20,17 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
           开始使用
         </p>
-        <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-          如果你愿意，
-          <br />
-          我想先陪你把第一版做出来
+        <h2 className="font-bold tracking-tight text-white">
+          <span className="block text-[2.8rem] leading-[0.98] tracking-[-0.05em] sm:hidden">
+            <span className="block">先把第一版</span>
+            <span className="mt-2 block">做出来，</span>
+            <span className="mt-2 block">再继续往前走</span>
+          </span>
+          <span className="hidden text-4xl md:text-5xl sm:block">
+            先把第一版做出来，
+            <br />
+            再继续往前走
+          </span>
         </h2>
         <p className="mt-4 text-base text-white/55" style={{ maxWidth: 480 }}>
           先用评分看清问题，再决定下一步怎么整理。

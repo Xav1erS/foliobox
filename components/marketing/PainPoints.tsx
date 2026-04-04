@@ -39,10 +39,16 @@ export function PainPoints() {
           {/* Left: heading */}
           <div className="lg:sticky lg:top-24 lg:self-start">
             <SectionEyebrow label="设计师真实痛点" className="mb-3" />
-            <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-              不是没有项目，
-              <br />
-              是不会整理
+            <h2 className="font-bold tracking-tight text-white">
+              <span className="block text-[2.8rem] leading-[0.98] tracking-[-0.05em] sm:hidden">
+                <span className="block">不是没有项目，</span>
+                <span className="mt-2 block">是不会整理</span>
+              </span>
+              <span className="hidden text-4xl md:text-5xl sm:block">
+                不是没有项目，
+                <br />
+                是不会整理
+              </span>
             </h2>
             <p className="mt-5 text-sm leading-relaxed text-white/50">
               大多数设计师卡在这里，不是不会做设计，而是没人帮你把表达这件事先理顺。

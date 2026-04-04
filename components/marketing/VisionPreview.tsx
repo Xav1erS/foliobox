@@ -19,9 +19,16 @@ export function VisionPreview() {
           {/* Left: text + future items + CTA */}
           <div>
             <SectionEyebrow label="长期方向" />
-            <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.6rem]">
-              不只想做一个<br />
-              作品集工具
+            <h2 className="mt-5 font-semibold leading-[1.05] tracking-[-0.04em] text-white">
+              <span className="block text-[2.4rem] leading-[0.98] sm:hidden">
+                <span className="block">不只想做一个</span>
+                <span className="mt-2 block">作品集工具</span>
+              </span>
+              <span className="hidden text-[2rem] sm:text-[2.6rem] sm:block">
+                不只想做一个
+                <br />
+                作品集工具
+              </span>
             </h2>
             <p className="mt-5 text-sm leading-[1.9] text-white/62 sm:text-base">
               我现在先从作品集整理开始做，是因为它最具体，也最容易立刻帮上忙。

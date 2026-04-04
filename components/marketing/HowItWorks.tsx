@@ -151,12 +151,16 @@ export function HowItWorks() {
           {/* Left: sticky heading */}
           <div className="lg:sticky lg:top-24">
             <SectionEyebrow label="使用流程" className="mb-3" />
-            <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-              先把最难开始的
-              <br />
-              那一段
-              <br />
-              做掉
+            <h2 className="font-bold tracking-tight text-white">
+              <span className="block text-[2.8rem] leading-[0.96] tracking-[-0.05em] sm:hidden">
+                <span className="block">先把最难开始的</span>
+                <span className="mt-2 block">那一段做掉</span>
+              </span>
+              <span className="hidden text-4xl md:text-5xl sm:block">
+                先把最难开始的
+                <br />
+                那一段做掉
+              </span>
             </h2>
             <p className="mt-5 text-sm leading-relaxed text-white/50">
               不需要从零开始排版，也不用一上来就把每句话都想清楚。
