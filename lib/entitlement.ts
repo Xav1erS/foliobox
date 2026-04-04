@@ -38,7 +38,7 @@ export const PLAN_DEFINITIONS = [
     highlightTag: "最适合多数用户",
     featureList: [
       "完整评分结果",
-      "完整重制流程",
+      "完整整理流程",
       "多版本生成",
       "PDF 导出",
       "在线链接发布",

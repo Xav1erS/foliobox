@@ -1,12 +1,8 @@
 import Link from "next/link";
-import {
-  getHeroPrimaryAction,
-  getHeroSecondaryAction,
-} from "@/lib/marketing-cta";
+import { getHeroPrimaryAction } from "@/lib/marketing-cta";
 
 export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const primaryAction = getHeroPrimaryAction(isLoggedIn);
-  const secondaryAction = getHeroSecondaryAction(isLoggedIn);
 
   return (
     <section className="relative overflow-hidden border-y border-white/8 px-6 py-20">
@@ -25,15 +21,16 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           开始使用
         </p>
         <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-          你的作品集，
-            <br />
-            现在拿得出手了吗？
+          如果你愿意，
+          <br />
+          我想先陪你把第一版做出来
         </h2>
         <p className="mt-4 text-base text-white/55" style={{ maxWidth: 480 }}>
-          先免费打分看看差距，再决定是否重制。不注册也能用。
+          先用评分看清问题，再决定下一步怎么整理。
+          现在不用一上来就做到完美，先从能继续修改的第一版开始。
         </p>
 
-        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center gap-4">
           <Link
             href={primaryAction.href}
             className="flex h-12 min-w-[200px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
@@ -41,10 +38,10 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             {primaryAction.label}
           </Link>
           <Link
-            href={secondaryAction.href}
-            className="flex h-12 min-w-[180px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
+            href="/vision"
+            className="text-sm text-white/55 transition-colors hover:text-white"
           >
-            {secondaryAction.label}
+            也可以先看看我想把它做成什么
           </Link>
         </div>
       </div>

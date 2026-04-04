@@ -4,6 +4,7 @@ import { CaseCard, EXAMPLE_CASES } from "@/components/marketing/CaseCard";
 import { PainPoints } from "@/components/marketing/PainPoints";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { DevelopersNotePreview } from "@/components/marketing/DevelopersNotePreview";
+import { VisionPreview } from "@/components/marketing/VisionPreview";
 import { ScoreFeature } from "@/components/marketing/ScoreFeature";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CtaBanner } from "@/components/marketing/CtaBanner";
@@ -30,17 +31,17 @@ export default async function LandingPage() {
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-                几种常见项目，整理成
+                几种常见项目，先整理成
                 <br />
-                作品集之后会是什么样
+                第一版之后会是什么样
               </h2>
               <div className="max-w-xs sm:text-right">
                 <p className="text-sm text-white/40">
-                  B 端、G 端、C 端都做过。
+                  B 端、G 端、C 端都能整理。
                   <br />
-                  不只是"好看项目"才能生成。
+                  不只“好看项目”才值得认真讲清楚。
                 </p>
-                <p className="mt-1.5 text-xs text-white/20">基于真实求职场景构建的演示案例</p>
+                <p className="mt-1.5 text-xs text-white/20">这些都是按真实求职表达逻辑整理出来的演示案例</p>
               </div>
             </div>
           </div>
@@ -58,6 +59,8 @@ export default async function LandingPage() {
       <HowItWorks />
 
       <DevelopersNotePreview content={developersNoteContent} />
+
+      <VisionPreview />
 
       <ScoreFeature />
 

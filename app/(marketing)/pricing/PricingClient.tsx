@@ -14,12 +14,33 @@ const COMPARISON_ROWS = [
   { label: "免费评分入口", free: true, pro: true, sprint: true },
   { label: "简版评分结果", free: true, pro: true, sprint: true },
   { label: "完整评分结果", free: false, pro: true, sprint: true },
-  { label: "完整重制流程", free: false, pro: true, sprint: true },
+  { label: "完整整理流程", free: false, pro: true, sprint: true },
   { label: "多版本生成", free: false, pro: true, sprint: true },
   { label: "PDF 导出", free: false, pro: true, sprint: true },
   { label: "在线链接发布", free: false, pro: true, sprint: true },
   { label: "更高配额", free: false, pro: false, sprint: true },
   { label: "岗位定向优化", free: false, pro: false, sprint: true },
+];
+
+const STAGE_GUIDES = [
+  {
+    title: "我还不确定这份作品集现在能不能投",
+    body: "先免费评分。先看清问题，再决定要不要继续整理，不需要一上来就买。",
+    cta: "先给我的作品集打分",
+    href: "/score",
+  },
+  {
+    title: "我已经准备开始认真整理第一版",
+    body: "如果你已经想把项目、结构和导出都走完整，Pro 会是最稳的主线。",
+    cta: "优先看 Pro 版",
+    href: "#plans",
+  },
+  {
+    title: "我正处在投递窗口，想集中冲刺",
+    body: "如果你已经开始密集投递，希望在短时间内多做几轮优化，再看求职冲刺版。",
+    cta: "了解冲刺版",
+    href: "#plans",
+  },
 ];
 
 export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
@@ -36,11 +57,17 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
   return (
     <main className="mx-auto max-w-5xl px-6 pb-20 pt-28">
       <div className="mb-14 text-center">
-        <h1 className="text-4xl font-bold text-white">
-          选择适合你的方式，继续完成作品集整理
+        <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
+          继续往前走
+        </p>
+        <h1 className="text-4xl font-bold tracking-tight text-white">
+          先判断你现在
+          <br />
+          最需要哪一步
         </h1>
         <p className="mt-4 text-lg text-white/60">
-          根据你的当前阶段，选择先体验、继续整理，或直接解锁完整能力。
+          这页不是要你立刻做购买决定，而是先帮你判断：
+          现在应该先评分、继续整理，还是进入投递前冲刺。
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
@@ -58,8 +85,40 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         </div>
         <p className="mt-3 text-sm text-white/35">
           {!isLoggedIn
-            ? "未登录时也可以先免费评分；购买前再登录即可继续。"
-            : "你已经登录，可以直接回到工作台或继续整理当前作品集。"}
+            ? "未登录时也可以先免费评分；等你确定要继续整理时，再登录购买也来得及。"
+            : "你已经登录，可以直接回到工作台，也可以先判断现在更适合哪条路。"}
+        </p>
+      </div>
+
+      <div className="mb-14 grid gap-4 lg:grid-cols-3">
+        {STAGE_GUIDES.map((item) => (
+          <div
+            key={item.title}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+          >
+            <h2 className="text-lg font-semibold text-white">{item.title}</h2>
+            <p className="mt-3 text-sm leading-relaxed text-white/55">{item.body}</p>
+            <Link
+              href={item.href}
+              className="mt-5 inline-flex h-10 items-center justify-center rounded-xl border border-white/14 px-4 text-sm font-medium text-white/80 transition-colors hover:border-white/28 hover:text-white"
+            >
+              {item.cta}
+            </Link>
+          </div>
+        ))}
+      </div>
+
+      <div id="plans" className="mb-6">
+        <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
+          能力与阶段
+        </p>
+        <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+          如果你已经决定继续整理，
+          <br />
+          再看具体适合哪一档
+        </h2>
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/55">
+          免费版适合先看清问题；Pro 版适合把第一版真正做出来；求职冲刺版适合在投递窗口里做更密集的优化。
         </p>
       </div>
 
@@ -111,7 +170,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
                   href="/score"
                   className="flex h-10 w-full items-center justify-center rounded-xl border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
                 >
-                  {isLoggedIn ? "继续查看评分结果" : "先给我的作品集打分"}
+                  {isLoggedIn ? "继续回到评分结果" : "先给我的作品集打分"}
                 </Link>
               ) : !isLoggedIn ? (
                 <Link
@@ -139,6 +198,18 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-5">
+        <p className="text-sm leading-relaxed text-white/55">
+          如果你现在还在犹豫，其实最稳的顺序通常是：
+          <span className="text-white/78"> 先评分 </span>
+          <span className="text-white/35">→</span>
+          <span className="text-white/78"> 再决定要不要继续整理 </span>
+          <span className="text-white/35">→</span>
+          <span className="text-white/78"> 需要更完整能力时再解锁付费</span>
+          。
+        </p>
       </div>
 
       <div className="mb-14 overflow-hidden rounded-2xl border border-white/10">
@@ -176,7 +247,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
       </div>
 
       <p className="mb-10 text-center text-sm text-white/40">
-        你可以先体验评分，也可以直接开始整理作品集；当你需要完整生成、编辑、导出和更多配额时，再解锁付费能力。
+        价格不是为了催你立刻下决定，而是为了让你在不同阶段，都知道什么时候该继续往前走。
       </p>
 
       <div className="mb-6 text-center text-sm text-white/30">支持微信支付 / 支付宝</div>

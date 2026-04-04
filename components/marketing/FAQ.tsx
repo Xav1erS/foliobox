@@ -25,7 +25,12 @@ export function FAQ() {
           <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
             常见问题
           </p>
-          <h2 className="text-4xl font-bold tracking-tight text-white">FAQ</h2>
+          <h2 className="text-4xl font-bold tracking-tight text-white">
+            你可能会先问这些
+          </h2>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/50">
+            我先把当前版本最容易让人犹豫的几个问题放在这里，避免你还没开始就先被不确定感卡住。
+          </p>
         </div>
 
         <div className="flex flex-col">

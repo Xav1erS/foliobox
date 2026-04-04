@@ -23,16 +23,18 @@ export function ScoreFeature() {
               评分诊断能力
             </p>
             <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-              先知道哪里
+              先知道现在
               <br />
-              不行，再改
+              卡在哪，
+              <br />
+              再决定怎么整理
             </h2>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/55">
-              上传现有作品集，系统按 8 个维度出具评分报告。
-              不只给分，还告诉你具体哪里不过线、优先修哪里。
+              上传现有作品集后，我会先用评分帮你看清楚：
+              这份东西现在能不能投，最该优先补的是哪里。
             </p>
             <p className="mt-3 max-w-sm text-sm font-medium text-white/60">
-              先看问题，再决定要不要重做。
+              分数不是为了评判你，而是为了帮你少走弯路。
             </p>
 
             {/* Score levels */}
@@ -58,7 +60,7 @@ export function ScoreFeature() {
               href="/score"
               className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
             >
-              免费给作品集打分
+              先看这份作品集现在能不能投
             </Link>
           </div>
 

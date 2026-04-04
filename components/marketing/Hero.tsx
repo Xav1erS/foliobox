@@ -6,7 +6,9 @@ import {
 
 export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const primaryAction = getHeroPrimaryAction(isLoggedIn);
-  const secondaryAction = getHeroSecondaryAction(isLoggedIn);
+  const secondaryAction = isLoggedIn
+    ? getHeroSecondaryAction(isLoggedIn)
+    : { href: "/vision", label: "看看我想把它做成什么" };
 
   return (
     <section className="relative overflow-hidden pt-14">
@@ -27,35 +29,34 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         {/* Badge */}
         <div className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] text-white/70 sm:mb-8 sm:px-4 sm:text-xs">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <span className="whitespace-nowrap">OpenAI 驱动 · 面向产品 / UX 设计师</span>
+          <span className="whitespace-nowrap">集盒FolioBox · 从作品集整理开始</span>
         </div>
 
         {/* Heading */}
-        <h1 className="mx-auto max-w-[320px] font-bold text-white sm:max-w-[640px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[860px] lg:text-[72px] lg:leading-[1.1]">
-          <span className="text-[38px] leading-[0.98] tracking-[-0.05em] sm:hidden">
-            <span className="block">把零散项目</span>
-            <span className="mt-1.5 block">整理成</span>
-            <span className="mt-1.5 block text-white/40">拿得出手的</span>
-            <span className="mt-1.5 block">作品集</span>
+        <h1 className="mx-auto max-w-[320px] font-bold text-white sm:max-w-[720px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[900px] lg:text-[72px] lg:leading-[1.06]">
+          <span className="text-[36px] leading-[0.98] tracking-[-0.05em] sm:hidden">
+            <span className="block">我想先陪你</span>
+            <span className="mt-1.5 block text-white/45">把第一版作品集</span>
+            <span className="mt-1.5 block">整理出来</span>
           </span>
           <span className="hidden sm:block">
-            把零散项目整理成
+            我想先陪你
             <br />
-            <span className="text-white/40">拿得出手的</span>作品集
+            把<span className="text-white/40">第一版作品集</span>整理出来
           </span>
         </h1>
 
         <p
-          className="mx-auto mt-6 max-w-[340px] text-base leading-8 text-white/60 sm:max-w-[560px] sm:text-lg sm:leading-relaxed"
+          className="mx-auto mt-6 max-w-[340px] text-base leading-8 text-white/60 sm:max-w-[640px] sm:text-lg sm:leading-relaxed"
         >
-          导入设计稿和简历，补充项目关键信息，由 AI 帮你整理结构、生成第一版作品集初稿。
+          你给我现有设计稿、简历和项目事实，我先帮你把结构搭起来。
           <br />
-          20 分钟内完成第一版，不靠模板堆砌，也不做廉价感包装。
+          不是直接替你生成一个满分答案，而是先把最难开始的那一段做掉。
         </p>
 
         {/* Trust clarification */}
-        <p className="mx-auto mt-3 max-w-[330px] text-sm leading-7 text-white/40 sm:max-w-[480px] sm:leading-normal">
-          不是纯模板拼接，也不是完全交给 AI。先由 AI 完成第一版，再由你继续修改。
+        <p className="mx-auto mt-3 max-w-[340px] text-sm leading-7 text-white/40 sm:max-w-[560px] sm:leading-normal">
+          作品集只是入口。我更想继续帮你把项目表达、简历线索和求职叙事慢慢整理到同一条主线里。
         </p>
 
         {/* CTAs */}
@@ -75,12 +76,12 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </div>
 
         {/* Trust line */}
-        <div className="mt-9 flex max-w-[320px] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/30 sm:mt-10 sm:max-w-none sm:flex-nowrap">
-          <span>支持 Figma 导入</span>
+        <div className="mt-9 flex max-w-[340px] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/30 sm:mt-10 sm:max-w-none sm:flex-nowrap">
+          <span>先评分，再整理</span>
           <span className="h-px w-4 bg-white/15" />
-          <span>支持图片上传</span>
+          <span>支持 Figma / 图片导入</span>
           <span className="h-px w-4 bg-white/15" />
-          <span>专为国内大厂投递设计</span>
+          <span>生成第一版后还能继续修改</span>
         </div>
       </div>
 
