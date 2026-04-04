@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { RectActionLink } from "@/components/marketing/RectActionLink";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 import type { EditorialContent } from "@/content/editorial/types";
 
 export function DevelopersNotePreview({
@@ -9,19 +11,17 @@ export function DevelopersNotePreview({
   return (
     <section id="developers-note-preview" className="px-6 py-24">
       <div className="mx-auto max-w-[1200px]">
-        <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+        <div className="overflow-hidden border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
           <div className="grid gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[0.92fr_1.08fr] lg:px-12 lg:py-14">
             <div className="flex flex-col justify-between">
               <div>
-                <p className="mb-4 text-xs uppercase tracking-[0.26em] text-white/35">
-                  开发者说
-                </p>
-                <h2 className="max-w-xl text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                <SectionEyebrow label="开发者说" className="mb-4" />
+                <h2 className="max-w-xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
                   {content.previewTitle}
                 </h2>
               </div>
 
-              <div className="mt-8 rounded-[28px] border border-white/10 bg-black/30 px-5 py-5">
+              <div className="mt-8 border border-white/10 bg-black/30 px-5 py-5">
                 <p className="text-sm leading-7 text-white/58">
                   我不想只做一个更花哨的模板工具，而是想继续往前走，帮你把作品集、简历和求职表达慢慢整理到同一条主线里。
                 </p>
@@ -36,12 +36,9 @@ export function DevelopersNotePreview({
               ))}
 
               <div className="pt-3">
-                <Link
-                  href={`/editorial/${content.slug}`}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-white/14 px-5 text-sm font-medium text-white transition-colors hover:border-white/28 hover:bg-white/[0.05]"
-                >
+                <RectActionLink href={`/editorial/${content.slug}`}>
                   阅读完整观点
-                </Link>
+                </RectActionLink>
               </div>
             </div>
           </div>

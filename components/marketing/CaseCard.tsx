@@ -15,36 +15,36 @@ function DashboardMock() {
     <div className="flex h-full flex-col">
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2">
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/60" />
+        <div className="h-1.5 w-1.5 bg-emerald-500/60" />
         <span className="text-[10px] font-medium text-emerald-400/70">B 端 · 中后台系统</span>
       </div>
       <div className="flex flex-1">
         <div className="h-full w-9 shrink-0 border-r border-white/[0.06] bg-white/[0.02] p-2">
-          <div className="mb-3 h-3 w-3 rounded bg-white/15" />
+          <div className="mb-3 h-3 w-3 bg-white/15" />
           <div className="space-y-2">
             {[70, 90, 60, 80, 55].map((w, i) => (
-              <div key={i} className="h-1.5 rounded-full bg-white/[0.08]" style={{ width: `${w}%` }} />
+              <div key={i} className="h-1.5 bg-white/[0.08]" style={{ width: `${w}%` }} />
             ))}
           </div>
         </div>
         <div className="flex-1 p-3">
-          <div className="mb-3 h-2 w-1/2 rounded bg-white/10" />
+          <div className="mb-3 h-2 w-1/2 bg-white/10" />
           <div className="mb-2.5 grid grid-cols-3 gap-1.5">
             {[
               { h: "bg-emerald-500/30" },
               { h: "bg-white/10" },
               { h: "bg-amber-500/25" },
             ].map((c, i) => (
-              <div key={i} className="rounded bg-white/[0.04] p-2 border border-white/[0.06]">
-                <div className={`mb-1 h-3 w-5 rounded ${c.h}`} />
-                <div className="h-1.5 w-full rounded bg-white/[0.07]" />
+              <div key={i} className="border border-white/[0.06] bg-white/[0.04] p-2">
+                <div className={`mb-1 h-3 w-5 ${c.h}`} />
+                <div className="h-1.5 w-full bg-white/[0.07]" />
               </div>
             ))}
           </div>
-          <div className="h-10 rounded bg-white/[0.03] border border-white/[0.06] p-2">
+          <div className="h-10 border border-white/[0.06] bg-white/[0.03] p-2">
             <div className="space-y-1.5">
-              <div className="h-1.5 w-full rounded-full bg-white/[0.07]" />
-              <div className="h-1.5 w-4/5 rounded-full bg-white/[0.07]" />
+              <div className="h-1.5 w-full bg-white/[0.07]" />
+              <div className="h-1.5 w-4/5 bg-white/[0.07]" />
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ function MobileMock() {
     <div className="flex h-full flex-col">
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-blue-500/20 bg-blue-500/[0.07] px-3 py-2">
-        <div className="h-1.5 w-1.5 rounded-full bg-blue-400/60" />
+        <div className="h-1.5 w-1.5 bg-blue-400/60" />
         <span className="text-[10px] font-medium text-blue-400/70">C 端 · App 产品</span>
       </div>
       <div className="flex flex-1 items-center justify-center gap-3 px-4">
@@ -66,17 +66,17 @@ function MobileMock() {
           { accent: "bg-blue-500/30" },
           { accent: "bg-blue-400/20" },
         ].map((s, i) => (
-          <div key={i} className="h-[104px] w-[60px] rounded-xl border border-white/10 bg-white/[0.04] p-2" style={{ transform: i === 1 ? "translateY(8px)" : undefined }}>
+          <div key={i} className="h-[104px] w-[60px] border border-white/10 bg-white/[0.04] p-2" style={{ transform: i === 1 ? "translateY(8px)" : undefined }}>
             <div className="mb-1.5 flex items-center gap-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/20" />
-              <div className="h-1.5 w-8 rounded bg-white/10" />
+              <div className="h-1.5 w-1.5 bg-white/20" />
+              <div className="h-1.5 w-8 bg-white/10" />
             </div>
-            <div className={`mb-1.5 h-7 w-full rounded ${s.accent}`} />
+            <div className={`mb-1.5 h-7 w-full ${s.accent}`} />
             <div className="space-y-1">
-              <div className="h-1.5 w-full rounded-full bg-white/[0.08]" />
-              <div className="h-1.5 w-3/4 rounded-full bg-white/[0.08]" />
+              <div className="h-1.5 w-full bg-white/[0.08]" />
+              <div className="h-1.5 w-3/4 bg-white/[0.08]" />
             </div>
-            <div className="mt-1.5 h-4 w-full rounded bg-white/10" />
+            <div className="mt-1.5 h-4 w-full bg-white/10" />
           </div>
         ))}
       </div>
@@ -89,13 +89,13 @@ function DocumentMock() {
     <div className="flex h-full flex-col">
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-violet-500/20 bg-violet-500/[0.07] px-3 py-2">
-        <div className="h-1.5 w-1.5 rounded-full bg-violet-400/60" />
+        <div className="h-1.5 w-1.5 bg-violet-400/60" />
         <span className="text-[10px] font-medium text-violet-400/70">G 端 · 流程与系统</span>
       </div>
       <div className="flex flex-1 flex-col gap-0 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="h-2.5 w-1/3 rounded bg-white/15" />
-          <div className="h-5 w-12 rounded bg-white/[0.06] border border-white/[0.08]" />
+          <div className="h-2.5 w-1/3 bg-white/15" />
+          <div className="h-5 w-12 border border-white/[0.08] bg-white/[0.06]" />
         </div>
         <div className="flex-1 space-y-1.5">
           {[
@@ -112,8 +112,8 @@ function DocumentMock() {
               className="flex items-center gap-2"
               style={{ paddingLeft: row.indent }}
             >
-              {row.indent > 0 && <div className="h-1 w-1 shrink-0 rounded-full bg-white/15" />}
-              <div className="h-1.5 rounded-full bg-white/[0.08]" style={{ width: row.w }} />
+              {row.indent > 0 && <div className="h-1 w-1 shrink-0 bg-white/15" />}
+              <div className="h-1.5 bg-white/[0.08]" style={{ width: row.w }} />
             </div>
           ))}
         </div>
@@ -136,9 +136,9 @@ export function CaseCard({
   const MockComponent = MOCK_COMPONENTS[index % 3];
 
   return (
-    <div className="group flex flex-col rounded-2xl bg-white/[0.02] transition-all duration-300 hover:bg-white/[0.05] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]">
+    <div className="group flex flex-col bg-white/[0.02] transition-all duration-300 hover:bg-white/[0.05] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]">
       {/* Mock preview image */}
-      <div className="relative overflow-hidden rounded-t-2xl border-b border-white/[0.06] bg-white/[0.02]" style={{ height: 148 }}>
+      <div className="relative overflow-hidden border-b border-white/[0.06] bg-white/[0.02]" style={{ height: 148 }}>
         <MockComponent />
       </div>
 
@@ -146,17 +146,17 @@ export function CaseCard({
       <div className="flex flex-1 flex-col p-5">
         {/* Score pill + demo badge */}
         <div className="mb-4 flex items-center gap-2">
-          <span className="rounded-full border border-white/[0.08] px-2 py-0.5 text-[10px] text-white/35">
+          <span className="border border-white/[0.08] px-2 py-0.5 text-[10px] text-white/35">
             演示案例
           </span>
           <span className="h-3 w-px bg-white/[0.08]" />
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <span className="rounded-md bg-white/5 px-2.5 py-1 text-xs tabular-nums text-white/40 line-through">
+          <span className="bg-white/5 px-2.5 py-1 text-xs tabular-nums text-white/40 line-through">
             {scoreBefore}
           </span>
           <ArrowRight className="h-3 w-3 text-white/20" />
-          <span className="rounded-md bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-400">
+          <span className="bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-400">
             {scoreAfter} 分
           </span>
         </div>
@@ -173,7 +173,7 @@ export function CaseCard({
           {tags.map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-white/8 px-2.5 py-0.5 text-xs text-white/45"
+              className="border border-white/8 px-2.5 py-0.5 text-xs text-white/45"
             >
               {tag}
             </span>

@@ -101,13 +101,13 @@ export function Navbar({
         <div className="flex items-center gap-2">
           <Link
             href={secondaryCta.href}
-            className="hidden rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
+            className="hidden px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
           >
             {secondaryCta.label}
           </Link>
           <Link
             href={primaryCta.href}
-            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 sm:px-4 sm:text-sm"
+            className="bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 sm:px-4 sm:text-sm"
           >
             <span className="sm:hidden">{isLoggedIn ? "工作台" : "先打分"}</span>
             <span className="hidden sm:inline">{primaryCta.label} →</span>
@@ -118,7 +118,7 @@ export function Navbar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-lg border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
+                className="h-9 w-9 border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
               >
                 <Menu className="h-4 w-4" />
               </Button>
@@ -136,7 +136,7 @@ export function Navbar({
                     <DialogClose asChild key={item.key}>
                       <Link
                         href={item.href}
-                        className={`block rounded-xl px-3 py-3 text-sm transition-colors ${
+                        className={`block px-3 py-3 text-sm transition-colors ${
                           activePrimaryKey === item.key
                             ? "bg-white/10 text-white"
                             : "text-white/65 hover:bg-white/5 hover:text-white"
@@ -152,7 +152,7 @@ export function Navbar({
                   <DialogClose asChild>
                     <Link
                       href={primaryCta.href}
-                      className="flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                      className="flex h-11 items-center justify-center bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90"
                     >
                       {primaryCta.label}
                     </Link>
@@ -160,7 +160,7 @@ export function Navbar({
                   <DialogClose asChild>
                     <Link
                       href={secondaryCta.href}
-                      className="flex h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+                      className="flex h-11 items-center justify-center border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
                     >
                       {secondaryCta.label}
                     </Link>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { PLAN_DEFINITIONS } from "@/lib/entitlement";
 import { PaywallModal } from "@/components/billing/PaywallModal";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 import {
   getPricingPrimaryAction,
   getPricingSecondaryAction,
@@ -57,10 +58,8 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
   return (
     <main className="mx-auto max-w-5xl px-6 pb-20 pt-28">
       <div className="mb-14 text-center">
-        <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
-          继续往前走
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight text-white">
+        <SectionEyebrow label="继续往前走" className="mb-3 justify-center" />
+        <h1 className="text-balance text-4xl font-bold tracking-tight text-white">
           先判断你现在
           <br />
           最需要哪一步
@@ -72,13 +71,13 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href={primaryAction.href}
-            className="flex h-11 min-w-[200px] items-center justify-center rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            className="flex h-11 min-w-[200px] items-center justify-center bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-11 min-w-[200px] items-center justify-center rounded-xl border border-white/15 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+            className="flex h-11 min-w-[200px] items-center justify-center border border-white/15 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
           >
             {secondaryAction.label}
           </Link>
@@ -94,13 +93,13 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         {STAGE_GUIDES.map((item) => (
           <div
             key={item.title}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+            className="border border-white/10 bg-white/[0.03] p-6"
           >
             <h2 className="text-lg font-semibold text-white">{item.title}</h2>
             <p className="mt-3 text-sm leading-relaxed text-white/55">{item.body}</p>
             <Link
               href={item.href}
-              className="mt-5 inline-flex h-10 items-center justify-center rounded-xl border border-white/14 px-4 text-sm font-medium text-white/80 transition-colors hover:border-white/28 hover:text-white"
+              className="mt-5 inline-flex h-10 items-center justify-center border border-white/14 px-4 text-sm font-medium text-white/80 transition-colors hover:border-white/28 hover:text-white"
             >
               {item.cta}
             </Link>
@@ -109,10 +108,8 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
       </div>
 
       <div id="plans" className="mb-6">
-        <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
-          能力与阶段
-        </p>
-        <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+        <SectionEyebrow label="能力与阶段" className="mb-3" />
+        <h2 className="text-balance text-3xl font-bold tracking-tight text-white md:text-4xl">
           如果你已经决定继续整理，
           <br />
           再看具体适合哪一档
@@ -126,14 +123,14 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         {PLAN_DEFINITIONS.map((plan) => (
           <div
             key={plan.planType}
-            className={`relative flex flex-col rounded-2xl border p-6 ${
+            className={`relative flex flex-col border p-6 ${
               plan.isRecommended
                 ? "border-white/30 bg-white/[0.08]"
                 : "border-white/10 bg-white/[0.04]"
             }`}
           >
             {plan.highlightTag && (
-              <div className="mb-4 inline-flex self-start rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
+              <div className="mb-4 inline-flex self-start bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
                 {plan.highlightTag}
               </div>
             )}
@@ -168,14 +165,14 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
               {plan.planType === "free" ? (
                 <Link
                   href="/score"
-                  className="flex h-10 w-full items-center justify-center rounded-xl border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
+                  className="flex h-10 w-full items-center justify-center border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
                 >
                   {isLoggedIn ? "继续回到评分结果" : "先给我的作品集打分"}
                 </Link>
               ) : !isLoggedIn ? (
                 <Link
                   href="/login?next=/pricing"
-                  className={`flex h-10 w-full items-center justify-center rounded-xl text-sm font-medium transition-colors ${
+                  className={`flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
                     plan.isRecommended
                       ? "bg-white text-black hover:bg-white/90"
                       : "border border-white/15 text-white hover:border-white/30"
@@ -186,7 +183,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
               ) : (
                 <button
                   onClick={() => handleBuy(plan.planType as "pro" | "sprint")}
-                  className={`flex h-10 w-full items-center justify-center rounded-xl text-sm font-medium transition-colors ${
+                  className={`flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
                     plan.isRecommended
                       ? "bg-white text-black hover:bg-white/90"
                       : "border border-white/15 text-white hover:border-white/30"
@@ -200,7 +197,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         ))}
       </div>
 
-      <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-5">
+      <div className="mb-8 border border-white/10 bg-white/[0.03] px-6 py-5">
         <p className="text-sm leading-relaxed text-white/55">
           如果你现在还在犹豫，其实最稳的顺序通常是：
           <span className="text-white/78"> 先评分 </span>
@@ -212,7 +209,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         </p>
       </div>
 
-      <div className="mb-14 overflow-hidden rounded-2xl border border-white/10">
+      <div className="mb-14 overflow-hidden border border-white/10">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.03]">

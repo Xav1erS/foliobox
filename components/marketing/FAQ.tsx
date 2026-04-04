@@ -1,3 +1,5 @@
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
+
 const FAQS = [
   {
     q: "没有完整作品集也能用吗？",
@@ -22,10 +24,8 @@ export function FAQ() {
     <section id="faq" className="px-6 py-28">
       <div className="mx-auto" style={{ maxWidth: 800 }}>
         <div className="mb-12">
-          <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
-            常见问题
-          </p>
-          <h2 className="text-4xl font-bold tracking-tight text-white">
+          <SectionEyebrow label="常见问题" className="mb-3" />
+          <h2 className="text-balance text-4xl font-bold tracking-tight text-white">
             你可能会先问这些
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/50">

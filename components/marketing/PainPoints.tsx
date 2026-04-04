@@ -38,9 +38,7 @@ export function PainPoints() {
         <div className="grid gap-16 lg:grid-cols-[380px_1fr] lg:gap-24">
           {/* Left: heading */}
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <p className="mb-3 text-xs uppercase tracking-widest text-white/45">
-              设计师真实痛点
-            </p>
+            <SectionEyebrow label="设计师真实痛点" className="mb-3" />
             <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
               不是没有项目，
               <br />
@@ -74,7 +72,7 @@ export function PainPoints() {
               {SECONDARY_PAIN_POINTS.map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5"
+                  className="border border-white/[0.06] bg-white/[0.02] p-5"
                 >
                   <h4 className="mb-2 text-sm font-medium text-white/60">{item.title}</h4>
                   <p className="text-xs leading-relaxed text-white/45">{item.body}</p>
@@ -87,3 +85,4 @@ export function PainPoints() {
     </section>
   );
 }
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";

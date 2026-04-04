@@ -27,8 +27,8 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       {/* Above-fold content */}
       <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-start px-5 pb-10 pt-16 text-center sm:px-6 sm:pt-20 md:justify-center md:pt-0">
         {/* Badge */}
-        <div className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] text-white/70 sm:mb-8 sm:px-4 sm:text-xs">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        <div className="mb-6 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] text-white/70 sm:mb-8 sm:px-4 sm:text-xs">
+          <span className="h-1.5 w-1.5 bg-emerald-400" />
           <span className="whitespace-nowrap">集盒FolioBox · 从作品集整理开始</span>
         </div>
 
@@ -63,13 +63,13 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <div className="mt-9 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row">
           <Link
             href={primaryAction.href}
-            className="flex h-12 min-w-[220px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:min-w-[200px]"
+            className="flex h-12 min-w-[220px] items-center justify-center bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:min-w-[200px]"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-12 min-w-[220px] items-center justify-center rounded-xl border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white sm:min-w-[200px]"
+            className="flex h-12 min-w-[220px] items-center justify-center border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white sm:min-w-[200px]"
           >
             {secondaryAction.label}
           </Link>
@@ -93,7 +93,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         >
           {/* Main mock: portfolio preview */}
           <div
-            className="relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-950"
+            className="relative overflow-hidden border border-white/10 bg-neutral-950"
             style={{
               transform: "rotateX(5deg)",
               transformOrigin: "top center",
@@ -103,11 +103,11 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             {/* Browser chrome */}
             <div className="flex items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">
               <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-white/10" />
-                <div className="h-3 w-3 rounded-full bg-white/10" />
-                <div className="h-3 w-3 rounded-full bg-white/10" />
+                <div className="h-3 w-3 bg-white/10" />
+                <div className="h-3 w-3 bg-white/10" />
+                <div className="h-3 w-3 bg-white/10" />
               </div>
-              <div className="rounded bg-white/[0.05] px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
+              <div className="bg-white/[0.05] px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
                 foliobox.art/portfolio/preview
               </div>
             </div>
@@ -125,13 +125,13 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                   ].map((item) => (
                     <div
                       key={item.label}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 ${
+                      className={`flex items-center gap-2.5 px-3 py-2.5 ${
                         item.active
                           ? "bg-white/[0.08] border border-white/10"
                           : "border border-transparent"
                       }`}
                     >
-                      <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.active ? "bg-emerald-400" : "bg-white/20"}`} />
+                      <div className={`h-1.5 w-1.5 shrink-0 ${item.active ? "bg-emerald-400" : "bg-white/20"}`} />
                       <span className={`text-xs leading-snug ${item.active ? "text-white/80" : "text-white/35"}`}>
                         {item.label}
                       </span>
@@ -142,10 +142,10 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <div className="mt-6 border-t border-white/[0.06] pt-5">
                   <p className="mb-3 text-[10px] uppercase tracking-widest text-white/20">导出</p>
                   <div className="space-y-2">
-                    <div className="flex h-7 items-center justify-center rounded-lg bg-white/[0.08] border border-white/10 text-[11px] text-white/50">
+                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/[0.08] text-[11px] text-white/50">
                       分享链接
                     </div>
-                    <div className="flex h-7 items-center justify-center rounded-lg border border-white/[0.06] text-[11px] text-white/30">
+                    <div className="flex h-7 items-center justify-center border border-white/[0.06] text-[11px] text-white/30">
                       导出 PDF
                     </div>
                   </div>
@@ -157,15 +157,15 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 {/* Project header */}
                 <div className="mb-6 border-b border-white/[0.06] pb-6">
                   <div className="mb-3 flex items-center gap-2">
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-400">
+                    <span className="border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-400">
                       B 端 · 数据可视化
                     </span>
-                    <span className="rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[11px] text-white/35">
+                    <span className="border border-white/[0.08] px-2.5 py-0.5 text-[11px] text-white/35">
                       UX 设计师
                     </span>
                   </div>
-                  <div className="mb-2 h-6 w-3/5 rounded-lg bg-white/15" />
-                  <div className="h-2 w-2/5 rounded-full bg-white/[0.08]" />
+                  <div className="mb-2 h-6 w-3/5 bg-white/15" />
+                  <div className="h-2 w-2/5 bg-white/[0.08]" />
                 </div>
 
                 {/* Content sections */}
@@ -177,14 +177,14 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                   ].map((block) => (
                     <div key={block.section}>
                       <div className="mb-3 flex items-center gap-2">
-                        <div className="h-3 w-1 rounded-full bg-white/30" />
+                        <div className="h-3 w-1 bg-white/30" />
                         <span className="text-xs font-medium text-white/50">{block.section}</span>
                       </div>
                       <div className="space-y-2">
                         {block.lines.map((w, i) => (
                           <div
                             key={i}
-                            className="h-1.5 rounded-full bg-white/[0.08]"
+                            className="h-1.5 bg-white/[0.08]"
                             style={{ width: `${w}%` }}
                           />
                         ))}
@@ -201,7 +201,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
           {/* Score overlay card — bottom right */}
           <div
-            className="absolute bottom-6 right-4 sm:right-8 overflow-hidden rounded-xl border border-white/10 bg-neutral-950/95 backdrop-blur-sm"
+            className="absolute bottom-6 right-4 sm:right-8 overflow-hidden border border-white/10 bg-neutral-950/95 backdrop-blur-sm"
             style={{
               width: 200,
               boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
@@ -215,8 +215,8 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <span className="text-3xl font-bold tabular-nums text-white">72</span>
                 <span className="mb-1 text-xs text-white/30">/ 100</span>
               </div>
-              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-400">
-                <span className="h-1 w-1 rounded-full bg-amber-400" />
+              <div className="mb-3 inline-flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-400">
+                <span className="h-1 w-1 bg-amber-400" />
                 具备投递价值，但建议局部优化
               </div>
               <div className="space-y-2">
@@ -229,9 +229,9 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                       <span className="text-[10px] text-white/35">{d.label}</span>
                       <span className="font-mono text-[10px] text-white/25">{d.score}</span>
                     </div>
-                    <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
+                    <div className="h-1 w-full overflow-hidden bg-white/[0.08]">
                       <div
-                        className="h-full rounded-full bg-red-500/50"
+                        className="h-full bg-red-500/50"
                         style={{ width: `${d.score}%` }}
                       />
                     </div>
@@ -242,7 +242,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           </div>
 
           {/* Glow under mock */}
-          <div className="pointer-events-none absolute -bottom-12 left-1/2 h-28 w-3/4 -translate-x-1/2 rounded-full bg-white/[0.04] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 left-1/2 h-28 w-3/4 -translate-x-1/2 bg-white/[0.04] blur-3xl" />
         </div>
       </div>
     </section>

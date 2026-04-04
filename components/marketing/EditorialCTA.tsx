@@ -1,11 +1,12 @@
-import Link from "next/link";
+import { RectActionLink } from "@/components/marketing/RectActionLink";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 import type { EditorialCTA as EditorialCTAModel } from "@/content/editorial/types";
 
 export function EditorialCTA({ cta }: { cta: EditorialCTAModel }) {
   return (
     <section className="px-6 pb-24 pt-6">
-      <div className="mx-auto max-w-4xl rounded-[32px] border border-white/10 bg-white/[0.04] px-6 py-10 text-center sm:px-10">
-        <p className="text-xs uppercase tracking-[0.24em] text-white/30">继续下一步</p>
+      <div className="mx-auto max-w-4xl border border-white/10 bg-white/[0.04] px-6 py-10 text-center sm:px-10">
+        <SectionEyebrow label="继续下一步" className="justify-center" />
         <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
           先体验当前版本，再决定要不要继续往前走
         </h2>
@@ -13,12 +14,9 @@ export function EditorialCTA({ cta }: { cta: EditorialCTAModel }) {
           如果你也在整理作品集，不一定要先从排版开始。先做一次评分，看看问题到底出在哪，再决定要不要继续整理、继续修改，或者看看集盒FolioBox 以后会长成什么样。
         </p>
         <div className="mt-8">
-          <Link
-            href={cta.href}
-            className="inline-flex h-12 min-w-[220px] items-center justify-center rounded-xl bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-          >
+          <RectActionLink href={cta.href} variant="solid" size="lg">
             {cta.label}
-          </Link>
+          </RectActionLink>
         </div>
       </div>
     </section>

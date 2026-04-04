@@ -3,6 +3,7 @@ import {
   PORTFOLIO_SCORE_LEVEL_CONFIG,
   PORTFOLIO_SCORE_LEVEL_ORDER,
 } from "@/lib/portfolio-score-level";
+import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 
 const SCORE_DIMENSIONS = [
   { label: "首屏专业感", score: 65, weight: 15 },
@@ -19,10 +20,8 @@ export function ScoreFeature() {
         <div className="grid gap-10 items-center lg:grid-cols-2 lg:gap-14">
           {/* Left */}
           <div>
-            <p className="mb-3 text-xs uppercase tracking-widest text-white/35">
-              评分诊断能力
-            </p>
-            <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
+            <SectionEyebrow label="评分诊断能力" className="mb-3" />
+            <h2 className="text-balance text-4xl font-bold tracking-tight text-white md:text-5xl">
               先知道现在
               <br />
               卡在哪，
@@ -58,20 +57,20 @@ export function ScoreFeature() {
 
             <Link
               href="/score"
-              className="mt-8 inline-flex h-11 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+              className="mt-8 inline-flex h-11 items-center gap-2 bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
             >
               先看这份作品集现在能不能投
             </Link>
           </div>
 
           {/* Right: score result mock */}
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950">
+          <div className="overflow-hidden border border-white/10 bg-neutral-950">
             {/* Mock header */}
             <div className="flex items-center gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">
               <div className="flex gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
-                <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
-                <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
+                <div className="h-2.5 w-2.5 bg-white/10" />
+                <div className="h-2.5 w-2.5 bg-white/10" />
+                <div className="h-2.5 w-2.5 bg-white/10" />
               </div>
               <div className="ml-3 text-[11px] text-white/20">评分结果示例</div>
             </div>
@@ -85,10 +84,10 @@ export function ScoreFeature() {
                   <div className="mt-1 text-xs text-white/30">/ 100 分</div>
                 </div>
                 <div
-                  className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.badgeClassName}`}
+                  className={`mb-1 inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.badgeClassName}`}
                 >
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.indicatorClassName}`}
+                    className={`h-1.5 w-1.5 ${PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.indicatorClassName}`}
                   />
                   {PORTFOLIO_SCORE_LEVEL_CONFIG.NEEDS_IMPROVEMENT.label}
                 </div>
@@ -105,9 +104,9 @@ export function ScoreFeature() {
                       </div>
                       <span className="font-mono text-xs text-white/50">{d.score}</span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+                    <div className="h-1.5 w-full overflow-hidden bg-white/[0.08]">
                       <div
-                        className={`h-full rounded-full ${
+                        className={`h-full ${
                           d.score >= 85
                             ? "bg-emerald-500/60"
                             : d.score >= 70
@@ -124,15 +123,29 @@ export function ScoreFeature() {
               </div>
 
               {/* Summary issues */}
-              <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="mt-6 border border-white/[0.06] bg-white/[0.02] p-4">
                 <p className="mb-3 text-xs font-medium text-white/50">主要问题</p>
                 <div className="space-y-2">
                   {["角色表达不够清晰", "缺少量化结果数据", "项目选择需要精简"].map((p) => (
                     <div key={p} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400/50" />
+                      <span className="mt-1.5 h-1 w-1 shrink-0 bg-red-400/50" />
                       <span className="text-xs leading-relaxed text-white/50">{p}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-white/[0.07] pt-4">
+                <div className="grid grid-cols-3 gap-3 text-[11px] leading-[1.7] text-white/35">
+                  <div className="border border-white/[0.07] px-3 py-2">
+                    01 上传现状
+                  </div>
+                  <div className="border border-white/[0.07] px-3 py-2">
+                    02 看清问题
+                  </div>
+                  <div className="border border-white/[0.07] px-3 py-2">
+                    03 再继续整理
+                  </div>
                 </div>
               </div>
             </div>

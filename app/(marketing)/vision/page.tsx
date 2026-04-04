@@ -90,28 +90,50 @@ export default async function VisionPage() {
         />
 
         <div className="relative mx-auto max-w-6xl px-5 pb-16 sm:px-6 sm:pb-20">
-          {/* Section label */}
-          <SectionEyebrow label="公开愿景" secondaryLabel="集盒FolioBox" className="mb-8" />
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-14">
+            <div>
+              <SectionEyebrow label="公开愿景" secondaryLabel="集盒FolioBox" className="mb-8" />
 
-          {/* Title */}
-          <h1 className="text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
-            <span className="block">集盒FolioBox</span>
-            <span className="block">现在从作品集</span>
-            <span className="block">整理开始。</span>
-          </h1>
+              <h1 className="text-balance text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
+                <span className="block">集盒FolioBox</span>
+                <span className="block">现在从作品集</span>
+                <span className="block">整理开始。</span>
+              </h1>
 
-          {/* Subtitle */}
-          <div className="mt-8 max-w-xl space-y-4 text-sm leading-[1.9] text-white/60 sm:text-base">
-            <p>
-              我知道整理作品集很难开始。很多时候不是你不会做，而是这件事本身就很耗人。
-            </p>
-            <p>
-              所以我先把集盒FolioBox做成了现在这个样子：帮你评分、整理项目、补齐关键信息，先把第一版做出来。
-            </p>
-            <p className="text-white/90">但我想做的，不只是一个作品集工具。</p>
+              <div className="mt-8 max-w-xl space-y-4 text-sm leading-[1.9] text-white/60 sm:text-base">
+                <p>
+                  我知道整理作品集很难开始。很多时候不是你不会做，而是这件事本身就很耗人。
+                </p>
+                <p>
+                  所以我先把集盒FolioBox做成了现在这个样子：帮你评分、整理项目、补齐关键信息，先把第一版做出来。
+                </p>
+                <p className="text-white/90">但我想做的，不只是一个作品集工具。</p>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <RectActionLink href={primaryCta.href} variant="solid" size="lg">
+                  {primaryCta.label}
+                </RectActionLink>
+                <RectActionLink href="/editorial/developers-note" size="lg">
+                  先读开发者说
+                </RectActionLink>
+              </div>
+            </div>
+
+            <div className="border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
+                结构草图
+              </p>
+              <IsometricWireframe variant="hero" className="mt-4 opacity-80" />
+              <div className="mt-4 border-t border-white/[0.07] pt-4 text-sm leading-[1.8] text-white/55">
+                <p>我现在先做作品集整理，是因为它最具体，也最容易立刻帮上忙。</p>
+                <p className="mt-2">
+                  但这只是入口。后面真正想继续补上的，是简历一致性、岗位定向和面试讲述。
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Highlight strip */}
           <div className="mt-10 border border-white/10 sm:flex">
             {[
               { label: "现在能做", value: "评分、整理项目、补齐关键信息，先把第一版做出来" },
@@ -130,16 +152,6 @@ export default async function VisionPage() {
                 <p className="mt-2.5 text-sm leading-[1.75] text-white/65">{item.value}</p>
               </div>
             ))}
-          </div>
-
-          {/* CTAs */}
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <RectActionLink href={primaryCta.href} variant="solid" size="lg">
-              {primaryCta.label}
-            </RectActionLink>
-            <RectActionLink href="/editorial/developers-note" size="lg">
-              先读开发者说
-            </RectActionLink>
           </div>
         </div>
       </section>
