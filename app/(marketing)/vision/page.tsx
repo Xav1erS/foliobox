@@ -12,21 +12,21 @@ const futureDirections = [
     title: "简历和作品集，先说同一件事",
     description:
       "把简历、作品集和面试里的核心信息先对齐。很多人不是没有内容，而是三套说法各讲各的。",
-    status: "未来方向 / 尚未上线",
+    status: "未来方向",
   },
   {
     id: "02",
     title: "针对目标岗位，知道该强调什么",
     description:
       "同一个项目，面对不同岗位，重点并不一样。以后它不只告诉你哪里不够好，也会告诉你该把什么讲得更清楚。",
-    status: "未来方向 / 尚未上线",
+    status: "未来方向",
   },
   {
     id: "03",
     title: "把项目讲成一段真的讲得出口的话",
     description:
       "作品集整理完了，面试时还是可能卡住。未来它应该继续往前一步，帮你把讲述也整理出来。",
-    status: "未来方向 / 尚未上线",
+    status: "未来方向",
   },
   {
     id: "04",
@@ -57,24 +57,10 @@ const excludedPromiseItems = [
   "独立的新产品线",
 ];
 
-const promiseNotes = [
-  "这不是“以后所有东西都永久免费”。",
-  "但只要它仍然属于这条主线，我希望首批用户能一直在里面。",
-];
-
-const heroHighlights = [
-  {
-    label: "现在能做",
-    value: "评分、整理项目、补齐关键信息，先把第一版做出来。",
-  },
-  {
-    label: "以后想补",
-    value: "一致性检查、岗位映射、面试讲述，不只是更多模板。",
-  },
-  {
-    label: "给早期用户",
-    value: "围绕求职表达主线持续上线的重要能力，会默认免费开放。",
-  },
+const devNarratives = [
+  "我知道整理作品集为什么会拖很久。很多时候不是你不会做，而是这件事真的太耗人了。",
+  "你会反复想，这个项目到底值不值得放，这段经历应该怎么讲，这份作品集看起来到底像不像自己，现在这样拿出去投，会不会还是不够好。",
+  "我不想再做一个只给你模板的工具。我更想做一个能陪你先把第一版搭起来，再慢慢把它讲清楚的东西。",
 ];
 
 export default async function VisionPage() {
@@ -86,345 +72,359 @@ export default async function VisionPage() {
     <main className="bg-black text-white">
       <Navbar isLoggedIn={isLoggedIn} currentPage="vision" />
 
+      {/* ─────────────────────────────────────────
+          Section 1: 首屏 Hero
+      ───────────────────────────────────────── */}
       <section className="relative overflow-hidden pt-20 sm:pt-28">
+        {/* Subtle grid background */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          className="pointer-events-none absolute inset-0 opacity-[0.045]"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
+              "linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)",
             backgroundSize: "72px 72px",
           }}
         />
 
-        <div className="mx-auto max-w-6xl px-5 sm:px-6">
-          <div className="grid gap-10 border-b border-white/8 pb-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12 sm:pb-20">
-            <div className="pt-3">
-              <div className="mb-5 flex flex-wrap items-center gap-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.32em] text-white/35">
-                  长期方向 / 集盒FolioBox
+        <div className="relative mx-auto max-w-6xl px-5 pb-16 sm:px-6 sm:pb-20">
+          {/* Section label */}
+          <div className="mb-8 flex items-center gap-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+              公开愿景
+            </p>
+            <span className="h-px w-8 bg-white/15" />
+            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/20">
+              集盒FolioBox
+            </p>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
+            <span className="block">集盒FolioBox</span>
+            <span className="block">现在从作品集</span>
+            <span className="block">整理开始。</span>
+          </h1>
+
+          {/* Subtitle */}
+          <div className="mt-8 max-w-xl space-y-4 text-sm leading-[1.9] text-white/60 sm:text-base">
+            <p>
+              我知道整理作品集很难开始。很多时候不是你不会做，而是这件事本身就很耗人。
+            </p>
+            <p>
+              所以我先把集盒FolioBox做成了现在这个样子：帮你评分、整理项目、补齐关键信息，先把第一版做出来。
+            </p>
+            <p className="text-white/90">但我想做的，不只是一个作品集工具。</p>
+          </div>
+
+          {/* Highlight strip */}
+          <div className="mt-10 border border-white/10 sm:flex">
+            {[
+              { label: "现在能做", value: "评分、整理项目、补齐关键信息，先把第一版做出来" },
+              { label: "以后想补", value: "一致性检查、岗位映射、面试讲述，不只是更多模板" },
+              { label: "给早期用户", value: "围绕求职表达主线持续上线的重要能力，会默认免费开放" },
+            ].map((item, i) => (
+              <div
+                key={item.label}
+                className={`px-5 py-4 sm:flex-1 ${
+                  i !== 0 ? "border-t border-white/[0.07] sm:border-l sm:border-t-0" : ""
+                }`}
+              >
+                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                  {item.label}
                 </p>
-                <span className="inline-flex border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/45">
-                  公开愿景页
-                </span>
+                <p className="mt-2.5 text-sm leading-[1.75] text-white/65">{item.value}</p>
               </div>
+            ))}
+          </div>
 
-              <h1 className="max-w-[11ch] text-[2.45rem] font-semibold leading-[0.96] tracking-[-0.05em] text-white sm:max-w-[12ch] sm:text-[4.65rem]">
-                <span className="block whitespace-nowrap">集盒FolioBox</span>
-                <span className="block">现在从作品集</span>
-                <span className="block whitespace-nowrap">整理开始。</span>
-              </h1>
-
-              <div className="mt-7 max-w-2xl space-y-4 text-[1.02rem] leading-8 text-white/72 sm:text-lg">
-                <p>
-                  我知道整理作品集很难开始。很多时候不是你不会做，而是这件事本身就很耗人。
-                </p>
-                <p>
-                  所以我先把集盒FolioBox做成了现在这个样子：帮你评分、整理项目、补齐关键信息，先把第一版做出来。
-                </p>
-                <p className="text-white">但我想做的，不只是一个作品集工具。</p>
-              </div>
-
-              <div className="mt-8 flex w-full flex-col items-start gap-3 sm:mt-10 sm:flex-row">
-                <Link
-                  href={primaryCta.href}
-                  className="inline-flex h-12 w-full items-center justify-center border border-white bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:w-auto"
-                >
-                  {primaryCta.label}
-                </Link>
-                <Link
-                  href="/editorial/developers-note"
-                  className="inline-flex h-12 w-full items-center justify-center border border-white/14 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white sm:w-auto"
-                >
-                  先读开发者说
-                </Link>
-              </div>
-            </div>
-
-            <SectionFrame className="border border-white/10 bg-white/[0.02]">
-              <div className="grid gap-8 px-5 py-5 sm:px-6 sm:py-6">
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.22em] text-white/30">
-                      不是众筹 / 也不是路线图
-                    </p>
-                    <p className="mt-4 text-[1.02rem] leading-8 text-white sm:text-lg">
-                      这页更像一封公开说明：现在先做什么，以后为什么还想继续往前走。
-                    </p>
-                  </div>
-                  <div className="border border-white/10 bg-black/30 p-3">
-                    <IsometricWireframe className="mx-auto max-w-[210px]" />
-                  </div>
-                </div>
-
-                <div className="grid border-t border-white/8 sm:grid-cols-3">
-                  {heroHighlights.map((item, index) => (
-                    <div
-                      key={item.label}
-                      className={`py-4 sm:px-4 sm:py-0 ${
-                        index !== 0 ? "border-t border-white/8 sm:border-l sm:border-t-0" : ""
-                      }`}
-                    >
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-white/30">
-                        {item.label}
-                      </p>
-                      <p className="mt-3 text-sm leading-7 text-white/74">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </SectionFrame>
+          {/* CTAs */}
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={primaryCta.href}
+              className="inline-flex h-12 items-center justify-center border border-white bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            >
+              {primaryCta.label}
+            </Link>
+            <Link
+              href="/editorial/developers-note"
+              className="inline-flex h-12 items-center justify-center border border-white/15 px-6 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white"
+            >
+              先读开发者说
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-6 sm:py-18">
+      {/* ─────────────────────────────────────────
+          Section 2: 问题定义
+      ───────────────────────────────────────── */}
+      <section className="border-t border-white/10 px-5 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-6xl">
-          <SectionFrame className="border border-white/10 bg-white/[0.02]">
-            <div className="grid lg:grid-cols-[0.84fr_1.16fr]">
-              <div className="border-b border-white/8 px-5 py-6 sm:px-6 sm:py-8 lg:border-b-0 lg:border-r">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/30">
-                  为什么不只做工具
-                </p>
-                <h2 className="mt-4 max-w-[10ch] text-[2rem] font-semibold tracking-tight text-white sm:text-3xl">
-                  作品集从来不是问题的全部。
-                </h2>
-                <p className="mt-4 max-w-md text-sm leading-7 text-white/65 sm:text-base">
-                  很多设计师卡住，不是因为不会排版，也不是因为没有项目。真正难的，往往是求职表达本身。
-                </p>
-                <div className="mt-8 border border-white/10 bg-black/25 px-4 py-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/30">
-                    主叙事句
-                  </p>
-                  <p className="mt-3 text-lg leading-8 text-white">
-                    我知道这件事很难，我想先陪你把第一版做出来。
-                  </p>
-                </div>
-              </div>
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
 
-              <div className="grid sm:grid-cols-2">
-                {coreProblems.map((problem, index) => (
-                  <div
-                    key={problem}
-                    className={`px-5 py-5 sm:px-6 ${
-                      index >= 2 ? "border-t border-white/8" : ""
-                    } ${index % 2 === 1 ? "sm:border-l sm:border-white/8" : ""}`}
-                  >
-                    <span className="block text-[11px] uppercase tracking-[0.22em] text-white/28">
-                      0{index + 1}
-                    </span>
-                    <p className="mt-3 text-sm leading-7 text-white/76 sm:text-base">
-                      {problem}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </SectionFrame>
-        </div>
-      </section>
-
-      <section className="px-5 py-14 sm:px-6 sm:py-18">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+            {/* Left */}
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-white/30">长期方向</p>
-              <h2 className="mt-4 max-w-[14ch] text-[2rem] font-semibold tracking-tight text-white sm:max-w-none sm:text-4xl">
-                如果它继续往前走，
-                <span className="whitespace-nowrap">我最想补上的不是更多模板。</span>
-              </h2>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/65 sm:text-base">
-                我更想补的是这些能力。它们现在还没上线，但都属于同一条主线：帮设计师把自己的能力讲得更清楚、更可信，也更接近招聘方真正会看的东西。
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+                为什么不只做工具
               </p>
+              <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
+                作品集从来不是<br />
+                问题的全部。
+              </h2>
+              <p className="mt-5 text-sm leading-[1.9] text-white/62 sm:text-base">
+                很多设计师卡住，不是因为不会排版，也不是因为没有项目。真正难的，往往是求职表达本身。
+              </p>
+              {/* Pull quote */}
+              <div className="mt-8 border-l-2 border-white/20 pl-5">
+                <p className="text-base leading-[1.85] text-white/80 sm:text-lg">
+                  我知道这件事很难，我想先陪你把第一版做出来。
+                </p>
+              </div>
             </div>
 
-            <SectionFrame className="border border-white/10 bg-white/[0.02]">
-              <div className="grid gap-5 px-5 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1fr_180px] lg:items-center">
-                <p className="text-[1.02rem] leading-8 text-white sm:text-xl">
-                  不是让页面更多，而是让作品集、简历、岗位理解和面试讲述，开始说同一种语言。
-                </p>
-                <div className="border border-white/10 bg-black/25 p-3">
-                  <IsometricWireframe className="mx-auto max-w-[160px]" />
+            {/* Right: 4 problems as row list */}
+            <div className="border-t border-white/10 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+              {coreProblems.map((problem, i) => (
+                <div
+                  key={problem}
+                  className={`flex gap-5 py-5 ${
+                    i < coreProblems.length - 1 ? "border-b border-white/[0.07]" : ""
+                  }`}
+                >
+                  <span className="mt-0.5 shrink-0 font-mono text-[11px] tracking-[0.2em] text-white/25">
+                    0{i + 1}
+                  </span>
+                  <p className="text-sm leading-[1.85] text-white/70 sm:text-base">{problem}</p>
                 </div>
-              </div>
-            </SectionFrame>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────
+          Section 3: 长期方向
+      ───────────────────────────────────────── */}
+      <section className="border-t border-white/10 px-5 py-14 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+
+          {/* Header */}
+          <div className="mb-10 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+                长期方向
+              </p>
+              <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
+                如果它继续往前走，<br />
+                我最想补的不是更多模板。
+              </h2>
+            </div>
+            <p className="max-w-xs text-sm leading-[1.9] text-white/40 sm:text-right">
+              这些能力现在还没上线，<br className="hidden sm:block" />
+              但都属于同一条主线。
+            </p>
           </div>
 
-          <div className="mt-8 grid border border-white/10 sm:grid-cols-2">
-            {futureDirections.map((item, index) => (
+          {/* 4-item grid */}
+          <div className="grid border border-white/10 sm:grid-cols-2">
+            {futureDirections.map((item, i) => (
               <article
                 key={item.title}
-                className={`px-5 py-5 sm:px-6 sm:py-6 ${
-                  index >= 2 ? "border-t border-white/8" : ""
-                } ${index % 2 === 1 ? "sm:border-l sm:border-white/8" : ""}`}
+                className={`px-5 py-6 sm:px-6 sm:py-7 ${
+                  i >= 2 ? "border-t border-white/[0.07]" : ""
+                } ${i % 2 === 1 ? "sm:border-l sm:border-white/[0.07]" : ""}`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-white/36">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.15em] text-white/30">
                     {item.status}
                   </span>
-                  <span className="text-[11px] uppercase tracking-[0.28em] text-white/24">
+                  <span className="font-mono text-[11px] tracking-[0.25em] text-white/20">
                     {item.id}
                   </span>
                 </div>
-                <h3 className="mt-4 max-w-[13ch] text-2xl font-semibold tracking-tight text-white">
+                <h3 className="mt-4 text-[1.05rem] font-semibold leading-[1.35] tracking-[-0.02em] text-white sm:text-xl">
                   {item.title}
                 </h3>
-                <p className="mt-4 text-sm leading-7 text-white/68 sm:text-base">
+                <p className="mt-3 text-sm leading-[1.85] text-white/60 sm:text-base">
                   {item.description}
                 </p>
               </article>
             ))}
           </div>
+
+          {/* Vision diagram */}
+          <div className="mt-8 border border-white/10 p-5 sm:p-7">
+            <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
+              系统结构图
+            </p>
+            <IsometricWireframe className="mx-auto max-w-2xl opacity-75" />
+            <p className="mt-5 border-t border-white/[0.07] pt-4 text-[11px] leading-[1.7] text-white/30">
+              四个模块，最终回到同一个工作台。现在只有第一个在线上。
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="border-y border-white/8 bg-white/[0.02] px-5 py-14 sm:px-6 sm:py-18">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-white/30">
-              为什么会有它
-            </p>
-            <h2 className="mt-4 max-w-[12ch] text-[2rem] font-semibold tracking-tight text-white sm:max-w-none sm:text-4xl">
-              这个项目不是因为我想做一个工具，
-              <span className="whitespace-nowrap">而是因为我也经历过那段时间。</span>
-            </h2>
+      {/* ─────────────────────────────────────────
+          Section 4: 开发者动机
+      ───────────────────────────────────────── */}
+      <section className="border-t border-white/10 bg-white/[0.015] px-5 py-14 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
 
-            <div className="mt-8 border border-white/10 bg-black/30 px-5 py-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-white/30">
-                不是不会做
+            {/* Left */}
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+                为什么会有它
               </p>
-              <p className="mt-3 text-[1.02rem] leading-8 text-white sm:text-lg">
-                很多时候，卡住并不是因为你不够努力，而是这件事本来就很耗人。
-              </p>
+              <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.8rem]">
+                不是因为我想做<br />
+                一个工具，而是因为<br />
+                我也经历过那段时间。
+              </h2>
+              {/* Callout */}
+              <SectionFrame
+                className="mt-8 border border-white/10 bg-black/25"
+                noGrid
+              >
+                <div className="px-5 py-5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/25">
+                    不是不会做
+                  </p>
+                  <p className="mt-3 text-base leading-[1.85] text-white/80 sm:text-lg">
+                    很多时候，卡住并不是因为你不够努力，而是这件事本来就很耗人。
+                  </p>
+                </div>
+              </SectionFrame>
             </div>
-          </div>
 
-          <SectionFrame className="border border-white/10 bg-black/25">
-            <div className="grid">
-              {[
-                "我知道整理作品集为什么会拖很久。很多时候不是你不会做，而是这件事真的太耗人了。",
-                "你会反复想，这个项目到底值不值得放，这段经历应该怎么讲，这份作品集看起来到底像不像自己，现在这样拿出去投，会不会还是不够好。",
-                "我不想再做一个只给你模板的工具。我更想做一个能陪你先把第一版搭起来，再慢慢把它讲清楚的东西。",
-              ].map((paragraph, index) => (
+            {/* Right: narrative paragraphs */}
+            <div className="border-t border-white/10 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+              {devNarratives.map((para, i) => (
                 <p
-                  key={paragraph}
-                  className={`px-5 py-5 text-sm leading-8 text-white/68 sm:px-6 sm:text-base ${
-                    index !== 0 ? "border-t border-white/8" : ""
+                  key={i}
+                  className={`py-5 text-sm leading-[1.9] text-white/65 sm:text-base ${
+                    i < devNarratives.length - 1 ? "border-b border-white/[0.07]" : ""
                   }`}
                 >
-                  {paragraph}
+                  {para}
                 </p>
               ))}
-              <p className="border-t border-white/8 px-5 py-5 text-sm leading-8 text-white sm:px-6 sm:text-base">
+              <p className="border-t border-white/10 py-5 text-sm leading-[1.9] text-white/88 sm:text-base">
                 如果集盒FolioBox能帮你少熬两个月，它就已经有价值。
               </p>
             </div>
-          </SectionFrame>
+          </div>
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-6 sm:py-18">
-        <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.02fr_0.98fr]">
-          <SectionFrame className="border border-white/10 bg-white/[0.02]">
-            <div className="px-5 py-6 sm:px-6 sm:py-8">
-              <p className="text-xs uppercase tracking-[0.24em] text-white/30">首批用户</p>
-              <h2 className="mt-4 max-w-[12ch] text-[2rem] font-semibold tracking-tight text-white sm:max-w-none sm:text-4xl">
-                给首批用户的一个承诺
+      {/* ─────────────────────────────────────────
+          Section 5: 首批用户承诺
+      ───────────────────────────────────────── */}
+      <section className="border-t border-white/10 px-5 py-14 sm:px-6 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
+
+            {/* Left */}
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+                首批用户
+              </p>
+              <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-[2.6rem]">
+                给首批用户的<br />
+                一个承诺
               </h2>
-              <div className="mt-5 space-y-4 text-sm leading-7 text-white/68 sm:text-base">
+              <div className="mt-6 space-y-4 text-sm leading-[1.9] text-white/62 sm:text-base">
                 <p>
-                  如果你是在 MVP 阶段就开始使用集盒FolioBox的用户，未来围绕“设计师求职表达”这条主线持续上线的重要能力，我会默认免费开放给你。
+                  如果你是在 MVP 阶段就开始使用集盒FolioBox的用户，未来围绕"设计师求职表达"这条主线持续上线的重要能力，我会默认免费开放给你。
                 </p>
                 <p>
                   这不等于以后所有东西都永久免费。但只要它仍然属于这条主线，我希望首批用户能一直在里面。
                 </p>
               </div>
-              <div className="mt-8 border border-white/10 bg-black/30 px-5 py-5">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/30">
-                  我更在意的不是一次成交
-                </p>
-                <p className="mt-3 text-lg leading-8 text-white">
-                  而是如果你在最早期愿意相信这条路，后面主线能力长出来时，你不需要被挡在外面。
+              {/* Key sentiment */}
+              <div className="mt-7 border-l-2 border-white/20 pl-5">
+                <p className="text-base leading-[1.85] text-white/78 sm:text-lg">
+                  我更在意的不是一次成交，而是如果你在最早期愿意相信这条路，后面主线能力长出来时，你不需要被挡在外面。
                 </p>
               </div>
             </div>
-          </SectionFrame>
 
-          <div className="grid gap-4">
-            <SectionFrame className="border border-white/10 bg-black/30">
-              <div className="px-5 py-5 sm:px-6 sm:py-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/30">默认包含</p>
-                <div className="mt-4 flex flex-wrap gap-2.5">
-                  {includedPromiseItems.map((item) => (
-                    <span
-                      key={item}
-                      className="inline-flex border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/78"
-                    >
-                      {item}
-                    </span>
-                  ))}
+            {/* Right: included / excluded lists */}
+            <div className="space-y-5">
+              <div className="border border-white/10">
+                <div className="border-b border-white/[0.07] px-5 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                    默认包含
+                  </p>
                 </div>
+                {includedPromiseItems.map((item, i) => (
+                  <div
+                    key={item}
+                    className={`flex items-center gap-4 px-5 py-3.5 ${
+                      i < includedPromiseItems.length - 1 ? "border-b border-white/[0.07]" : ""
+                    }`}
+                  >
+                    <span className="h-1 w-1 shrink-0 bg-white/40" />
+                    <span className="text-sm text-white/72">{item}</span>
+                  </div>
+                ))}
               </div>
-            </SectionFrame>
 
-            <SectionFrame className="border border-white/10 bg-black/20">
-              <div className="px-5 py-5 sm:px-6 sm:py-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/30">不默认包含</p>
-                <div className="mt-4 flex flex-wrap gap-2.5">
-                  {excludedPromiseItems.map((item) => (
-                    <span
-                      key={item}
-                      className="inline-flex border border-white/10 bg-white/[0.02] px-4 py-2 text-sm text-white/60"
-                    >
-                      {item}
-                    </span>
-                  ))}
+              <div className="border border-white/10">
+                <div className="border-b border-white/[0.07] px-5 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                    不默认包含
+                  </p>
                 </div>
+                {excludedPromiseItems.map((item, i) => (
+                  <div
+                    key={item}
+                    className={`flex items-center gap-4 px-5 py-3.5 ${
+                      i < excludedPromiseItems.length - 1 ? "border-b border-white/[0.07]" : ""
+                    }`}
+                  >
+                    <span className="h-1 w-1 shrink-0 bg-white/20" />
+                    <span className="text-sm text-white/45">{item}</span>
+                  </div>
+                ))}
               </div>
-            </SectionFrame>
-
-            <SectionFrame className="border border-white/10 bg-white/[0.02]">
-              <div className="px-5 py-5 sm:px-6 sm:py-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/30">
-                  这条承诺真正想表达什么
-                </p>
-                <div className="mt-4 space-y-3 text-sm leading-7 text-white/68">
-                  {promiseNotes.map((note) => (
-                    <p key={note}>{note}</p>
-                  ))}
-                </div>
-              </div>
-            </SectionFrame>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="px-5 pb-18 pt-1 sm:px-6 sm:pb-24 sm:pt-2">
-        <SectionFrame className="mx-auto max-w-5xl border border-white/10 bg-white/[0.02] text-center">
-          <div className="px-5 py-9 sm:px-10 sm:py-14">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/30">接下来</p>
-            <h2 className="mx-auto mt-4 max-w-[13ch] text-[2rem] font-semibold tracking-tight text-white sm:max-w-none sm:text-4xl">
-              集盒FolioBox 现在还很早。
-              <span className="whitespace-nowrap">但我希望它以后能变成一个更完整的东西。</span>
-            </h2>
-            <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-white/68 sm:text-base">
-              现在，它先从作品集整理开始。以后，如果这条路值得继续走下去，我希望它能帮更多设计师把求职表达这件事也一起整理清楚。
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href={primaryCta.href}
-                className="inline-flex h-12 items-center justify-center border border-white bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-              >
-                {primaryCta.label}
-              </Link>
-              <Link
-                href="/editorial/developers-note"
-                className="inline-flex h-12 items-center justify-center border border-white/14 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
-              >
-                读一页开发者说
-              </Link>
-            </div>
+      {/* ─────────────────────────────────────────
+          Section 6: 收尾
+      ───────────────────────────────────────── */}
+      <section className="border-t border-white/10 px-5 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+            接下来
+          </p>
+          <h2 className="mt-6 text-[1.9rem] font-semibold leading-[1.1] tracking-[-0.04em] text-white sm:text-[2.8rem]">
+            集盒FolioBox 现在还很早。<br />
+            但我希望它以后能变成<br />
+            一个更完整的东西。
+          </h2>
+          <p className="mx-auto mt-6 max-w-xl text-sm leading-[1.9] text-white/60 sm:text-base">
+            现在，它先从作品集整理开始。以后，如果这条路值得继续走下去，我希望它能帮更多设计师把求职表达这件事也一起整理清楚。
+          </p>
+          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href={primaryCta.href}
+              className="inline-flex h-12 items-center justify-center border border-white bg-white px-7 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            >
+              {primaryCta.label}
+            </Link>
+            <Link
+              href="/editorial/developers-note"
+              className="inline-flex h-12 items-center justify-center border border-white/15 px-7 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white"
+            >
+              读一页开发者说
+            </Link>
           </div>
-        </SectionFrame>
+        </div>
       </section>
 
       <Footer />
