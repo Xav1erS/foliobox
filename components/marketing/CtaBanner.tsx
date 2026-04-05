@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { getHeroPrimaryAction } from "@/lib/marketing-cta";
+import { getHeroPrimaryAction, getHeroSecondaryAction } from "@/lib/marketing-cta";
 
 export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
-  const primaryAction = getHeroPrimaryAction(isLoggedIn);
+  const primaryAction = isLoggedIn
+    ? getHeroPrimaryAction(isLoggedIn)
+    : { href: "/score", label: "先看看现在能不能投" };
+  const secondaryAction = isLoggedIn
+    ? getHeroSecondaryAction(isLoggedIn)
+    : { href: "/login?next=/projects/new", label: "开始整理第一版" };
 
   return (
     <section className="relative overflow-hidden border-y border-white/8 px-6 py-20">
@@ -22,22 +27,20 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </p>
         <h2 className="font-bold tracking-tight text-white">
           <span className="block text-[2.8rem] leading-[0.98] tracking-[-0.05em] sm:hidden">
-            <span className="block">先把第一版</span>
-            <span className="mt-2 block">做出来，</span>
-            <span className="mt-2 block">再继续往前走</span>
+            <span className="block">先判断现在</span>
+            <span className="mt-2 block">该从哪一步开始</span>
           </span>
           <span className="hidden text-4xl md:text-5xl sm:block">
-            先把第一版做出来，
+            先判断现在
             <br />
-            再继续往前走
+            该从哪一步开始
           </span>
         </h2>
         <p className="mt-4 text-base text-white/55" style={{ maxWidth: 480 }}>
-          先用评分看清问题，再决定下一步怎么整理。
-          现在不用一上来就做到完美，先从能继续修改的第一版开始。
+          可以先评分，也可以直接开始整理。重点不是一上来就做到完美，而是先从最适合你的那一步开始。
         </p>
 
-        <div className="mt-10 flex flex-col items-center gap-4">
+        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
           <Link
             href={primaryAction.href}
             className="flex h-12 min-w-[200px] items-center justify-center bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
@@ -45,10 +48,10 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             {primaryAction.label}
           </Link>
           <Link
-            href="/vision"
-            className="text-sm text-white/55 transition-colors hover:text-white"
+            href={secondaryAction.href}
+            className="flex h-12 min-w-[200px] items-center justify-center border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
           >
-            也可以先看看我想把它做成什么
+            {secondaryAction.label}
           </Link>
         </div>
       </div>

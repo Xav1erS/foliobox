@@ -94,7 +94,7 @@ export default async function VisionPage() {
             <div>
               <SectionEyebrow label="公开愿景" secondaryLabel="集盒FolioBox" className="mb-8" />
 
-              <h1 className="text-balance text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
+              <h1 className="text-[2.8rem] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[4.5rem]">
                 <span className="block">集盒FolioBox</span>
                 <span className="block">现在从作品集</span>
                 <span className="block">整理开始。</span>

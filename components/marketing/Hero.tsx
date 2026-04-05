@@ -5,10 +5,12 @@ import {
 } from "@/lib/marketing-cta";
 
 export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
-  const primaryAction = getHeroPrimaryAction(isLoggedIn);
+  const primaryAction = isLoggedIn
+    ? getHeroPrimaryAction(isLoggedIn)
+    : { href: "/score", label: "先看看现在能不能投" };
   const secondaryAction = isLoggedIn
     ? getHeroSecondaryAction(isLoggedIn)
-    : { href: "/vision", label: "看看我想把它做成什么" };
+    : { href: "/login?next=/projects/new", label: "开始整理第一版" };
 
   return (
     <section className="relative overflow-hidden pt-14">
@@ -23,6 +25,17 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       />
       {/* Radial fade over grid */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.8)_100%)]" />
+      {/* Dot matrix accent */}
+      <div
+        className="pointer-events-none absolute bottom-24 right-4 h-28 w-36 opacity-40 sm:bottom-32 sm:right-10 sm:h-40 sm:w-52"
+        style={{
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.14) 1px, transparent 1px)",
+          backgroundSize: "12px 12px",
+          maskImage: "linear-gradient(135deg, transparent 0%, black 18%, black 100%)",
+          WebkitMaskImage:
+            "linear-gradient(135deg, transparent 0%, black 18%, black 100%)",
+        }}
+      />
 
       {/* Above-fold content */}
       <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-start px-5 pb-10 pt-16 text-center sm:px-6 sm:pt-20 md:justify-center md:pt-0">
@@ -33,30 +46,30 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </div>
 
         {/* Heading */}
-        <h1 className="mx-auto max-w-[320px] font-bold text-white sm:max-w-[720px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[900px] lg:text-[72px] lg:leading-[1.06]">
-          <span className="text-[36px] leading-[0.98] tracking-[-0.05em] sm:hidden">
-            <span className="block">先把第一版</span>
-            <span className="mt-1.5 block text-white/45">作品集</span>
-            <span className="mt-1.5 block">整理出来</span>
+        <h1 className="mx-auto max-w-[340px] font-bold text-white sm:max-w-[760px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[980px] lg:text-[72px] lg:leading-[1.06]">
+          <span className="text-[34px] leading-[0.98] tracking-[-0.05em] sm:hidden">
+            <span className="block whitespace-nowrap">把零散项目整理成</span>
+            <span className="mt-1.5 block whitespace-nowrap">拿得出手的</span>
+            <span className="mt-1.5 block whitespace-nowrap">UI/UX 作品集</span>
           </span>
           <span className="hidden sm:block">
-            先把第一版
-            <br />
-            <span className="text-white/40">作品集</span>整理出来
+            <span className="block">把零散项目整理成</span>
+            <span className="block">拿得出手的 UI/UX 作品集</span>
           </span>
         </h1>
 
         <p
           className="mx-auto mt-6 max-w-[340px] text-base leading-8 text-white/60 sm:max-w-[640px] sm:text-lg sm:leading-relaxed"
         >
-          你给我现有设计稿、简历和项目事实，我先帮你把结构搭起来。
+          如果你手上已经有项目和经历，只是还没整理成一版能投的作品集，
+          我可以先帮你把结构搭起来。
           <br />
-          不是直接替你生成一个满分答案，而是先把最难开始的那一段做掉。
+          不是替你把一切一次写完，而是先把最难开始的那一段理顺。
         </p>
 
         {/* Trust clarification */}
         <p className="mx-auto mt-3 max-w-[340px] text-sm leading-7 text-white/40 sm:max-w-[560px] sm:leading-normal">
-          作品集只是入口。等第一版先立起来，再继续整理项目表达、简历线索和求职叙事。
+          可以先看清现在能不能投，也可以直接开始整理。后面再慢慢把项目表达、简历线索和求职叙事接起来。
         </p>
 
         {/* CTAs */}
@@ -77,7 +90,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
         {/* Trust line */}
         <div className="mt-9 flex max-w-[340px] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/30 sm:mt-10 sm:max-w-none sm:flex-nowrap">
-          <span>先评分，再整理</span>
+          <span>先判断从哪一步开始</span>
           <span className="h-px w-4 bg-white/15" />
           <span>支持 Figma / 图片导入</span>
           <span className="h-px w-4 bg-white/15" />

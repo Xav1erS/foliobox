@@ -25,8 +25,9 @@ export function FAQ() {
       <div className="mx-auto" style={{ maxWidth: 800 }}>
         <div className="mb-12">
           <SectionEyebrow label="常见问题" className="mb-3" />
-          <h2 className="text-balance text-4xl font-bold tracking-tight text-white">
-            你可能会先问这些
+          <h2 className="text-4xl font-bold tracking-tight text-white">
+            <span className="block">你可能会</span>
+            <span className="block">先问这些</span>
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/50">
             我先把当前版本最容易让人犹豫的几个问题放在这里，避免你还没开始就先被不确定感卡住。

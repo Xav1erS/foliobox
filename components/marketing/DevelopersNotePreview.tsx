@@ -16,8 +16,13 @@ export function DevelopersNotePreview({
             <div className="flex flex-col justify-between">
               <div>
                 <SectionEyebrow label="开发者说" className="mb-4" />
-                <h2 className="max-w-xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                  {content.previewTitle}
+                <h2 className="max-w-xl text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                  <span className="block sm:hidden">我为什么觉得，</span>
+                  <span className="block sm:hidden">作品集只是入口，</span>
+                  <span className="block sm:hidden">不是问题的全部</span>
+                  <span className="hidden sm:block lg:hidden">我为什么觉得，作品集只是入口，</span>
+                  <span className="hidden sm:block lg:hidden">不是问题的全部</span>
+                  <span className="hidden lg:block">我为什么觉得，作品集只是入口，不是问题的全部</span>
                 </h2>
               </div>
 

@@ -51,10 +51,10 @@ export function LegalDocument({
               </div>
 
               {section.bullets?.length ? (
-                <ul className="space-y-3 rounded-3xl border border-white/8 bg-white/[0.02] px-6 py-6">
+                <ul className="space-y-3 border border-white/8 bg-white/[0.02] px-6 py-6">
                   {section.bullets.map((bullet) => (
                     <li key={bullet} className="flex items-start gap-3 text-base leading-7 text-white/68">
-                      <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span className="mt-3 h-1.5 w-1.5 shrink-0 bg-emerald-400" />
                       <span>{bullet}</span>
                     </li>
                   ))}

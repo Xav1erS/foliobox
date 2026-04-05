@@ -152,9 +152,9 @@ export function HowItWorks() {
           <div className="lg:sticky lg:top-24">
             <SectionEyebrow label="使用流程" className="mb-3" />
             <h2 className="font-bold tracking-tight text-white">
-              <span className="block text-[2.8rem] leading-[0.96] tracking-[-0.05em] sm:hidden">
-                <span className="block">先把最难开始的</span>
-                <span className="mt-2 block">那一段做掉</span>
+              <span className="block text-[2.6rem] leading-[0.96] tracking-[-0.05em] sm:hidden">
+                <span className="block whitespace-nowrap">先把最难开始的</span>
+                <span className="mt-2 block whitespace-nowrap">那一段做掉</span>
               </span>
               <span className="hidden text-4xl md:text-5xl sm:block">
                 先把最难开始的

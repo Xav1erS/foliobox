@@ -59,10 +59,9 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
     <main className="mx-auto max-w-5xl px-6 pb-20 pt-28">
       <div className="mb-14 text-center">
         <SectionEyebrow label="继续往前走" className="mb-3 justify-center" />
-        <h1 className="text-balance text-4xl font-bold tracking-tight text-white">
-          先判断你现在
-          <br />
-          最需要哪一步
+        <h1 className="text-4xl font-bold tracking-tight text-white">
+          <span className="block">先判断你现在</span>
+          <span className="block">最需要哪一步</span>
         </h1>
         <p className="mt-4 text-lg text-white/60">
           这页不是要你立刻做购买决定，而是先帮你判断：
@@ -109,10 +108,11 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
 
       <div id="plans" className="mb-6">
         <SectionEyebrow label="能力与阶段" className="mb-3" />
-        <h2 className="text-balance text-3xl font-bold tracking-tight text-white md:text-4xl">
-          如果你已经决定继续整理，
-          <br />
-          再看具体适合哪一档
+        <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+          <span className="block md:hidden">如果你已经决定继续整理，</span>
+          <span className="block md:hidden">再看具体适合哪一档</span>
+          <span className="hidden md:block">如果你已经决定继续整理，</span>
+          <span className="hidden md:block">再看具体适合哪一档</span>
         </h2>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/55">
           免费版适合先看清问题；Pro 版适合把第一版真正做出来；求职冲刺版适合在投递窗口里做更密集的优化。

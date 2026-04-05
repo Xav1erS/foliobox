@@ -21,12 +21,12 @@ export function ScoreFeature() {
           {/* Left */}
           <div>
             <SectionEyebrow label="评分诊断能力" className="mb-3" />
-            <h2 className="text-balance text-4xl font-bold tracking-tight text-white md:text-5xl">
-              先知道现在
-              <br />
-              卡在哪，
-              <br />
-              再决定怎么整理
+            <h2 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
+              <span className="block md:hidden">先知道现在卡在哪，</span>
+              <span className="block md:hidden">再决定怎么整理</span>
+              <span className="hidden md:block">先知道现在</span>
+              <span className="hidden md:block">卡在哪，</span>
+              <span className="hidden md:block">再决定怎么整理</span>
             </h2>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/55">
               上传现有作品集后，我会先用评分帮你看清楚：
@@ -42,9 +42,7 @@ export function ScoreFeature() {
                 const level = PORTFOLIO_SCORE_LEVEL_CONFIG[levelKey];
                 return (
                   <div key={level.rangeLabel} className="flex items-center gap-3">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${level.indicatorClassName}`}
-                    />
+                    <span className={`h-1.5 w-1.5 ${level.indicatorClassName}`} />
                     <span className="font-mono text-xs text-white/50">
                       {level.rangeLabel}
                     </span>
