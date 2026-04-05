@@ -19,7 +19,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
           backgroundSize: "80px 80px",
         }}
       />
@@ -27,9 +27,9 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.8)_100%)]" />
       {/* Dot matrix accent */}
       <div
-        className="pointer-events-none absolute bottom-24 right-4 h-28 w-36 opacity-40 sm:bottom-32 sm:right-10 sm:h-40 sm:w-52"
+        className="pointer-events-none absolute bottom-24 right-4 h-28 w-36 opacity-55 sm:bottom-32 sm:right-10 sm:h-40 sm:w-52"
         style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.14) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.2) 1px, transparent 1px)",
           backgroundSize: "12px 12px",
           maskImage: "linear-gradient(135deg, transparent 0%, black 18%, black 100%)",
           WebkitMaskImage:
@@ -49,12 +49,14 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <h1 className="mx-auto max-w-[340px] font-bold text-white sm:max-w-[760px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[980px] lg:text-[72px] lg:leading-[1.06]">
           <span className="text-[34px] leading-[0.98] tracking-[-0.05em] sm:hidden">
             <span className="block whitespace-nowrap">把零散项目整理成</span>
-            <span className="mt-1.5 block whitespace-nowrap">拿得出手的</span>
+            <span className="mt-1.5 block whitespace-nowrap text-white/38">拿得出手的</span>
             <span className="mt-1.5 block whitespace-nowrap">UI/UX 作品集</span>
           </span>
           <span className="hidden sm:block">
             <span className="block">把零散项目整理成</span>
-            <span className="block">拿得出手的 UI/UX 作品集</span>
+            <span className="block">
+              <span className="text-white/38">拿得出手的</span> UI/UX 作品集
+            </span>
           </span>
         </h1>
 
