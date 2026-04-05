@@ -49,13 +49,14 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <h1 className="mx-auto max-w-[340px] font-bold text-white sm:max-w-[760px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[980px] lg:text-[72px] lg:leading-[1.06]">
           <span className="text-[34px] leading-[0.98] tracking-[-0.05em] sm:hidden">
             <span className="block whitespace-nowrap">把零散项目整理成</span>
-            <span className="mt-1.5 block whitespace-nowrap text-white/38">拿得出手的</span>
+            <span className="mt-1.5 block whitespace-nowrap text-neutral-500">拿得出手的</span>
             <span className="mt-1.5 block whitespace-nowrap">UI/UX 作品集</span>
           </span>
           <span className="hidden sm:block">
             <span className="block">把零散项目整理成</span>
             <span className="block">
-              <span className="text-white/38">拿得出手的</span> UI/UX 作品集
+              <span className="text-neutral-500">拿得出手的</span>{" "}
+              <span className="text-white">UI/UX 作品集</span>
             </span>
           </span>
         </h1>
