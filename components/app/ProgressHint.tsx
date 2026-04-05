@@ -15,9 +15,9 @@ export function ProgressHint({
           第 {current} / {total} 步
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200">
+      <div className="h-1.5 overflow-hidden border border-neutral-300 bg-neutral-200/80">
         <div
-          className="h-full rounded-full bg-neutral-900 transition-all"
+          className="h-full bg-neutral-900 transition-all"
           style={{ width: `${(current / total) * 100}%` }}
         />
       </div>

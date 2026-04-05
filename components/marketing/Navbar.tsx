@@ -73,10 +73,13 @@ export function Navbar({
   })();
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-4 sm:px-6">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/85 backdrop-blur-md">
+      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-5 sm:h-14 sm:px-6">
         {/* Logo */}
-        <Link href="/" className="whitespace-nowrap text-xs font-semibold leading-tight tracking-tight text-white sm:text-sm">
+        <Link
+          href="/"
+          className="whitespace-nowrap text-[18px] font-semibold leading-none tracking-tight text-white sm:text-sm"
+        >
           集盒FolioBox
         </Link>
 
@@ -98,7 +101,7 @@ export function Navbar({
         </nav>
 
         {/* CTAs */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Link
             href={secondaryCta.href}
             className="hidden px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
@@ -107,9 +110,9 @@ export function Navbar({
           </Link>
           <Link
             href={primaryCta.href}
-            className="bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 sm:px-4 sm:text-sm"
+            className="flex h-12 min-w-[124px] items-center justify-center bg-white px-5 text-base font-semibold text-black transition-colors hover:bg-white/90 sm:h-auto sm:min-w-0 sm:px-4 sm:py-1.5 sm:text-sm"
           >
-            <span className="sm:hidden">{isLoggedIn ? "工作台" : "先打分"}</span>
+            <span className="sm:hidden">{isLoggedIn ? "进入工作台" : "开始评分"}</span>
             <span className="hidden sm:inline">{primaryCta.label} →</span>
           </Link>
 
@@ -118,9 +121,9 @@ export function Navbar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
+                className="h-12 w-12 rounded-none border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
               >
-                <Menu className="h-4 w-4" />
+                <Menu className="h-5 w-5" />
               </Button>
             </DialogTrigger>
             <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-none">

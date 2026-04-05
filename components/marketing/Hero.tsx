@@ -13,7 +13,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
     : { href: "/login?next=/projects/new", label: "开始整理第一版" };
 
   return (
-    <section className="relative overflow-hidden pt-14">
+    <section className="relative overflow-hidden pt-[72px] sm:pt-14">
       {/* Grid background */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -38,54 +38,66 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       />
 
       {/* Above-fold content */}
-      <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-start px-5 pb-10 pt-16 text-center sm:px-6 sm:pt-20 md:justify-center md:pt-0">
+      <div className="relative flex min-h-[calc(100vh-72px)] flex-col items-center justify-start px-5 pb-12 pt-[72px] text-center sm:min-h-[calc(100vh-56px)] sm:px-6 sm:pt-20 md:justify-center md:pt-0">
         {/* Badge */}
-        <div className="mb-6 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-[11px] text-white/70 sm:mb-8 sm:px-4 sm:text-xs">
+        <div className="mb-7 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/[0.06] px-4 py-2 text-xs text-white/70 sm:mb-8 sm:px-4 sm:py-1.5 sm:text-xs">
           <span className="h-1.5 w-1.5 bg-emerald-400" />
           <span className="whitespace-nowrap">集盒FolioBox · 从作品集整理开始</span>
         </div>
 
         {/* Heading */}
-        <h1 className="mx-auto max-w-[340px] font-bold text-white sm:max-w-[760px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[980px] lg:text-[72px] lg:leading-[1.06]">
-          <span className="text-[34px] leading-[0.98] tracking-[-0.05em] sm:hidden">
+        <h1 className="mx-auto max-w-[352px] font-bold text-white sm:max-w-[760px] sm:text-6xl sm:leading-[1.02] sm:tracking-tight lg:max-w-[980px] lg:text-[72px] lg:leading-[1.06]">
+          <span className="text-[48px] leading-[0.9] tracking-[-0.06em] sm:hidden">
             <span className="block whitespace-nowrap">把零散项目整理成</span>
-            <span className="mt-1.5 block whitespace-nowrap text-neutral-500">拿得出手的</span>
-            <span className="mt-1.5 block whitespace-nowrap">UI/UX 作品集</span>
+            <span className="mt-2 block whitespace-nowrap text-neutral-600">拿得出手的</span>
+            <span className="mt-2 block whitespace-nowrap">UI/UX 作品集</span>
           </span>
           <span className="hidden sm:block">
             <span className="block">把零散项目整理成</span>
             <span className="block">
-              <span className="text-neutral-500">拿得出手的</span>{" "}
+              <span className="text-neutral-600">拿得出手的</span>{" "}
               <span className="text-white">UI/UX 作品集</span>
             </span>
           </span>
         </h1>
 
-        <p
-          className="mx-auto mt-6 max-w-[340px] text-base leading-8 text-white/60 sm:max-w-[640px] sm:text-lg sm:leading-relaxed"
-        >
-          如果你手上已经有项目和经历，只是还没整理成一版能投的作品集，
-          我可以先帮你把结构搭起来。
-          <br />
-          不是替你把一切一次写完，而是先把最难开始的那一段理顺。
+        <p className="mx-auto mt-7 max-w-[356px] text-[16px] leading-8 text-white/60 sm:mt-6 sm:max-w-[640px] sm:text-lg sm:leading-relaxed">
+          <span className="sm:hidden">
+            <span className="block">如果你手上已经有项目和经历，</span>
+            <span className="mt-1 block">只是还没整理成一版能投的作品集，</span>
+            <span className="mt-1 block">我可以先帮你把结构搭起来。</span>
+          </span>
+          <span className="hidden sm:inline">
+            如果你手上已经有项目和经历，只是还没整理成一版能投的作品集，
+            我可以先帮你把结构搭起来。
+          </span>
+          <span className="mt-3 block">
+            不是替你把一切一次写完，而是先把最难开始的那一段理顺。
+          </span>
         </p>
 
         {/* Trust clarification */}
-        <p className="mx-auto mt-3 max-w-[340px] text-sm leading-7 text-white/40 sm:max-w-[560px] sm:leading-normal">
-          可以先看清现在能不能投，也可以直接开始整理。后面再慢慢把项目表达、简历线索和求职叙事接起来。
+        <p className="mx-auto mt-4 max-w-[356px] text-[15px] leading-8 text-white/40 sm:mt-3 sm:max-w-[560px] sm:text-sm sm:leading-normal">
+          <span className="sm:hidden">
+            <span className="block">可以先看清现在能不能投，也可以直接开始整理。</span>
+            <span className="mt-1 block">后面再慢慢把项目表达、简历线索和求职叙事接起来。</span>
+          </span>
+          <span className="hidden sm:inline">
+            可以先看清现在能不能投，也可以直接开始整理。后面再慢慢把项目表达、简历线索和求职叙事接起来。
+          </span>
         </p>
 
         {/* CTAs */}
-        <div className="mt-9 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row">
+        <div className="mt-10 flex w-full max-w-[360px] flex-col items-center gap-5 sm:mt-10 sm:max-w-none sm:flex-row sm:gap-4">
           <Link
             href={primaryAction.href}
-            className="flex h-12 min-w-[220px] items-center justify-center bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:min-w-[200px]"
+            className="flex h-14 w-full touch-manipulation items-center justify-center bg-white px-8 text-base font-semibold text-black transition-colors hover:bg-white/90 active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-12 min-w-[220px] items-center justify-center border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white sm:min-w-[200px]"
+            className="flex h-14 w-full touch-manipulation items-center justify-center border border-white/15 px-8 text-base font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
           >
             {secondaryAction.label}
           </Link>

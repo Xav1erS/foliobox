@@ -337,7 +337,7 @@ Landing Page 案例卡片可点击，但 `app/(marketing)/cases/[slug]/page.tsx`
 - 设计师档案页要明确说明各字段“会影响什么生成结果”
 - 设计系统收口以共享 token 为目标：
   - 官网深色，工作台浅色
-  - 共享字体、圆角、描边、主按钮与 icon 风格
+  - 共享字体、转角策略、描边、主按钮、辅助插图与 icon 风格
   - 不要为 Marketing / Focus / App 再各造一套 UI 语言
 
 ---

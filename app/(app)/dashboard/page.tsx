@@ -155,7 +155,7 @@ export default async function DashboardPage({
         title="工作台首页"
         description="这里的任务只有一个：帮你尽快回到最近的工作上下文。全部项目管理请进入“我的项目”。"
         actions={
-          <Button asChild className="h-11 rounded-xl px-5">
+          <Button asChild className="h-11 rounded-none px-5">
             <Link href="/projects/new">
               <PlusCircle className="mr-2 h-4 w-4" />
               新建项目
@@ -200,21 +200,21 @@ export default async function DashboardPage({
               </div>
               <div className="flex flex-wrap gap-3">
                 {focusedScore ? (
-                  <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                  <Button asChild variant="outline" className="h-11 rounded-none px-5">
                     <Link href={`/score/${focusedScore.id}`}>
                       查看这次评分结果
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 ) : null}
-                <Button asChild className="h-11 rounded-xl px-5">
+                <Button asChild className="h-11 rounded-none px-5">
                   <Link href={scoreNextStep?.primaryHref ?? `/projects/new?from=score&sid=${scoreId}`}>
                     {scoreNextStep?.primaryLabel ?? "新建项目开始整理"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
                 {scoreNextStep?.secondaryHref ? (
-                  <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                  <Button asChild variant="outline" className="h-11 rounded-none px-5">
                     <Link href={scoreNextStep.secondaryHref}>
                       {scoreNextStep.secondaryLabel}
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -235,7 +235,7 @@ export default async function DashboardPage({
               title="还没有项目"
               description="先导入一个真实项目，再补充项目关键信息，生成第一版作品集初稿。"
               action={
-                <Button asChild className="h-11 rounded-xl px-5">
+                <Button asChild className="h-11 rounded-none px-5">
                   <Link href="/projects/new">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     导入第一个项目
@@ -281,7 +281,7 @@ export default async function DashboardPage({
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Link
                   href="/score"
-                  className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100"
+                  className="border border-neutral-300 bg-neutral-100/85 px-4 py-4 transition-colors hover:border-neutral-400 hover:bg-white"
                 >
                   <Star className="h-4 w-4 text-neutral-900" />
                   <p className="mt-3 text-sm font-medium text-neutral-900">先给作品集打分</p>
@@ -318,7 +318,7 @@ export default async function DashboardPage({
                       </Badge>
                     </div>
 
-                    <div className="inline-flex rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                    <div className="inline-flex border border-neutral-300 bg-neutral-100/85 px-4 py-3">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-400">下一步动作</p>
                         <p className="mt-1 text-sm font-medium text-neutral-900">
@@ -328,7 +328,7 @@ export default async function DashboardPage({
                     </div>
                   </div>
 
-                  <Button asChild className="h-12 rounded-xl px-6">
+                  <Button asChild className="h-12 rounded-none px-6">
                     <Link href={getProjectContinuePath(recentProject).href}>
                       {getProjectContinuePath(recentProject).label}
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -348,7 +348,7 @@ export default async function DashboardPage({
                       </span>
                       <span className="pb-1 text-sm text-neutral-400">/100</span>
                     </div>
-                    <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                    <div className="border border-neutral-300 bg-neutral-100/85 px-4 py-3">
                       <p className="text-sm font-medium text-neutral-900">
                         {latestScoreLevel
                           ? PORTFOLIO_SCORE_LEVEL_CONFIG[latestScoreLevel].label
@@ -356,7 +356,7 @@ export default async function DashboardPage({
                       </p>
                       <p className="mt-1 text-xs text-neutral-500">生成于 {formatProjectDate(latestScore.createdAt)}</p>
                     </div>
-                    <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                    <Button asChild variant="outline" className="h-11 rounded-none px-5">
                       <Link href={`/score/${latestScore.id}`}>
                         查看评分结果
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -366,7 +366,7 @@ export default async function DashboardPage({
                 ) : (
                   <div className="space-y-4">
                     <p className="text-sm leading-6 text-neutral-500">你还没有登录后的评分记录。可以先给现有作品集打分，再决定是否继续整理。</p>
-                    <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                    <Button asChild variant="outline" className="h-11 rounded-none px-5">
                       <Link href="/score">
                         先给我的作品集打分
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -378,14 +378,14 @@ export default async function DashboardPage({
 
               <SectionCard title="当前套餐状态" description="权益决定你能否查看完整评分结果、导出 PDF 和发布在线链接。">
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <div className="border border-neutral-300 bg-neutral-100/85 px-4 py-3">
                     <p className="text-sm font-medium text-neutral-900">{planCopy.title}</p>
                     <p className="mt-1 text-sm leading-6 text-neutral-500">{planCopy.description}</p>
                     {userPlan?.expiresAt ? (
                       <p className="mt-2 text-xs text-neutral-400">有效期至 {formatProjectDate(userPlan.expiresAt)}</p>
                     ) : null}
                   </div>
-                  <Button asChild variant="outline" className="h-11 rounded-xl px-5">
+                  <Button asChild variant="outline" className="h-11 rounded-none px-5">
                     <Link href="/pricing">
                       <CreditCard className="mr-2 h-4 w-4" />
                       查看套餐与权益
@@ -396,22 +396,22 @@ export default async function DashboardPage({
 
               <SectionCard title="快捷入口" description="这里只保留高频入口；完整项目管理请进入“我的项目”页面。">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <Link href="/projects/new" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+                  <Link href="/projects/new" className="border border-neutral-300 bg-neutral-100/85 px-4 py-4 transition-colors hover:border-neutral-400 hover:bg-white">
                     <PlusCircle className="h-4 w-4 text-neutral-900" />
                     <p className="mt-3 text-sm font-medium text-neutral-900">新建项目</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">从 Figma 链接或截图开始整理作品集。</p>
                   </Link>
-                  <Link href="/projects" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+                  <Link href="/projects" className="border border-neutral-300 bg-neutral-100/85 px-4 py-4 transition-colors hover:border-neutral-400 hover:bg-white">
                     <FileText className="h-4 w-4 text-neutral-900" />
                     <p className="mt-3 text-sm font-medium text-neutral-900">查看全部项目</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">集中管理全部项目，不依赖工作台首页的最近项目。</p>
                   </Link>
-                  <Link href={latestScore ? `/score/${latestScore.id}` : "/score"} className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+                  <Link href={latestScore ? `/score/${latestScore.id}` : "/score"} className="border border-neutral-300 bg-neutral-100/85 px-4 py-4 transition-colors hover:border-neutral-400 hover:bg-white">
                     <Star className="h-4 w-4 text-neutral-900" />
                     <p className="mt-3 text-sm font-medium text-neutral-900">查看评分结果</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">先看当前作品集有没有明显短板，再决定是否继续整理。</p>
                   </Link>
-                  <Link href="/profile" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4 transition-colors hover:border-neutral-300 hover:bg-neutral-100">
+                  <Link href="/profile" className="border border-neutral-300 bg-neutral-100/85 px-4 py-4 transition-colors hover:border-neutral-400 hover:bg-white">
                     <User className="h-4 w-4 text-neutral-900" />
                     <p className="mt-3 text-sm font-medium text-neutral-900">去设计师档案</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">完善职位、经验和目标岗位，影响 AI 的表达重心。</p>

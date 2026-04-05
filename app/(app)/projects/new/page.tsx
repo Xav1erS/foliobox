@@ -236,7 +236,7 @@ export default function NewProjectPage() {
               <p className="text-sm text-neutral-500">正在读取这次评分的重点建议…</p>
             ) : scoreContext ? (
               <div className="space-y-4">
-                <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 md:flex-row md:items-end md:justify-between">
+                <div className="flex flex-col gap-4 border border-neutral-300 bg-neutral-100/85 p-4 md:flex-row md:items-end md:justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">当前评分结果</p>
                     <div className="mt-2 flex items-end gap-2">
@@ -255,13 +255,13 @@ export default function NewProjectPage() {
                 </div>
 
                 {focusPoints.length > 0 ? (
-                  <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+                  <div className="border border-neutral-300 bg-white/88 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">这次导入时优先关注</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {focusPoints.map((point) => (
                         <span
                           key={point}
-                          className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
+                          className="border border-neutral-300 bg-neutral-100/85 px-3 py-1 text-xs text-neutral-700"
                         >
                           {point}
                         </span>
@@ -293,10 +293,10 @@ export default function NewProjectPage() {
               <button
                 type="button"
                 onClick={() => setMethod("figma")}
-                className={`rounded-2xl border p-5 text-left transition-colors ${
+                className={`border p-5 text-left transition-colors ${
                   method === "figma"
-                    ? "border-neutral-900 bg-neutral-50"
-                    : "border-neutral-200 hover:border-neutral-300"
+                    ? "border-neutral-900 bg-neutral-100/90"
+                    : "border-neutral-300 bg-white/88 hover:border-neutral-400"
                 }`}
               >
                 <Link2 className="h-5 w-5 text-neutral-900" />
@@ -309,10 +309,10 @@ export default function NewProjectPage() {
               <button
                 type="button"
                 onClick={() => setMethod("images")}
-                className={`rounded-2xl border p-5 text-left transition-colors ${
+                className={`border p-5 text-left transition-colors ${
                   method === "images"
-                    ? "border-neutral-900 bg-neutral-50"
-                    : "border-neutral-200 hover:border-neutral-300"
+                    ? "border-neutral-900 bg-neutral-100/90"
+                    : "border-neutral-300 bg-white/88 hover:border-neutral-400"
                 }`}
               >
                 <ImageIcon className="h-5 w-5 text-neutral-900" />
@@ -353,7 +353,7 @@ export default function NewProjectPage() {
               ) : (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-neutral-500">上传设计稿截图</Label>
-                  <label className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 transition-colors hover:border-neutral-400 hover:bg-neutral-100">
+                  <label className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-neutral-300 bg-neutral-100/85 transition-colors hover:border-neutral-400 hover:bg-white">
                     <ImageIcon className="h-6 w-6 text-neutral-300" />
                     <span className="text-sm text-neutral-500">
                       {imageFiles.length > 0 ? `已选择 ${imageFiles.length} 张图片` : "点击或拖拽上传截图"}
@@ -383,10 +383,10 @@ export default function NewProjectPage() {
                       key={tag}
                       type="button"
                       onClick={() => toggleTag(tag)}
-                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      className={`border px-3 py-1 text-xs transition-colors ${
                         tags.includes(tag)
                           ? "border-neutral-900 bg-neutral-900 text-white"
-                          : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                          : "border-neutral-300 bg-white/88 text-neutral-600 hover:border-neutral-400"
                       }`}
                     >
                       {tag}
@@ -416,17 +416,17 @@ export default function NewProjectPage() {
             description="创建项目后会进入素材确认 / 页面选择页，下一步再补项目事实并生成第一版。"
           >
             <div className="space-y-5">
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="border border-neutral-300 bg-neutral-100/85 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">导入方式</p>
                 <p className="mt-2 text-sm font-medium text-neutral-900">{summary.methodLabel}</p>
               </div>
 
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="border border-neutral-300 bg-neutral-100/85 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">项目名称</p>
                 <p className="mt-2 text-sm font-medium text-neutral-900">{projectName || "未填写"}</p>
               </div>
 
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="border border-neutral-300 bg-neutral-100/85 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">
                   {method === "figma" ? "来源链接" : "上传素材"}
                 </p>
@@ -434,13 +434,13 @@ export default function NewProjectPage() {
               </div>
 
               {tags.length > 0 ? (
-                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                <div className="border border-neutral-300 bg-neutral-100/85 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">当前理解标签</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-600"
+                        className="border border-neutral-300 bg-white/88 px-3 py-1 text-xs text-neutral-600"
                       >
                         {tag}
                       </span>
@@ -473,7 +473,7 @@ export default function NewProjectPage() {
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-xl px-5"
+              className="h-11 rounded-none px-5"
               onClick={() => setStep((prev) => Math.max(1, prev - 1))}
               disabled={loading}
             >
@@ -484,7 +484,7 @@ export default function NewProjectPage() {
           {step < 3 ? (
             <Button
               type="button"
-              className="h-11 rounded-xl px-5"
+              className="h-11 rounded-none px-5"
               onClick={() => {
                 if (step === 1 && canGoStep2) setStep(2);
                 if (step === 2 && canGoStep3) setStep(3);
@@ -496,7 +496,7 @@ export default function NewProjectPage() {
           ) : (
             <Button
               type="button"
-              className="h-11 rounded-xl px-5"
+              className="h-11 rounded-none px-5"
               onClick={handleSubmit}
               disabled={loading}
             >

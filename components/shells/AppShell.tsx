@@ -9,19 +9,27 @@ export function AppShell({
   userEmail?: string | null;
 }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-50 text-neutral-900">
+    <div className="relative flex h-screen overflow-hidden bg-neutral-100 text-neutral-900">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.22]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(10,10,10,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(10,10,10,0.055) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
       <div className="hidden md:flex md:shrink-0">
         <AppSidebar userEmail={userEmail} />
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
         <MobileBanner />
 
-        <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 md:hidden">
-          <span className="text-sm font-semibold text-neutral-900">集盒 FolioBox</span>
+        <div className="flex items-center justify-between border-b border-neutral-300 bg-neutral-100/95 px-4 py-3 backdrop-blur md:hidden">
+          <span className="text-sm font-semibold tracking-tight text-neutral-900">集盒FolioBox</span>
         </div>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="relative flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

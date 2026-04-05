@@ -55,9 +55,9 @@ export function ProjectsCollection({
         return (
           <div
             key={project.id}
-            className="rounded-2xl border border-neutral-200 bg-white p-5 transition-all hover:border-neutral-300 hover:shadow-sm"
+            className="border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:border-neutral-400 hover:bg-white"
           >
-            <div className="flex h-32 items-center justify-center rounded-xl bg-neutral-50">
+            <div className="flex h-32 items-center justify-center border border-neutral-300 bg-neutral-100/85">
               <FileText className="h-8 w-8 text-neutral-300" />
             </div>
 
@@ -66,19 +66,19 @@ export function ProjectsCollection({
                 <p className="truncate text-sm font-medium text-neutral-900">{project.name}</p>
                 <p className="mt-1 text-xs text-neutral-400">{project.updatedAt}</p>
               </div>
-              <Badge variant={status.variant} className="shrink-0 text-xs">
+              <Badge variant={status.variant} className="shrink-0 rounded-none text-xs">
                 {status.label}
               </Badge>
             </div>
 
-            <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+            <div className="mt-4 border border-neutral-300 bg-neutral-100/85 px-3 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-400">下一步</p>
               <p className="mt-1 text-sm font-medium text-neutral-800">{project.nextStep.label}</p>
               <p className="mt-1 text-xs leading-5 text-neutral-500">{project.stageSummary}</p>
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button asChild className="h-10 flex-1 rounded-xl px-4">
+              <Button asChild className="h-10 flex-1 rounded-none px-4">
                 <Link href={project.nextStep.href}>
                   继续
                   <ArrowRight className="h-4 w-4" />
@@ -87,7 +87,7 @@ export function ProjectsCollection({
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 rounded-xl px-3"
+                className="h-10 rounded-none px-3"
                 disabled={deleting}
                 onClick={() => handleDelete(project.id, project.name)}
               >

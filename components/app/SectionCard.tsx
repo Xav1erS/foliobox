@@ -14,11 +14,11 @@ export function SectionCard({
   contentClassName?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-neutral-200 bg-white", className)}>
+    <section className={cn("border border-neutral-300 bg-white/88 backdrop-blur-sm", className)}>
       {(title || description) && (
-        <div className="border-b border-neutral-100 px-6 py-5">
+        <div className="border-b border-neutral-300 px-6 py-5">
           {title ? <h2 className="text-sm font-semibold text-neutral-800">{title}</h2> : null}
-          {description ? <p className="mt-1 text-xs leading-5 text-neutral-500">{description}</p> : null}
+          {description ? <p className="mt-1 text-xs leading-5 text-neutral-600">{description}</p> : null}
         </div>
       )}
       <div className={cn("p-6", contentClassName)}>{children}</div>

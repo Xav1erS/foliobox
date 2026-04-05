@@ -27,36 +27,46 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-neutral-200 bg-white px-3 py-4">
+    <aside className="relative flex h-full w-60 shrink-0 flex-col border-r border-neutral-300 bg-neutral-100/95 px-3 py-4 backdrop-blur">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.2]"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(10,10,10,0.08) 0.8px, transparent 0.8px)",
+          backgroundSize: "14px 14px",
+          maskImage: "linear-gradient(180deg, black 0%, transparent 85%)",
+          WebkitMaskImage: "linear-gradient(180deg, black 0%, transparent 85%)",
+        }}
+      />
       {/* Brand */}
       <Link
         href="/dashboard"
-        className="mb-6 px-3 text-sm font-semibold text-neutral-900"
+        className="relative z-10 mb-6 px-3 text-sm font-semibold tracking-tight text-neutral-900"
       >
-        集盒 FolioBox
+        集盒FolioBox
       </Link>
 
       {/* New project CTA */}
       <Link
         href="/projects/new"
-        className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700 transition-colors"
+        className="relative z-10 mb-4 flex items-center gap-2 border border-neutral-900 bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
       >
         <PlusCircle className="h-4 w-4" />
         新建项目
       </Link>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col">
+      <nav className="relative z-10 flex flex-1 flex-col">
         <div className="flex flex-col gap-0.5">
           {PRIMARY_NAV_ITEMS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-2.5 border border-transparent px-3 py-2 text-sm transition-colors",
                 pathname === href || pathname.startsWith(href + "/")
-                  ? "bg-neutral-100 font-medium text-neutral-900"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
+                  ? "border-neutral-300 bg-white/70 font-medium text-neutral-900"
+                  : "text-neutral-500 hover:border-neutral-200 hover:bg-white/50 hover:text-neutral-900"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -65,7 +75,7 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
           ))}
         </div>
 
-        <div className="mt-5 border-t border-neutral-100 pt-4">
+        <div className="mt-5 border-t border-neutral-300 pt-4">
           <p className="px-3 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
             工具
           </p>
@@ -74,7 +84,7 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
               <Link
                 key={href}
                 href={href}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
+                className="flex items-center gap-2.5 border border-transparent px-3 py-2 text-sm text-neutral-500 transition-colors hover:border-neutral-200 hover:bg-white/50 hover:text-neutral-900"
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {label}
@@ -85,7 +95,7 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
       </nav>
 
       {/* User + logout */}
-      <div className="mt-auto border-t border-neutral-100 pt-3">
+      <div className="relative z-10 mt-auto border-t border-neutral-300 pt-3">
         {userEmail && (
           <p className="mb-2 truncate px-3 text-xs text-neutral-400">
             {userEmail}
@@ -93,7 +103,7 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
         )}
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+          className="flex w-full items-center gap-2.5 border border-transparent px-3 py-2 text-sm text-neutral-500 transition-colors hover:border-neutral-200 hover:bg-white/50 hover:text-neutral-900"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           退出登录
