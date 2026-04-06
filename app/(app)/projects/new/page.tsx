@@ -62,6 +62,13 @@ export default function NewProjectPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [scoreContext, setScoreContext] = useState<ScoreContext | null>(null);
   const [scoreContextLoading, setScoreContextLoading] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    const urls = imageFiles.map((f) => URL.createObjectURL(f));
+    setPreviewUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [imageFiles]);
 
   const canGoStep2 = !!method;
   const canGoStep3 =
@@ -369,17 +376,37 @@ export default function NewProjectPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs text-neutral-500">上传设计稿截图</Label>
                   <label
-                    className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-neutral-300 bg-neutral-100/85 transition-colors hover:border-neutral-400 hover:bg-white"
+                    className="block w-full cursor-pointer border border-dashed border-neutral-300 bg-neutral-100/85 transition-colors hover:border-neutral-400 hover:bg-white"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDrop}
                   >
-                    <ImageIcon className="h-6 w-6 text-neutral-300" />
-                    <span className="text-sm text-neutral-500">
-                      {imageFiles.length > 0 ? `已选择 ${imageFiles.length} 张图片` : "点击或拖拽上传截图"}
-                    </span>
-                    <span className="text-xs text-neutral-400">
-                      支持 JPG / PNG / WebP，建议 3–15 张（最多 {MAX_IMAGES} 张）
-                    </span>
+                    {previewUrls.length > 0 ? (
+                      <div className="p-3">
+                        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6">
+                          {previewUrls.map((url, i) => (
+                            <div key={url} className="border border-neutral-200 bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`preview-${i}`}
+                                className="h-auto w-full object-contain"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-center text-xs text-neutral-400">
+                          已选择 {imageFiles.length} 张 · 点击或拖拽可重新选择
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex h-40 flex-col items-center justify-center gap-2">
+                        <ImageIcon className="h-6 w-6 text-neutral-300" />
+                        <span className="text-sm text-neutral-500">点击或拖拽上传截图</span>
+                        <span className="text-xs text-neutral-400">
+                          支持 JPG / PNG / WebP，建议 3–15 张（最多 {MAX_IMAGES} 张）
+                        </span>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
