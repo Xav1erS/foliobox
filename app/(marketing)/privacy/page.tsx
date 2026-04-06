@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { Navbar } from "@/components/marketing/Navbar";
 import { Footer } from "@/components/marketing/Footer";
 import { LegalDocument } from "@/components/marketing/LegalDocument";
-import { privacyContent } from "@/private-docs/llm-measurements/content/legal/privacy";
+import { privacyContent } from "@/content/legal/privacy";
 
 export default async function PrivacyPage() {
   const session = await auth();
