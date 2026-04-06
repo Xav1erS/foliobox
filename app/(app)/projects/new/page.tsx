@@ -139,6 +139,21 @@ export default function NewProjectPage() {
     setImageFiles(files);
   }
 
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      ["image/jpeg", "image/png", "image/webp"].includes(f.type)
+    );
+    if (files.length === 0) return;
+    if (files.length > MAX_IMAGES) {
+      setError(`最多上传 ${MAX_IMAGES} 张图片`);
+      return;
+    }
+    setError("");
+    setImageFiles(files);
+  }
+
   async function handleSubmit() {
     if (!projectName.trim()) {
       setError("请输入项目名称");
@@ -353,7 +368,11 @@ export default function NewProjectPage() {
               ) : (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-neutral-500">上传设计稿截图</Label>
-                  <label className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-neutral-300 bg-neutral-100/85 transition-colors hover:border-neutral-400 hover:bg-white">
+                  <label
+                    className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-neutral-300 bg-neutral-100/85 transition-colors hover:border-neutral-400 hover:bg-white"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDrop}
+                  >
                     <ImageIcon className="h-6 w-6 text-neutral-300" />
                     <span className="text-sm text-neutral-500">
                       {imageFiles.length > 0 ? `已选择 ${imageFiles.length} 张图片` : "点击或拖拽上传截图"}
