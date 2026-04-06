@@ -73,6 +73,7 @@ model User {
   profile           DesignerProfile?
   resumes           Resume[]
   projects          Project[]
+  portfolios        Portfolio[]
   portfolioScores   PortfolioScore[]
   portfolioOutlines PortfolioOutline[]
   portfolioDrafts   PortfolioDraft[]
@@ -81,6 +82,9 @@ model User {
   userPlans         UserPlan[]
   llmUsageEvents    LLMUsageEvent[]
   externalParseUsageEvents ExternalParseUsageEvent[]
+  generationTasks   GenerationTask[]
+  precheckLogs      PrecheckLog[]
+  budgetUsageEvents BudgetUsageEvent[]
 }
 
 model DesignerProfile {
@@ -136,6 +140,14 @@ model Project {
   sourceType   ProjectSource
   sourceUrl    String?
   importStatus ImportStatus  @default(DRAFT)
+  // V3 stage field (replaces importStatus as primary status signal)
+  stage        ProjectStage  @default(DRAFT)
+  // V3 AI output per stage
+  boundaryJson     Json?
+  completenessJson Json?
+  packageJson      Json?
+  layoutJson       Json?
+  packageMode      PackageMode?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -145,6 +157,21 @@ model Project {
   outlines PortfolioOutline[] @relation("OutlineProjects")
   drafts   PortfolioDraft[]
   llmUsageEvents LLMUsageEvent[]
+}
+
+enum ProjectStage {
+  DRAFT
+  BOUNDARY
+  COMPLETENESS
+  PACKAGE
+  LAYOUT
+  READY
+}
+
+enum PackageMode {
+  DEEP
+  LIGHT
+  SUPPORTIVE
 }
 
 enum ProjectSource {
@@ -378,7 +405,8 @@ enum DraftStatus {
 
 model PublishedPortfolio {
   id            String   @id @default(cuid())
-  draftId       String   @unique
+  draftId       String?  @unique   // V2 source (optional for V3)
+  portfolioId   String?            // V3 source
   userId        String
   slug          String   @unique
   publishedHtml String   @db.Text
@@ -387,8 +415,122 @@ model PublishedPortfolio {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  draft PortfolioDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
-  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draft     PortfolioDraft? @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  portfolio Portfolio?      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// V3: Portfolio (first-class object)
+// ─────────────────────────────────────────────
+
+model Portfolio {
+  id          String          @id @default(cuid())
+  userId      String
+  name        String
+  status      PortfolioStatus @default(DRAFT)
+  projectIds  String[]
+  outlineJson Json?
+  contentJson Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  published PublishedPortfolio[]
+
+  @@index([userId, updatedAt])
+}
+
+enum PortfolioStatus {
+  DRAFT
+  SELECTION
+  OUTLINE
+  EDITOR
+  PUBLISHED
+}
+
+// ─────────────────────────────────────────────
+// V3: Generation system
+// ─────────────────────────────────────────────
+
+model GenerationTask {
+  id                    String   @id @default(cuid())
+  userId                String
+  objectType            String   // "project" | "portfolio"
+  objectId              String   // stores projectId or portfolioId (no FK, polymorphic)
+  actionType            String   // "boundary_identification" | "project_layout_generation" | ...
+  usageClass            String   // "low_cost" | "high_cost"
+  provider              String?
+  model                 String?
+  requestHash           String?
+  status                String   @default("pending") // "pending" | "running" | "done" | "failed" | "reused"
+  reusedFromTaskId      String?
+  styleReferenceSetHash String?
+  wasSuccessful         Boolean  @default(false)
+  countedToBudget       Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drafts GeneratedDraft[]
+
+  @@index([userId, createdAt])
+  @@index([objectType, objectId])
+  @@index([requestHash])
+}
+
+model GeneratedDraft {
+  id            String   @id @default(cuid())
+  userId        String
+  objectType    String   // "project" | "portfolio"
+  objectId      String
+  sourceTaskId  String
+  draftType     String   // "layout" | "packaging" | "rewrite" | "validation"
+  versionNumber Int      @default(1)
+  contentJson   Json
+  isReusable    Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sourceTask GenerationTask @relation(fields: [sourceTaskId], references: [id], onDelete: Cascade)
+
+  @@index([objectType, objectId, draftType])
+  @@index([sourceTaskId])
+}
+
+model PrecheckLog {
+  id              String   @id @default(cuid())
+  userId          String
+  objectType      String   // "project" | "portfolio"
+  objectId        String   // stores projectId or portfolioId (no FK, polymorphic)
+  actionType      String
+  budgetStatus    String   // "healthy" | "near_limit" | "needs_topup"
+  suggestedMode   String   // "continue" | "reuse" | "downgrade" | "block"
+  reusableDraftId String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([objectType, objectId])
+}
+
+model BudgetUsageEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  objectType      String   // "project" | "portfolio"
+  objectId        String
+  actionType      String
+  usageClass      String   // "low_cost" | "high_cost"
+  wasReused       Boolean  @default(false)
+  wasSuccessful   Boolean  @default(true)
+  countedToBudget Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([objectType, objectId])
 }
 
 // ─────────────────────────────────────────────

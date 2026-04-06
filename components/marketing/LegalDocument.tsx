@@ -1,4 +1,4 @@
-import type { LegalDocumentContent } from "@/private-docs/llm-measurements/content/legal/types";
+import type { LegalDocumentContent } from "@/content/legal/types";
 
 export function LegalDocument({
   content,

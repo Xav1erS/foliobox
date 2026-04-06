@@ -8,6 +8,32 @@ import { Button } from "@/components/ui/button";
 import { StepHeader } from "@/components/app/StepHeader";
 import { AuthFocusAside } from "@/components/app/AuthFocusAside";
 
+const EMAIL_PROVIDER_URLS: Record<string, string> = {
+  "qq.com": "https://mail.qq.com",
+  "foxmail.com": "https://mail.qq.com",
+  "163.com": "https://mail.163.com",
+  "126.com": "https://mail.126.com",
+  "yeah.net": "https://mail.yeah.net",
+  "sina.com": "https://mail.sina.com.cn",
+  "sina.cn": "https://mail.sina.com.cn",
+  "sohu.com": "https://mail.sohu.com",
+  "gmail.com": "https://mail.google.com",
+  "googlemail.com": "https://mail.google.com",
+  "outlook.com": "https://outlook.live.com",
+  "hotmail.com": "https://outlook.live.com",
+  "live.com": "https://outlook.live.com",
+  "icloud.com": "https://www.icloud.com/mail",
+  "me.com": "https://www.icloud.com/mail",
+  "mac.com": "https://www.icloud.com/mail",
+};
+
+function getEmailProviderUrl(email: string | null): string | null {
+  if (!email) return null;
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return null;
+  return EMAIL_PROVIDER_URLS[domain] ?? null;
+}
+
 function maskEmail(email: string | null) {
   if (!email) return "你的邮箱";
   const [name, domain] = email.split("@");
@@ -23,6 +49,7 @@ export function VerifyClient() {
   const next = searchParams.get("next") ?? "/dashboard";
   const [checkingSession, setCheckingSession] = useState(true);
   const maskedEmail = useMemo(() => maskEmail(email), [email]);
+  const providerUrl = useMemo(() => getEmailProviderUrl(email), [email]);
 
   useEffect(() => {
     let mounted = true;
@@ -79,19 +106,41 @@ export function VerifyClient() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button
-                  asChild
-                  className="h-11 rounded-xl bg-white px-5 text-black hover:bg-white/90"
-                >
-                  <Link href={`/login?next=${encodeURIComponent(next)}`}>重新发送</Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white hover:bg-white/5 hover:text-white"
-                >
-                  <Link href="/">返回首页</Link>
-                </Button>
+                {providerUrl ? (
+                  <>
+                    <Button
+                      asChild
+                      className="h-11 rounded-xl bg-white px-5 text-black hover:bg-white/90"
+                    >
+                      <a href={providerUrl} target="_blank" rel="noopener noreferrer">
+                        前往邮箱
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white hover:bg-white/5 hover:text-white"
+                    >
+                      <Link href={`/login?next=${encodeURIComponent(next)}`}>重新发送</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      asChild
+                      className="h-11 rounded-xl bg-white px-5 text-black hover:bg-white/90"
+                    >
+                      <Link href={`/login?next=${encodeURIComponent(next)}`}>重新发送</Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-11 rounded-xl border-white/15 bg-transparent px-5 text-white hover:bg-white/5 hover:text-white"
+                    >
+                      <Link href="/">返回首页</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           )}

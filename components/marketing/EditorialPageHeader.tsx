@@ -1,4 +1,4 @@
-import type { EditorialContent } from "@/private-docs/llm-measurements/content/editorial/types";
+import type { EditorialContent } from "@/content/editorial/types";
 
 export function EditorialPageHeader({
   eyebrow,

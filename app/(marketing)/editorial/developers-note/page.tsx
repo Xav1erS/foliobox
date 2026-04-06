@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { developersNoteContent } from "@/private-docs/llm-measurements/content/editorial/developers-note";
+import { developersNoteContent } from "@/content/editorial/developers-note";
 import { EditorialArticle } from "@/components/marketing/EditorialArticle";
 import { EditorialCTA } from "@/components/marketing/EditorialCTA";
 import { EditorialPageHeader } from "@/components/marketing/EditorialPageHeader";

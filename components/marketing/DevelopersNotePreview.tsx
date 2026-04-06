@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { RectActionLink } from "@/components/marketing/RectActionLink";
 import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
-import type { EditorialContent } from "@/private-docs/llm-measurements/content/editorial/types";
+import type { EditorialContent } from "@/content/editorial/types";
 
 export function DevelopersNotePreview({
   content,
