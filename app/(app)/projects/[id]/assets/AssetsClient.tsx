@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ArrowUp, ArrowDown, ImageIcon, Loader2 } from "lucide-react";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
@@ -193,7 +192,11 @@ export function AssetsClient({ projectId, sourceType, initialAssets }: Props) {
       {/* Selection hint */}
       <div className="mb-4 flex items-center justify-between border border-neutral-300 bg-white/82 px-4 py-3">
         <p className="text-xs text-neutral-400">
-          已选 <span className="font-medium text-neutral-700">{selectedCount}</span> / {assets.length} 张
+          {sourceType === "IMAGES" ? (
+            <>共 <span className="font-medium text-neutral-700">{assets.length}</span> 张</>
+          ) : (
+            <>已选 <span className="font-medium text-neutral-700">{selectedCount}</span> / {assets.length} 张</>
+          )}
         </p>
         <div className="flex gap-2">
           <button
@@ -225,12 +228,11 @@ export function AssetsClient({ projectId, sourceType, initialAssets }: Props) {
           >
             {/* Image */}
             <div className="relative aspect-[4/3] bg-neutral-100">
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={asset.imageUrl}
                 alt={asset.title || `页面 ${index + 1}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="absolute inset-0 h-full w-full object-cover"
               />
 
               {/* Checkbox overlay */}

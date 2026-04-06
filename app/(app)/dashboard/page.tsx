@@ -298,34 +298,23 @@ export default async function DashboardPage({
           </div>
         ) : (
           <div className="space-y-6">
-            <SectionCard
-              title="继续上一次整理"
-              description="这是工作台首页的主任务区块。先回到最近一个项目的下一步，不需要重新找入口。"
-            >
+            <SectionCard title="继续上一次整理" className="border-neutral-400">
               {recentProject ? (
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-start gap-3">
-                      <div>
-                        <p className="text-xl font-semibold text-neutral-900">{recentProject.name}</p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          最近更新于 {formatProjectDate(recentProject.updatedAt)}
-                        </p>
-                      </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-2xl font-semibold tracking-tight text-neutral-900">{recentProject.name}</p>
                       <Badge variant={(PROJECT_STATUS_LABEL[recentProject.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT).variant}>
                         {(PROJECT_STATUS_LABEL[recentProject.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT).label}
                       </Badge>
                     </div>
-
-                    <div className="inline-flex border border-neutral-300 bg-neutral-100/85 px-4 py-3">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-neutral-400">下一步动作</p>
-                        <p className="mt-1 text-sm font-medium text-neutral-900">
-                          {getProjectContinuePath(recentProject).label}
-                        </p>
-                      </div>
-                    </div>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      {getProjectContinuePath(recentProject).label}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      最近更新于 {formatProjectDate(recentProject.updatedAt)}
+                    </p>
                   </div>
 
                   <Button asChild className="h-12 rounded-none px-6">
@@ -343,18 +332,18 @@ export default async function DashboardPage({
                 {latestScore ? (
                   <div className="space-y-4">
                     <div className="flex items-end gap-3">
-                      <span className="text-5xl font-semibold tracking-tight text-neutral-900">
+                      <span className="text-4xl font-semibold tracking-tight text-neutral-900">
                         {latestScoreDisplayTotal}
                       </span>
                       <span className="pb-1 text-sm text-neutral-400">/100</span>
                     </div>
-                    <div className="border border-neutral-300 bg-neutral-100/85 px-4 py-3">
+                    <div>
                       <p className="text-sm font-medium text-neutral-900">
                         {latestScoreLevel
                           ? PORTFOLIO_SCORE_LEVEL_CONFIG[latestScoreLevel].label
                           : "评分已生成"}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-500">生成于 {formatProjectDate(latestScore.createdAt)}</p>
+                      <p className="mt-1 text-xs text-neutral-400">生成于 {formatProjectDate(latestScore.createdAt)}</p>
                     </div>
                     <Button asChild variant="outline" className="h-11 rounded-none px-5">
                       <Link href={`/score/${latestScore.id}`}>

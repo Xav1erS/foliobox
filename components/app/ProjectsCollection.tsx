@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
-import { ArrowRight, FileText, Loader2, Trash2 } from "lucide-react";
+import { ArrowRight, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PROJECT_STATUS_LABEL, PROJECT_STAGE_LABEL } from "@/lib/project-workflow";
@@ -16,6 +16,7 @@ type ProjectCard = {
   stage?: string;
   nextStep: { href: string; label: string };
   stageSummary: string;
+  coverImageUrl: string | null;
 };
 
 export function ProjectsCollection({
@@ -61,13 +62,26 @@ export function ProjectsCollection({
             key={project.id}
             className="border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:border-neutral-400 hover:bg-white"
           >
-            <div className="flex h-32 items-center justify-center border border-neutral-300 bg-neutral-100/85">
-              <FileText className="h-8 w-8 text-neutral-300" />
+            <div className="relative h-36 overflow-hidden border border-neutral-200 bg-neutral-100">
+              {project.coverImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={project.coverImageUrl}
+                  alt={`${project.name} 封面`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <span className="text-4xl font-semibold text-neutral-200">
+                    {project.name.charAt(0)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-neutral-900">{project.name}</p>
+                <p className="truncate text-[15px] font-medium text-neutral-900">{project.name}</p>
                 <p className="mt-1 text-xs text-neutral-400">{project.updatedAt}</p>
               </div>
               <Badge variant={status.variant} className="shrink-0 rounded-none text-xs">

@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
@@ -61,11 +60,11 @@ export default async function BoundaryPage({
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {displayAssets.slice(0, 9).map((asset) => (
                   <div key={asset.id} className="relative aspect-[4/3] border border-neutral-200 bg-neutral-100">
-                    <Image
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={buildPrivateBlobProxyUrl(asset.imageUrl)}
                       alt={asset.title ?? "素材"}
-                      fill
-                      className="object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                     {asset.isCover && (
                       <span className="absolute left-2 top-2 bg-neutral-900 px-1.5 py-0.5 text-[10px] text-white">

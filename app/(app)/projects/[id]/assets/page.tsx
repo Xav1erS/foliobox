@@ -26,9 +26,13 @@ export default async function AssetsPage({
       {/* Header */}
       <div className="mb-8">
         <p className="mb-1 text-xs text-neutral-400">{project.name}</p>
-        <h1 className="text-xl font-semibold text-neutral-900">选择展示页</h1>
+        <h1 className="text-xl font-semibold text-neutral-900">
+          {project.sourceType === "IMAGES" ? "确认并排序" : "选择展示页"}
+        </h1>
         <p className="mt-1 text-sm text-neutral-500">
-          勾选要展示的设计稿页面，调整顺序，设置封面。
+          {project.sourceType === "IMAGES"
+            ? "调整顺序，设置展示封面。如需去掉某张，取消勾选即可。"
+            : "勾选要展示的设计稿页面，调整顺序，设置封面。"}
         </p>
       </div>
 

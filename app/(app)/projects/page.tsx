@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, FileText, PlusCircle } from "lucide-react";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import {
   formatProjectDate,
   getProjectContinuePath,
@@ -30,6 +31,11 @@ export default async function ProjectsPage() {
         orderBy: { updatedAt: "desc" },
         select: { id: true, updatedAt: true, status: true },
         take: 1,
+      },
+      assets: {
+        where: { isCover: true, selected: true },
+        take: 1,
+        select: { imageUrl: true },
       },
     },
   });
@@ -96,6 +102,9 @@ export default async function ProjectsPage() {
                 stage: project.stage,
                 nextStep: getProjectContinuePath(project),
                 stageSummary: getProjectStageSummary(project),
+                coverImageUrl: project.assets[0]
+                  ? buildPrivateBlobProxyUrl(project.assets[0].imageUrl)
+                  : null,
               }))}
             />
           </div>
