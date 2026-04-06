@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   FolderOpen,
+  BookOpen,
   User,
   Star,
   PlusCircle,
@@ -15,7 +16,8 @@ import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV_ITEMS = [
   { href: "/dashboard", label: "工作台首页", icon: LayoutDashboard },
-  { href: "/projects", label: "我的项目", icon: FolderOpen },
+  { href: "/projects", label: "项目", icon: FolderOpen },
+  { href: "/portfolios", label: "作品集", icon: BookOpen },
   { href: "/profile", label: "设计师档案", icon: User },
 ];
 
@@ -46,14 +48,23 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
         集盒FolioBox
       </Link>
 
-      {/* New project CTA */}
-      <Link
-        href="/projects/new"
-        className="relative z-10 mb-4 flex items-center gap-2 border border-neutral-900 bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
-      >
-        <PlusCircle className="h-4 w-4" />
-        新建项目
-      </Link>
+      {/* Quick create */}
+      <div className="relative z-10 mb-4 flex gap-1.5">
+        <Link
+          href="/projects/new"
+          className="flex flex-1 items-center justify-center gap-1.5 border border-neutral-900 bg-neutral-900 px-2.5 py-2 text-xs font-medium text-white transition-colors hover:bg-neutral-800"
+        >
+          <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+          新建项目
+        </Link>
+        <Link
+          href="/portfolios/new"
+          className="flex flex-1 items-center justify-center gap-1.5 border border-neutral-300 px-2.5 py-2 text-xs font-medium text-neutral-700 transition-colors hover:bg-white hover:text-neutral-900"
+        >
+          <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+          新建作品集
+        </Link>
+      </div>
 
       {/* Nav */}
       <nav className="relative z-10 flex flex-1 flex-col">

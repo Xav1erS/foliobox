@@ -102,12 +102,14 @@ export function Navbar({
 
         {/* CTAs */}
         <div className="flex items-center gap-3">
-          <Link
-            href={secondaryCta.href}
-            className="hidden px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
-          >
-            {secondaryCta.label}
-          </Link>
+          {!isLoggedIn && (
+            <Link
+              href={secondaryCta.href}
+              className="hidden px-3 py-1.5 text-sm text-white/60 transition-colors hover:text-white lg:block"
+            >
+              {secondaryCta.label}
+            </Link>
+          )}
           <Link
             href={primaryCta.href}
             className="flex h-12 min-w-[124px] items-center justify-center bg-white px-5 text-base font-semibold text-black transition-colors hover:bg-white/90 sm:h-auto sm:min-w-0 sm:px-4 sm:py-1.5 sm:text-sm"
@@ -160,14 +162,16 @@ export function Navbar({
                       {primaryCta.label}
                     </Link>
                   </DialogClose>
-                  <DialogClose asChild>
-                    <Link
-                      href={secondaryCta.href}
-                      className="flex h-11 items-center justify-center border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
-                    >
-                      {secondaryCta.label}
-                    </Link>
-                  </DialogClose>
+                  {!isLoggedIn && (
+                    <DialogClose asChild>
+                      <Link
+                        href={secondaryCta.href}
+                        className="flex h-11 items-center justify-center border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+                      >
+                        {secondaryCta.label}
+                      </Link>
+                    </DialogClose>
+                  )}
                 </div>
               </div>
             </DialogContent>

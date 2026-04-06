@@ -88,19 +88,21 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </p>
 
         {/* CTAs */}
-        <div className="mt-10 flex w-full max-w-[360px] flex-col items-center gap-5 sm:mt-10 sm:max-w-none sm:flex-row sm:gap-4">
+        <div className="mt-10 flex w-full max-w-[360px] flex-col items-center gap-5 sm:mt-10 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
           <Link
             href={primaryAction.href}
             className="flex h-14 w-full touch-manipulation items-center justify-center bg-white px-8 text-base font-semibold text-black transition-colors hover:bg-white/90 active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
           >
             {primaryAction.label}
           </Link>
-          <Link
-            href={secondaryAction.href}
-            className="flex h-14 w-full touch-manipulation items-center justify-center border border-white/15 px-8 text-base font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
-          >
-            {secondaryAction.label}
-          </Link>
+          {!isLoggedIn && (
+            <Link
+              href={secondaryAction.href}
+              className="flex h-14 w-full touch-manipulation items-center justify-center border border-white/15 px-8 text-base font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
+            >
+              {secondaryAction.label}
+            </Link>
+          )}
         </div>
 
         {/* Trust line */}
