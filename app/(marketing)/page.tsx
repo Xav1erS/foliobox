@@ -10,7 +10,7 @@ import { FAQ } from "@/components/marketing/FAQ";
 import { CtaBanner } from "@/components/marketing/CtaBanner";
 import { Footer } from "@/components/marketing/Footer";
 import { auth } from "@/lib/auth";
-import { developersNoteContent } from "@/content/editorial/developers-note";
+import { developersNoteContent } from "@/private-docs/llm-measurements/content/editorial/developers-note";
 
 export default async function LandingPage() {
   const session = await auth();

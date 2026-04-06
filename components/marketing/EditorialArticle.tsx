@@ -1,4 +1,4 @@
-import type { EditorialQuote, EditorialSection } from "@/content/editorial/types";
+import type { EditorialQuote, EditorialSection } from "@/private-docs/llm-measurements/content/editorial/types";
 import { EditorialQuoteCard } from "./EditorialQuoteCard";
 
 export function EditorialArticle({

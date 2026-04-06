@@ -1,6 +1,6 @@
 import { RectActionLink } from "@/components/marketing/RectActionLink";
 import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
-import type { EditorialCTA as EditorialCTAModel } from "@/content/editorial/types";
+import type { EditorialCTA as EditorialCTAModel } from "@/private-docs/llm-measurements/content/editorial/types";
 
 export function EditorialCTA({ cta }: { cta: EditorialCTAModel }) {
   return (

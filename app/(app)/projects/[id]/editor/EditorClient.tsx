@@ -49,7 +49,7 @@ function EditableText({
       contentEditable
       suppressContentEditableWarning
       onBlur={(e) => onChange(e.currentTarget.textContent ?? "")}
-      className={`outline-none focus:ring-2 focus:ring-neutral-300 focus:ring-offset-1 rounded px-1 -mx-1 empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-300 ${className ?? ""}`}
+      className={`-mx-1 px-1 outline-none focus:ring-2 focus:ring-neutral-300 focus:ring-offset-1 empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-300 ${className ?? ""}`}
       data-placeholder={placeholder}
       dangerouslySetInnerHTML={{ __html: value }}
     />
@@ -58,7 +58,7 @@ function EditableText({
 
 function HeroBlock({ data, onChange }: { data: Record<string, unknown>; onChange: (d: Record<string, unknown>) => void }) {
   return (
-    <div className="space-y-2 rounded-xl bg-neutral-900 px-8 py-10 text-white">
+    <div className="space-y-2 border border-neutral-900 bg-neutral-900 px-8 py-10 text-white">
       <EditableText
         as="h1"
         value={String(data.title ?? "")}
@@ -105,7 +105,7 @@ function BulletListBlock({ data, onChange }: { data: Record<string, unknown>; on
     <ul className="space-y-1.5">
       {items.map((item, i) => (
         <li key={i} className="flex gap-2">
-          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400" />
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 bg-neutral-400" />
           <EditableText
             value={item}
             onChange={(v) => {
@@ -157,9 +157,9 @@ function StatGroupBlock({ data, onChange }: { data: Record<string, unknown>; onC
 
 function ImageSingleBlock({ data, assetMap }: { data: Record<string, unknown>; assetMap: Record<string, Asset> }) {
   const asset = assetMap[String(data.assetId ?? "")];
-  if (!asset) return <div className="h-48 rounded-xl bg-neutral-100 flex items-center justify-center text-xs text-neutral-400">图片未找到</div>;
+  if (!asset) return <div className="flex h-48 items-center justify-center border border-neutral-300 bg-neutral-100 text-xs text-neutral-400">图片未找到</div>;
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative overflow-hidden border border-neutral-300">
       <Image src={asset.imageUrl} alt={String(data.alt ?? asset.title)} width={800} height={500} className="w-full object-cover" />
     </div>
   );
@@ -172,9 +172,9 @@ function ImageGridBlock({ data, assetMap }: { data: Record<string, unknown>; ass
     <div className={`grid gap-2 ${cols}`}>
       {ids.map((assetId) => {
         const asset = assetMap[assetId];
-        if (!asset) return <div key={assetId} className="h-32 rounded-xl bg-neutral-100" />;
+        if (!asset) return <div key={assetId} className="h-32 border border-neutral-300 bg-neutral-100" />;
         return (
-          <div key={assetId} className="relative overflow-hidden rounded-xl">
+          <div key={assetId} className="relative overflow-hidden border border-neutral-300">
             <Image src={asset.imageUrl} alt={asset.title} width={400} height={250} className="w-full object-cover" />
           </div>
         );
@@ -253,10 +253,10 @@ function PublishModal({ slug, onClose }: { slug: string; onClose: () => void }) 
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl">
+      <div className="w-full max-w-sm border border-neutral-300 bg-white p-6 shadow-xl">
         <h2 className="mb-1 text-base font-semibold text-neutral-900">作品集已发布</h2>
         <p className="mb-4 text-xs text-neutral-500">分享以下链接给招聘方，无需登录即可查看。</p>
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+        <div className="mb-4 flex items-center gap-2 border border-neutral-300 bg-neutral-50 px-3 py-2.5">
           <span className="flex-1 truncate text-xs text-neutral-700">{url}</span>
           <button
             onClick={copy}
@@ -265,7 +265,7 @@ function PublishModal({ slug, onClose }: { slug: string; onClose: () => void }) 
             {copied ? <Check className="h-4 w-4 text-emerald-500" /> : "复制"}
           </button>
         </div>
-        <Button onClick={onClose} variant="outline" className="w-full h-9">关闭</Button>
+        <Button onClick={onClose} variant="outline" className="h-9 w-full rounded-none border-neutral-300 bg-white hover:bg-neutral-100">关闭</Button>
       </div>
     </div>
   );
@@ -352,9 +352,9 @@ export function EditorClient({ draftId, projectId, projectName, initialContentJs
   const currentPage = pages[activePage];
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-50">
+    <div className="flex h-screen flex-col bg-neutral-100">
       {/* Top bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-300 bg-white/92 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-neutral-900">{projectName}</span>
           <span className="text-neutral-300">·</span>
@@ -366,15 +366,15 @@ export function EditorClient({ draftId, projectId, projectName, initialContentJs
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-3 text-xs">
+          <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 rounded-none border-neutral-300 bg-white px-3 text-xs hover:bg-neutral-100">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             <span className="ml-1.5">{saving ? "保存中…" : "保存"}</span>
           </Button>
-          <Button variant="outline" onClick={handlePublish} disabled={publishing} className="h-8 px-3 text-xs">
+          <Button variant="outline" onClick={handlePublish} disabled={publishing} className="h-8 rounded-none border-neutral-300 bg-white px-3 text-xs hover:bg-neutral-100">
             {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
             <span className="ml-1.5">{publishing ? "发布中…" : "发布在线链接"}</span>
           </Button>
-          <Button variant="outline" onClick={handlePrint} className="h-8 px-3 text-xs">
+          <Button variant="outline" onClick={handlePrint} className="h-8 rounded-none border-neutral-300 bg-white px-3 text-xs hover:bg-neutral-100">
             <Printer className="h-3.5 w-3.5" />
             <span className="ml-1.5">导出 PDF</span>
           </Button>
@@ -383,7 +383,7 @@ export function EditorClient({ draftId, projectId, projectName, initialContentJs
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left nav */}
-        <aside className="w-52 shrink-0 overflow-y-auto border-r border-neutral-200 bg-white">
+        <aside className="w-52 shrink-0 overflow-y-auto border-r border-neutral-300 bg-white/92 backdrop-blur-sm">
           <div className="p-3">
             <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">页面</p>
             <div className="space-y-0.5">
@@ -391,10 +391,10 @@ export function EditorClient({ draftId, projectId, projectName, initialContentJs
                 <button
                   key={page.id}
                   onClick={() => setActivePage(i)}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                  className={`w-full border px-3 py-2 text-left text-xs transition-colors ${
                     activePage === i
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:bg-neutral-100"
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-transparent bg-transparent text-neutral-600 hover:border-neutral-300 hover:bg-white"
                   }`}
                 >
                   <span className="mr-2 font-mono text-[10px] opacity-50">{String(i + 1).padStart(2, "0")}</span>
@@ -412,7 +412,7 @@ export function EditorClient({ draftId, projectId, projectName, initialContentJs
               <p className="mb-4 text-xs font-medium text-neutral-400">{currentPage.title}</p>
               <div className="space-y-4">
                 {currentPage.blocks.map((block, bi) => (
-                  <div key={block.id} className="rounded-xl border border-neutral-200 bg-white p-5">
+                  <div key={block.id} className="border border-neutral-300 bg-white/9 p-5 backdrop-blur-sm">
                     <BlockRenderer
                       block={block}
                       assetMap={assetMap}

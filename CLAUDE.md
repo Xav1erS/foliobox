@@ -4,39 +4,39 @@
 
 ---
 
-## 产品规范入口（v2）
+## 产品规范入口（v3）
 
-从现在开始，产品规范以 `private-docs/CURRENT_SPEC.md` 为稳定入口，并以 `private-docs/spec-system-v2/` 下文档为唯一有效依据。
+从现在开始，产品规范以 `private-docs/CURRENT_SPEC.md` 为稳定入口，并以 `private-docs/spec-system-v3/` 下文档为唯一有效依据。
 
 文档权威顺序：
 - 稳定入口：`private-docs/CURRENT_SPEC.md`
-- 总入口与读取顺序：`private-docs/spec-system-v2/00_README_Document_Map_v2.md`
-- 产品范围与页面地图：`private-docs/spec-system-v2/01_FolioBox_MVP_Spec_Core_v2.md`
-- 当前版本页面归属、文案、CTA、壳层与行为冻结：`private-docs/spec-system-v2/02_Current_Freeze_v2.md`
-- 评分策略：`private-docs/spec-system-v2/03_Scoring_Strategy_v2.md`
-- 生成、配额、重试与成本控制：`private-docs/spec-system-v2/04_Generation_and_Cost_Control_v2.md`
-- 支付、套餐、权限与回跳：`private-docs/spec-system-v2/05_Billing_and_Entitlement_v2.md`
-- 工作台 IA、项目管理与状态流：`private-docs/spec-system-v2/06_Workspace_IA_v2.md`
-- 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v2/07_Quality_Engineering_v1.md`
-- 整站体验基线、文案语气、CTA 与视觉达标线：`private-docs/spec-system-v2/08_Experience_Baseline_v1.md`
-- 文档维护规则与冲突处理：`private-docs/spec-system-v2/99_Document_Maintenance_Rules.md`
+- 总入口与读取顺序：`private-docs/spec-system-v3/00_README_Document_Map_v3.md`
+- 产品范围与页面地图：`private-docs/spec-system-v3/01_FolioBox_Spec_Core_v3.md`
+- 当前版本页面归属、文案、CTA、壳层与行为冻结：`private-docs/spec-system-v3/02_Current_Freeze_v3.md`
+- 评分策略：`private-docs/spec-system-v3/03_Scoring_Strategy_v3.md`
+- 生成、配额、重试与成本控制：`private-docs/spec-system-v3/04_Generation_and_Cost_Control_v3.md`
+- 支付、套餐、权限与回跳：`private-docs/spec-system-v3/05_Billing_and_Entitlement_v3.md`
+- 工作台 IA、项目管理与状态流：`private-docs/spec-system-v3/06_Workspace_IA_v3.md`
+- 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v3/07_Quality_Engineering_v3.md`
+- 整站体验基线、文案语气、CTA 与视觉达标线：`private-docs/spec-system-v3/08_Experience_Baseline_v3.md`
+- 文档维护规则与冲突处理：`private-docs/spec-system-v3/99_Document_Maintenance_Rules_v3.md`
 
 使用规则：
-- 主 spec `01_FolioBox_MVP_Spec_Core_v2.md` 只用于确认产品范围、主闭环与页面地图
-- Freeze `02_Current_Freeze_v2.md` 用于当前版本页面归属、文案、CTA、壳层与行为冻结
+- 主 spec `01_FolioBox_Spec_Core_v3.md` 只用于确认产品范围、主闭环与页面地图
+- Freeze `02_Current_Freeze_v3.md` 用于当前版本页面归属、文案、CTA、壳层与行为冻结
 - 专题规则分别以对应专题文档为准，不回到主 spec 重复判断
-- 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v1.md` 为准
-- 跨页面共享的体验基线、文案语气、CTA 规则与桌面端 / 移动端达标线统一以 `08_Experience_Baseline_v1.md` 为准
-- 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules.md` 为准
+- 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v3.md` 为准
+- 跨页面共享的体验基线、文案语气、CTA 规则与桌面端 / 移动端达标线统一以 `08_Experience_Baseline_v3.md` 为准
+- 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules_v3.md` 为准
 - `private-docs/archive-legacy/` 下的旧文档仅作历史参考，不作为当前实现依据
-- 如果旧文档、旧备注或本文其他段落与 v2 文档冲突，一律以 `private-docs/spec-system-v2/` 下文档为准
-- 用户可见页面的体验判断，如无更具体规则，优先查 `08_Experience_Baseline_v1.md`，不要仅凭个人审美临场判断
+- 如果旧文档、旧备注或本文其他段落与 v3 文档冲突，一律以 `private-docs/spec-system-v3/` 下文档为准
+- 用户可见页面的体验判断，如无更具体规则，优先查 `08_Experience_Baseline_v3.md`，不要仅凭个人审美临场判断
 
 执行要求：
 - 开始任何产品相关代码修改前，先阅读 `private-docs/CURRENT_SPEC.md`
-- 再阅读 `00_README_Document_Map_v2.md`
+- 再阅读 `00_README_Document_Map_v3.md`
 - 再按任务命中范围读取 `01` 到 `07` 和 `99` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付、工作台 IA、质量工程或文档维护规则，必须读取对应文档
-- 若任务涉及用户可见页面的视觉、文案、CTA、桌面端 / 移动端体验判断，必须额外读取 `08_Experience_Baseline_v1.md`
+- 若任务涉及用户可见页面的视觉、文案、CTA、桌面端 / 移动端体验判断，必须额外读取 `08_Experience_Baseline_v3.md`
 - 在开始修改代码前，先输出本次任务命中的文档清单
 - 在开始修改代码前，先明确说明：
   - 本次任务涉及哪几份文档
@@ -48,7 +48,7 @@
 
 后续所有具体改动，默认按以下边界执行：
 
-- **必须进文档的改动**：必须先同步到 v2 文档，且在用户确认后，才能继续改代码
+- **必须进文档的改动**：必须先同步到 v3 文档，且在用户确认后，才能继续改代码
   - 会改变产品规则、权限边界、默认行为、主流程、信息架构、评分口径、成本/模型策略、支付与权益规则的修改
   - 会影响系统边界或多人协作判断的修改
   - 例如：
@@ -57,7 +57,7 @@
     - 结果页 CTA 规则
     - PDF 主链路选型
 
-- **不必进文档、但要在实现里处理的改动**：可以直接改代码，不要求先改 v2 文档
+- **不必进文档、但要在实现里处理的改动**：可以直接改代码，不要求先改 v3 文档
   - 比较明显的产品 / 交互问题
   - 不会改变规则，只会修正当前实现偏差
   - 例如：
@@ -73,17 +73,17 @@
 
 执行规则：
 - 如果判断本次修改属于“必须进文档的改动”，先暂停代码实现
-- 先指出应同步的 v2 文档位置
+- 先指出应同步的 v3 文档位置
 - 在用户确认文档更新方案后，再执行代码修改
-- 未获得用户确认，不要擅自修改 v2 文档对应规则并同时改代码
-- 不要把明显浅显的实现判断不断上升为 v2 文档内容
+- 未获得用户确认，不要擅自修改 v3 文档对应规则并同时改代码
+- 不要把明显浅显的实现判断不断上升为 v3 文档内容
 - 只有会反复被争议、会影响多人协作判断、或会影响系统边界的东西，才进文档
 - 明显浅显的实现判断，不进文档，直接修
 
 记忆规则：
 - 本约定写入 `CLAUDE.md` 后，作为后续会话的仓库内长期规则
-- 但 agent 不应假设自己一定“自动记住”；每次开始涉及产品实现的任务时，仍应先读取本文件与 `private-docs/CURRENT_SPEC.md`
-- 如果上下文很长、对规则边界不确定，优先回读 `CLAUDE.md` 与 `99_Document_Maintenance_Rules.md`，而不是凭印象继续实现
+- 但 agent 不应假设自己一定”自动记住”；每次开始涉及产品实现的任务时，仍应先读取本文件与 `private-docs/CURRENT_SPEC.md`
+- 如果上下文很长、对规则边界不确定，优先回读 `CLAUDE.md` 与 `99_Document_Maintenance_Rules_v3.md`，而不是凭印象继续实现
 
 ---
 
@@ -123,6 +123,7 @@ npm run db:generate  # 重新生成 Prisma Client（schema 改完后运行）
 - 面向用户可见的 UI 页面，视觉质量与功能完成度同等重要，不将“功能已通但界面粗糙”视为可交付状态
 - 当前产品面向 UI / UX 设计师用户，agent 在处理 Landing、评分入口、评分结果、价格页、Dashboard、项目工作流、案例展示等关键页面时，应同时关注视觉专业感、排版层级、留白、节奏、组件一致性与 CTA 权重，而不是只修功能逻辑
 - 面向用户的文案默认采用“设计师对设计师”的语气：有人情味、真诚、克制、不夸大承诺，不使用居高临下的专家腔或过度营销话术；应更接近“我知道这件事很难，我们先一起把第一版做出来”
+- 当前对外品牌主语默认优先使用第一人称单数“我”，而不是“我们”；尤其适用于开发者说、长期方向、创作者立场说明和带品牌判断的公开文案
 
 ### 工具使用偏好
 
@@ -184,7 +185,7 @@ lib/
   utils.ts            # cn() 等工具
   llm/
     provider.ts       # LLMProvider 接口
-    openai.ts         # OpenAI 实现（具体模型与 task routing 以 04_Generation_and_Cost_Control_v2.md 和环境变量为准）
+    openai.ts         # OpenAI 实现（具体模型与 task routing 以 04_Generation_and_Cost_Control_v3.md 和环境变量为准）
     index.ts          # 导出 llm 实例
   payment/
     index.ts          # PaymentProvider 接口 + getProvider() 工厂
@@ -339,6 +340,52 @@ Landing Page 案例卡片可点击，但 `app/(marketing)/cases/[slug]/page.tsx`
   - 官网深色，工作台浅色
   - 共享字体、转角策略、描边、主按钮、辅助插图与 icon 风格
   - 不要为 Marketing / Focus / App 再各造一套 UI 语言
+
+### 当前设计语言基线（交接重点）
+
+从现在开始，用户可见页面的实现默认延续以下设计语言；如果没有明确理由，不要退回旧的圆角 SaaS 风格：
+
+- 公开页主壳采用黑色品牌底，工作台采用浅色效率壳，但两者共享同一套几何语言
+- 默认优先使用直角体系，不使用大圆角、胶囊感、软卡片感
+- 页面骨架优先依赖：分割线、网格、边框、编号、小节点，而不是靠大片圆角卡片组织信息
+- 点阵已作为辅助视觉元素进入正式语言，但只能作为辅助层，不应盖过标题、正文和主要交互
+- 插图优先使用黑白灰、有语义的等距线稿 / 结构图；主题应围绕结构、整理、模块、表达，不要用无语义炫技图形
+- icon 需要和页面语言保持一致；如主体壳层已进入直角体系，图标和局部装饰应去圆角化，避免同时出现两套几何性格
+- 中文大标题默认优先手动控行，不允许出现单字悬挂、断句僵硬或浏览器随意拆分造成的视觉事故
+- 高密度正文区、表单区、数据列表区、关键 CTA 周围，谨慎使用重网格和重角标，避免噪声压过内容
+
+### 当前壳层迁移进度（交接重点）
+
+截至当前版本，设计语言迁移状态如下：
+
+- `MarketingShell`
+  - 已完成第一轮统一
+  - 首页、`/pricing`、`/score`、`/editorial/developers-note`、`/vision` 已基本进入同一套黑底直角品牌语言
+- `AppShell`
+  - 已完成第一轮统一
+  - `dashboard`
+  - `projects`
+  - `projects/new`
+  - `projects/[id]/assets`
+  - `projects/[id]/facts`
+  - `projects/[id]/outline`
+  - `projects/[id]/editor`
+  - 上述页面已从旧圆角白卡片系统迁移到浅色直角工作台变体
+- `FocusShell`
+  - 仍有残留旧风格，需要后续继续收口
+  - 重点页：`/login`、`/login/verify`、`/score/[id]`、`/payment/result`
+- `PublicViewerShell`
+  - 暂未正式按新语言做一轮统一，后续需要单独判断它应该更偏“作品集成品展示”还是更偏“品牌系统延续”
+
+### 当前工作方式约定（交接重点）
+
+如果后续继续做 UI / 壳层延展，默认按这个顺序推进：
+
+- 先延展共享语言，不要先做局部装饰
+- 先统一高曝光壳层、主按钮、卡片、标题、导航、空状态、操作条
+- 再处理插图、点阵、局部图标与细节修饰
+- 优先保证 `MarketingShell` 与 `AppShell` 是“同品牌的两种变体”，而不是两套不相关的产品
+- 若需要复用组件，优先复用“视觉语法”而不是整页模板；可以复用 section/frame/eyebrow/CTA/list 这类中层模块，但不要让每页长成同一个结构
 
 ---
 

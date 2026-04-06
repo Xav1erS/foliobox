@@ -4,7 +4,7 @@ export function ResumeContextBanner({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+    <div className="border border-neutral-300 bg-white/82 px-4 py-3 backdrop-blur-sm">
       <p className="text-sm leading-6 text-neutral-600">{children}</p>
     </div>
   );

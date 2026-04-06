@@ -127,26 +127,26 @@ export function OutlineClient({
   return (
     <div className="space-y-5">
       {/* Sections */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <div className="mb-5">
+      <section className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
+        <div className="border-b border-neutral-300 px-6 py-5">
           <h2 className="text-sm font-semibold text-neutral-700">① 板块结构</h2>
           <p className="mt-0.5 text-xs text-neutral-400">
             可关闭不需要的板块；预计 {estimatedPages} 页（共 {totalEstimatedPages} 页）
           </p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 px-6 py-5">
           {sections.map((section) => (
             <div
               key={section.id}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-                section.enabled ? "border-neutral-200 bg-white" : "border-neutral-100 bg-neutral-50"
+              className={`flex items-center justify-between border px-4 py-3 transition-colors ${
+                section.enabled ? "border-neutral-300 bg-white" : "border-neutral-200 bg-neutral-100/8"
               }`}
             >
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
-                  className={`h-5 w-5 shrink-0 rounded border-2 transition-colors ${
+                  className={`h-5 w-5 shrink-0 border-2 transition-colors ${
                     section.enabled
                       ? "border-neutral-900 bg-neutral-900"
                       : "border-neutral-300 bg-white"
@@ -174,17 +174,17 @@ export function OutlineClient({
       </section>
 
       {/* Theme */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <div className="mb-5">
+      <section className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
+        <div className="border-b border-neutral-300 px-6 py-5">
           <h2 className="text-sm font-semibold text-neutral-700">② 风格方向</h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 px-6 py-5 sm:grid-cols-3">
           {THEMES.map((t) => (
             <button
               key={t.value}
               type="button"
               onClick={() => setTheme(t.value)}
-              className={`rounded-xl border p-4 text-left transition-all ${t.accent} ${theme === t.value ? t.accentActive : "opacity-70 hover:opacity-100"}`}
+              className={`border p-4 text-left transition-all ${t.accent} ${theme === t.value ? t.accentActive : "opacity-70 hover:opacity-100"}`}
             >
               <p className="text-sm font-semibold">{t.label}</p>
               <p className="mt-1 text-xs opacity-70">{t.desc}</p>
@@ -195,19 +195,19 @@ export function OutlineClient({
 
       {/* Cover image */}
       {assets.length > 0 && (
-        <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-          <div className="mb-5">
+        <section className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
+          <div className="border-b border-neutral-300 px-6 py-5">
             <h2 className="text-sm font-semibold text-neutral-700">③ 封面图</h2>
             <p className="mt-0.5 text-xs text-neutral-400">从已选设计稿中选择一张作为作品集封面</p>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-3 overflow-x-auto px-6 py-5 pb-4">
             {assets.map((asset) => (
               <button
                 key={asset.id}
                 type="button"
                 onClick={() => setCoverId(asset.id)}
-                className={`relative shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
-                  coverId === asset.id ? "border-neutral-900" : "border-neutral-200 hover:border-neutral-400"
+                className={`relative shrink-0 overflow-hidden border-2 transition-all ${
+                  coverId === asset.id ? "border-neutral-900" : "border-neutral-300 hover:border-neutral-500"
                 }`}
                 style={{ width: 120, height: 80 }}
               >
@@ -220,7 +220,7 @@ export function OutlineClient({
                 />
                 {coverId === asset.id && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <div className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-900">封面</div>
+                    <div className="border border-white bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-900">封面</div>
                   </div>
                 )}
               </button>
@@ -236,7 +236,11 @@ export function OutlineClient({
         <p className="text-xs text-neutral-400">
           确认后 AI 将生成约 {estimatedPages} 页的作品集初稿，预计 15–20 秒
         </p>
-        <Button onClick={handleConfirmAndRender} disabled={rendering} className="h-10 px-6">
+        <Button
+          onClick={handleConfirmAndRender}
+          disabled={rendering}
+          className="h-10 rounded-none border border-neutral-900 bg-neutral-900 px-6 text-white hover:bg-neutral-800"
+        >
           {rendering ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />AI 生成中，请稍候…</>
           ) : (

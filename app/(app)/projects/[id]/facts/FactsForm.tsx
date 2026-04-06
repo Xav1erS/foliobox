@@ -42,12 +42,12 @@ const INVOLVEMENT_LEVELS = [
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-      <div className="mb-5">
+    <section className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
+      <div className="border-b border-neutral-300 px-6 py-5">
         <h2 className="text-sm font-semibold text-neutral-700">{title}</h2>
         {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-4 px-6 py-5">{children}</div>
     </section>
   );
 }
@@ -92,6 +92,12 @@ export function FactsForm({
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const fieldClassName =
+    "rounded-none border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-0 focus-visible:ring-offset-0";
+  const selectTriggerClassName =
+    "rounded-none border-neutral-300 bg-neutral-50 text-neutral-900 data-[placeholder]:text-neutral-400 focus:ring-0 focus:ring-offset-0";
+  const selectContentClassName = "rounded-none border-neutral-300 bg-white";
+  const selectItemClassName = "rounded-none focus:bg-neutral-100 focus:text-neutral-900";
 
   function set<K extends keyof FactsData>(key: K, value: FactsData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -159,12 +165,12 @@ export function FactsForm({
               value={form.projectType ?? ""}
               onValueChange={(v) => set("projectType", v)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={selectTriggerClassName}>
                 <SelectValue placeholder="选择类型" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={selectContentClassName}>
                 {PROJECT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                  <SelectItem key={t} value={t} className={selectItemClassName}>{t}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -175,6 +181,7 @@ export function FactsForm({
               value={form.industry ?? ""}
               onChange={(e) => set("industry", e.target.value)}
               placeholder="如：金融科技、医疗健康、企业 SaaS"
+              className={fieldClassName}
             />
           </Field>
 
@@ -183,6 +190,7 @@ export function FactsForm({
               value={form.timeline ?? ""}
               onChange={(e) => set("timeline", e.target.value)}
               placeholder="如：2023.06 – 2023.12（6 个月）"
+              className={fieldClassName}
             />
           </Field>
 
@@ -193,10 +201,10 @@ export function FactsForm({
                   key={label}
                   type="button"
                   onClick={() => set("hasLaunched", val)}
-                  className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  className={`border px-3 py-2 text-xs transition-colors ${
                     form.hasLaunched === val
                       ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
+                      : "border-neutral-300 bg-neutral-50 text-neutral-600 hover:bg-white hover:text-neutral-800"
                   }`}
                 >
                   {label}
@@ -217,7 +225,7 @@ export function FactsForm({
             value={form.background ?? ""}
             onChange={(e) => set("background", e.target.value)}
             placeholder="如：用户投诉账单页面信息混乱，流失率较高。产品决定对账单模块进行体验重构，优化用户对账单内容的理解与操作效率。"
-            className="min-h-[88px] resize-none"
+            className={`min-h-[88px] resize-none ${fieldClassName}`}
           />
         </Field>
 
@@ -226,6 +234,7 @@ export function FactsForm({
             value={form.targetUsers ?? ""}
             onChange={(e) => set("targetUsers", e.target.value)}
             placeholder="如：面向 30–45 岁的月光族用户，主要使用场景是每月还款前查账"
+            className={fieldClassName}
           />
         </Field>
 
@@ -234,6 +243,7 @@ export function FactsForm({
             value={form.businessGoal ?? ""}
             onChange={(e) => set("businessGoal", e.target.value)}
             placeholder="如：提升账单页 7 日留存率，减少客服咨询量"
+            className={fieldClassName}
           />
         </Field>
       </Section>
@@ -246,9 +256,10 @@ export function FactsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="职位头衔 *">
             <Input
-              value={form.roleTitle ?? ""}
-              onChange={(e) => set("roleTitle", e.target.value)}
-              placeholder="如：产品设计师、高级 UI 设计师"
+            value={form.roleTitle ?? ""}
+            onChange={(e) => set("roleTitle", e.target.value)}
+            placeholder="如：产品设计师、高级 UI 设计师"
+            className={fieldClassName}
             />
           </Field>
 
@@ -257,12 +268,12 @@ export function FactsForm({
               value={form.involvementLevel ?? ""}
               onValueChange={(v) => set("involvementLevel", v)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={selectTriggerClassName}>
                 <SelectValue placeholder="选择参与深度" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={selectContentClassName}>
                 {INVOLVEMENT_LEVELS.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value} className={selectItemClassName}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -274,7 +285,7 @@ export function FactsForm({
             value={form.keyContribution ?? ""}
             onChange={(e) => set("keyContribution", e.target.value)}
             placeholder="如：主导重构了账单信息架构，将原有 11 个层级的信息折叠为 3 个主视图，提升扫描效率。"
-            className="min-h-[80px] resize-none"
+            className={`min-h-[80px] resize-none ${fieldClassName}`}
           />
         </Field>
 
@@ -283,7 +294,7 @@ export function FactsForm({
             value={form.biggestChallenge ?? ""}
             onChange={(e) => set("biggestChallenge", e.target.value)}
             placeholder="如：需要在不改变底层数据结构的前提下优化展示层，且要兼容 iOS / Android 两端规范。"
-            className="min-h-[80px] resize-none"
+            className={`min-h-[80px] resize-none ${fieldClassName}`}
           />
         </Field>
       </Section>
@@ -295,7 +306,7 @@ export function FactsForm({
             value={form.resultSummary ?? ""}
             onChange={(e) => set("resultSummary", e.target.value)}
             placeholder="如：新版账单页上线后用户满意度评分从 3.2 提升至 4.1，客服投诉量下降约 18%。"
-            className="min-h-[80px] resize-none"
+            className={`min-h-[80px] resize-none ${fieldClassName}`}
           />
         </Field>
 
@@ -304,25 +315,28 @@ export function FactsForm({
             value={form.measurableImpact ?? ""}
             onChange={(e) => set("measurableImpact", e.target.value)}
             placeholder="如：留存率 +12%，首屏加载时间 -40%"
+            className={fieldClassName}
           />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="目标岗位方向">
             <Input
-              value={form.targetJob ?? ""}
-              onChange={(e) => set("targetJob", e.target.value)}
-              placeholder="如：大厂产品设计师、C 端增长设计"
-            />
-          </Field>
+            value={form.targetJob ?? ""}
+            onChange={(e) => set("targetJob", e.target.value)}
+            placeholder="如：大厂产品设计师、C 端增长设计"
+            className={fieldClassName}
+          />
+        </Field>
 
           <Field label="目标公司类型">
             <Input
-              value={form.targetCompanyType ?? ""}
-              onChange={(e) => set("targetCompanyType", e.target.value)}
-              placeholder="如：一线大厂、B 轮及以上创业公司"
-            />
-          </Field>
+            value={form.targetCompanyType ?? ""}
+            onChange={(e) => set("targetCompanyType", e.target.value)}
+            placeholder="如：一线大厂、B 轮及以上创业公司"
+            className={fieldClassName}
+          />
+        </Field>
         </div>
       </Section>
 
@@ -333,7 +347,7 @@ export function FactsForm({
             variant="outline"
             onClick={handleSaveDraft}
             disabled={saving}
-            className="h-10"
+            className="h-10 rounded-none border-neutral-300 bg-white px-4 hover:bg-neutral-100"
           >
             {saving ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />保存中</> : "保存草稿"}
           </Button>
@@ -346,7 +360,11 @@ export function FactsForm({
           {error && <span className="text-xs text-red-500">{error}</span>}
         </div>
 
-        <Button onClick={handleSubmit} disabled={submitting} className="h-10 px-6">
+        <Button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="h-10 rounded-none border border-neutral-900 bg-neutral-900 px-6 text-white hover:bg-neutral-800"
+        >
           {submitting ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />AI 生成中，请稍候…</>
           ) : (
