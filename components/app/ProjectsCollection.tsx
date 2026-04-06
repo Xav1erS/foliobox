@@ -6,13 +6,14 @@ import { startTransition, useState } from "react";
 import { ArrowRight, FileText, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PROJECT_STATUS_LABEL } from "@/lib/project-workflow";
+import { PROJECT_STATUS_LABEL, PROJECT_STAGE_LABEL } from "@/lib/project-workflow";
 
 type ProjectCard = {
   id: string;
   name: string;
   updatedAt: string;
   importStatus: string;
+  stage?: string;
   nextStep: { href: string; label: string };
   stageSummary: string;
 };
@@ -49,7 +50,10 @@ export function ProjectsCollection({
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {projects.map((project) => {
-        const status = PROJECT_STATUS_LABEL[project.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT;
+        const status =
+          project.stage && project.stage !== "DRAFT"
+            ? (PROJECT_STAGE_LABEL[project.stage] ?? PROJECT_STATUS_LABEL.DRAFT)
+            : (PROJECT_STATUS_LABEL[project.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT);
         const deleting = deletingId === project.id;
 
         return (

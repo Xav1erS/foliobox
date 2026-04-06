@@ -93,6 +93,7 @@ export default async function ProjectsPage() {
                 name: project.name,
                 updatedAt: formatProjectDate(project.updatedAt),
                 importStatus: project.importStatus,
+                stage: project.stage,
                 nextStep: getProjectContinuePath(project),
                 stageSummary: getProjectStageSummary(project),
               }))}
