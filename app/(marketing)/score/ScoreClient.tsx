@@ -8,13 +8,13 @@ import {
   ImageIcon,
   Loader2,
   X,
-  Plus,
   FileText,
   CheckCircle2,
   ArrowRight,
   Sparkles,
   CloudUpload,
 } from "lucide-react";
+import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 const MAX_SCORE_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB
@@ -36,25 +36,11 @@ export function ScoreClient() {
   const [processingStep, setProcessingStep] = useState(0);
   const [error, setError] = useState("");
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
-  const [isDraggingImages, setIsDraggingImages] = useState(false);
-  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
-  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
 
   const [url, setUrl] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    const previewUrls = imageFiles.map((file) => URL.createObjectURL(file));
-    setImagePreviewUrls(previewUrls);
-
-    return () => {
-      previewUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [imageFiles]);
 
   useEffect(() => {
     if (!loading) return;
@@ -111,40 +97,6 @@ export function ScoreClient() {
     setPdfSelection(file);
   }
 
-  function dedupeFiles(files: File[]) {
-    const seen = new Set<string>();
-    return files.filter((file) => {
-      const key = `${file.name}-${file.size}-${file.lastModified}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  function setImageSelection(files: File[]) {
-    if (files.length > MAX_IMAGES) {
-      setError(`最多上传 ${MAX_IMAGES} 张图片`);
-      return;
-    }
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_SCORE_UPLOAD_SIZE) {
-      setError("评分入口当前仅支持总大小 20MB 以内的截图，请压缩后重试");
-      return;
-    }
-    setError("");
-    setImageFiles(files);
-  }
-
-  function appendImageSelection(files: File[]) {
-    setImageSelection(dedupeFiles([...imageFiles, ...files]));
-  }
-
-  function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    appendImageSelection(files);
-    e.target.value = "";
-  }
-
   function handlePdfDragOver(e: React.DragEvent<HTMLLabelElement>) {
     e.preventDefault();
     e.stopPropagation();
@@ -179,95 +131,11 @@ export function ScoreClient() {
     setPdfSelection(file);
   }
 
-  function handleImagesDragOver(e: React.DragEvent<HTMLLabelElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingImages(true);
-  }
-
-  function handleImagesDragLeave(e: React.DragEvent<HTMLLabelElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingImages(false);
-  }
-
-  function handleImagesDrop(e: React.DragEvent<HTMLLabelElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingImages(false);
-
-    const files = Array.from(e.dataTransfer.files).filter((file) =>
-      file.type.startsWith("image/")
-    );
-    if (files.length === 0) {
-      setError("请拖入 JPG / PNG / WebP 图片");
-      return;
-    }
-
-    if (imageInputRef.current) {
-      const dataTransfer = new DataTransfer();
-      dedupeFiles([...imageFiles, ...files]).forEach((file) => dataTransfer.items.add(file));
-      imageInputRef.current.files = dataTransfer.files;
-    }
-
-    appendImageSelection(files);
-  }
-
   function removePdfSelection() {
     setPdfFile(null);
     if (pdfInputRef.current) {
       pdfInputRef.current.value = "";
     }
-  }
-
-  function removeImageSelection(indexToRemove: number) {
-    const nextFiles = imageFiles.filter((_, index) => index !== indexToRemove);
-    setImageSelection(nextFiles);
-    if (imageInputRef.current) {
-      const dataTransfer = new DataTransfer();
-      nextFiles.forEach((file) => dataTransfer.items.add(file));
-      imageInputRef.current.files = dataTransfer.files;
-    }
-  }
-
-  function syncImageInput(files: File[]) {
-    if (!imageInputRef.current) return;
-    const dataTransfer = new DataTransfer();
-    files.forEach((file) => dataTransfer.items.add(file));
-    imageInputRef.current.files = dataTransfer.files;
-  }
-
-  function moveImage(fromIndex: number, toIndex: number) {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
-    const nextFiles = [...imageFiles];
-    const [movedFile] = nextFiles.splice(fromIndex, 1);
-    nextFiles.splice(toIndex, 0, movedFile);
-    setImageSelection(nextFiles);
-    syncImageInput(nextFiles);
-  }
-
-  function handlePreviewDragStart(index: number) {
-    setDraggedImageIndex(index);
-    setDragOverImageIndex(index);
-  }
-
-  function handlePreviewDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
-    e.preventDefault();
-    if (dragOverImageIndex !== index) {
-      setDragOverImageIndex(index);
-    }
-  }
-
-  function handlePreviewDrop(index: number) {
-    if (draggedImageIndex === null) return;
-    moveImage(draggedImageIndex, index);
-    setDraggedImageIndex(null);
-    setDragOverImageIndex(null);
-  }
-
-  function clearPreviewDragState() {
-    setDraggedImageIndex(null);
-    setDragOverImageIndex(null);
   }
 
   async function handleSubmit() {
@@ -443,7 +311,6 @@ export function ScoreClient() {
       : loadingStage === "redirecting"
         ? "bg-emerald-300"
         : "bg-amber-300";
-  const totalImageSize = imageFiles.reduce((sum, file) => sum + file.size, 0);
 
   return (
     <>
@@ -571,98 +438,15 @@ export function ScoreClient() {
             {tab === "images" && (
               <div className="space-y-3">
                 <label className="block text-xs text-white/45">上传作品集截图</label>
-                <label
-                  onDragOver={handleImagesDragOver}
-                  onDragLeave={handleImagesDragLeave}
-                  onDrop={handleImagesDrop}
-                  className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed bg-white/[0.02] transition-colors ${
-                    isDraggingImages
-                      ? "border-white/45 bg-white/[0.08]"
-                      : "border-white/15 hover:border-white/25 hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <ImageIcon className="h-5 w-5 text-white/30" />
-                  <span className="text-sm text-white/50">
-                    {imageFiles.length > 0 ? `已选择 ${imageFiles.length} 张图片` : "点击或拖拽上传截图"}
-                  </span>
-                  <span className="text-xs text-white/25">
-                    支持 JPG / PNG，建议 3–10 张，最多 20 张，总大小 20MB 以内
-                  </span>
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImagesChange}
-                  />
-                </label>
-                {imagePreviewUrls.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-white/35">
-                        共 {imageFiles.length} 张，当前总大小 {formatBytes(totalImageSize)}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => imageInputRef.current?.click()}
-                        disabled={loading}
-                        className="inline-flex items-center gap-1 border border-white/10 px-3 py-1 text-xs text-white/60 transition-colors hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        继续添加
-                      </button>
-                    </div>
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      {imagePreviewUrls.map((previewUrl, index) => (
-                        <div
-                          key={`${previewUrl}-${index}`}
-                          draggable
-                          onDragStart={() => handlePreviewDragStart(index)}
-                          onDragOver={(e) => handlePreviewDragOver(e, index)}
-                          onDrop={() => handlePreviewDrop(index)}
-                          onDragEnd={clearPreviewDragState}
-                          className={`min-w-[180px] overflow-hidden border bg-white/[0.03] transition-all ${
-                            dragOverImageIndex === index
-                              ? "border-white/35 ring-1 ring-white/20"
-                              : "border-white/10"
-                          } ${draggedImageIndex === index ? "opacity-70" : ""}`}
-                        >
-                          <div className="aspect-[4/3] bg-white/[0.04]">
-                            <img
-                              src={previewUrl}
-                              alt={`作品集截图 ${index + 1}`}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <div className="border-t border-white/10 px-3 py-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-xs text-white/70">
-                                  第 {index + 1} 张 · {imageFiles[index]?.name}
-                                </p>
-                                <p className="mt-1 text-[11px] text-white/35">
-                                  {formatBytes(imageFiles[index]?.size ?? 0)}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeImageSelection(index)}
-                                disabled={loading}
-                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-white/10 text-white/45 transition-colors hover:border-white/20 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-white/30">
-                      可直接拖拽缩略图调整顺序，系统会按当前顺序理解整组截图。
-                    </p>
-                  </div>
-                ) : null}
+                <ImageUploadZone
+                  files={imageFiles}
+                  onFilesChange={setImageFiles}
+                  maxFiles={MAX_IMAGES}
+                  maxTotalBytes={MAX_SCORE_UPLOAD_SIZE}
+                  disabled={loading}
+                  theme="dark"
+                  onError={setError}
+                />
                 <p className="text-xs text-white/30">
                   截图会按上传顺序整体理解；如果总大小超过 20MB，建议先压缩后再评分。
                 </p>
