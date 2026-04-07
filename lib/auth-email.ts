@@ -1,7 +1,7 @@
 import { createTransport } from "nodemailer";
 import type { Theme } from "@auth/core/types";
 import type { NodemailerConfig } from "@auth/core/providers/nodemailer";
-import { getConfiguredAppHost, normalizeUrlToConfiguredOrigin } from "@/lib/app-url";
+import { getConfiguredAppHost, getConfiguredAppUrl } from "@/lib/app-url";
 
 export type AuthEmailVariant = "hero-shell" | "product-panel";
 
@@ -262,14 +262,28 @@ export async function sendMagicLinkEmail(params: {
   provider: NodemailerConfig;
   theme: Theme;
 }) {
-  const normalizedUrl = normalizeUrlToConfiguredOrigin(params.url);
-  const host = getConfiguredAppHost() ?? new URL(normalizedUrl).host;
+  // NextAuth 内部生成 callback URL 时读取 AUTH_URL（可能是生产域名）。
+  // 用 APP_BASE_URL（本地开发时设为 http://localhost:3000）强制替换 origin，
+  // 保证 magic link 始终指向当前运行环境，而不是 AUTH_URL 里写死的域名。
+  const canonical = getConfiguredAppUrl();
+  const parsedUrl = new URL(params.url);
+  const normalizedUrl = canonical
+    ? new URL(parsedUrl.pathname + parsedUrl.search + parsedUrl.hash, canonical).toString()
+    : params.url;
+  const host = getConfiguredAppHost() ?? parsedUrl.host;
   const transport = createTransport(params.provider.server);
   const html = getMagicLinkEmailHtml({
     url: normalizedUrl,
     host,
     expires: params.expires,
   });
+
+  // 开发环境下把 magic link 打印到终端，跳过邮件客户端的各种代理问题
+  if (process.env.NODE_ENV === "development") {
+    console.log("\n\x1b[36m━━━ DEV MAGIC LINK ━━━\x1b[0m");
+    console.log("\x1b[33m" + normalizedUrl + "\x1b[0m");
+    console.log("\x1b[36m━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n");
+  }
 
   const result = await transport.sendMail({
     to: params.identifier,

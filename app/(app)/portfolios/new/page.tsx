@@ -70,7 +70,7 @@ export default function NewPortfolioPage() {
               </Label>
               <Input
                 id="portfolio-name"
-                placeholder="例如：2024 UX 求职 / 互联网大厂投递版"
+                placeholder="例如：2026 UX 求职 / 互联网大厂投递版"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {

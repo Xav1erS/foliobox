@@ -74,7 +74,7 @@ function TagSelector({
             key={opt}
             type="button"
             onClick={() => toggle(opt)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+            className={`rounded-none border px-3 py-1 text-xs transition-colors ${
               active
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400"
@@ -235,7 +235,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
               key={value}
               type="button"
               onClick={() => set("tonePreference", value)}
-              className={`rounded-xl border p-4 text-left transition-colors ${
+              className={`rounded-none border p-4 text-left transition-colors ${
                 form.tonePreference === value
                   ? "border-neutral-900 bg-neutral-50"
                   : "border-neutral-200 bg-white hover:border-neutral-300"
@@ -263,7 +263,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         <div className="flex items-center gap-3">
           {saved ? <span className="text-sm text-emerald-600">已保存 ✓</span> : null}
           {error ? <span className="text-sm text-red-500">{error}</span> : null}
-          <Button onClick={handleSave} disabled={saving} className="h-11 rounded-xl px-8">
+          <Button onClick={handleSave} disabled={saving} className="h-11 rounded-none px-8">
             {saving ? "保存中..." : "保存档案"}
           </Button>
         </div>

@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-
-const STAGE_ORDER = ["DRAFT", "BOUNDARY", "COMPLETENESS", "PACKAGE", "LAYOUT", "READY"] as const;
-type ProjectStage = (typeof STAGE_ORDER)[number];
-
-const STAGE_TRANSITIONS: Record<ProjectStage, ProjectStage | null> = {
-  DRAFT: "BOUNDARY",
-  BOUNDARY: "COMPLETENESS",
-  COMPLETENESS: "PACKAGE",
-  PACKAGE: "LAYOUT",
-  LAYOUT: "READY",
-  READY: null,
-};
+import { type ProjectStage, STAGE_TRANSITIONS } from "@/lib/project-workflow";
 
 export async function PATCH(
   request: NextRequest,
@@ -35,21 +24,18 @@ export async function PATCH(
 
   const body = await request.json().catch(() => ({}));
 
-  // Allow explicit stage set (for packageMode updates) or auto-advance
-  let nextStage: ProjectStage;
+  // Auto-advance to the next stage in sequence
   const extraData: Record<string, unknown> = {};
 
-  if (body.stage && STAGE_ORDER.includes(body.stage)) {
-    nextStage = body.stage as ProjectStage;
-  } else {
-    const advanced = STAGE_TRANSITIONS[project.stage as ProjectStage];
-    if (!advanced) {
-      return NextResponse.json({ error: "Already at final stage" }, { status: 400 });
-    }
-    nextStage = advanced;
+  const nextStage = STAGE_TRANSITIONS[project.stage as ProjectStage];
+  if (!nextStage) {
+    return NextResponse.json({ error: "Already at final stage" }, { status: 400 });
   }
 
-  if (body.packageMode && ["DEEP", "LIGHT", "SUPPORTIVE"].includes(body.packageMode)) {
+  if (
+    typeof body.packageMode === "string" &&
+    ["DEEP", "LIGHT", "SUPPORTIVE"].includes(body.packageMode)
+  ) {
     extraData.packageMode = body.packageMode;
   }
 

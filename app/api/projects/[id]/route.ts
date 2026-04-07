@@ -11,12 +11,10 @@ function serializeProject(project: {
   sourceType: string;
   sourceUrl: string | null;
   importStatus: string;
+  stage: string;
   createdAt: Date;
   updatedAt: Date;
   _count: { assets: number };
-  facts: { updatedAt: Date } | null;
-  outlines: Array<{ id: string; updatedAt: Date }>;
-  drafts: Array<{ id: string; updatedAt: Date; status: string }>;
 }) {
   return {
     id: project.id,
@@ -24,6 +22,7 @@ function serializeProject(project: {
     sourceType: project.sourceType,
     sourceUrl: project.sourceUrl,
     importStatus: project.importStatus,
+    stage: project.stage,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     assetCount: project._count.assets,
@@ -35,19 +34,16 @@ function serializeProject(project: {
 async function getOwnedProject(userId: string, id: string) {
   return db.project.findFirst({
     where: { id, userId },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      sourceType: true,
+      sourceUrl: true,
+      importStatus: true,
+      stage: true,
+      createdAt: true,
+      updatedAt: true,
       _count: { select: { assets: true } },
-      facts: { select: { updatedAt: true } },
-      outlines: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true },
-        take: 1,
-      },
-      drafts: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true, status: true },
-        take: 1,
-      },
     },
   });
 }

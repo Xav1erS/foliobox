@@ -35,7 +35,7 @@ export default async function PortfoliosPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-6 py-10">
       <PageHeader
         eyebrow="Portfolios"
         title="我的作品集"
@@ -50,7 +50,10 @@ export default async function PortfoliosPage() {
         }
       />
 
-      <div className="mt-8">
+      {/* 2px structural divider */}
+      <div className="mt-6 -mx-6 border-t-2 border-black" />
+
+      <div className="mt-6">
         {portfolios.length === 0 ? (
           <EmptyState
             icon={<BookOpen className="h-6 w-6 text-neutral-400" />}
@@ -71,25 +74,21 @@ export default async function PortfoliosPage() {
             }
           />
         ) : (
-          <div className="space-y-6">
-            <div className="border border-neutral-300 bg-white/88 px-6 py-5 backdrop-blur-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900">全部作品集</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-500">
-                    共 {portfolios.length} 份，按最近更新时间排列。
-                  </p>
-                </div>
-                {portfolios[0] && portfolios[0].status !== "DRAFT" ? (
-                  <Link
-                    href={getPortfolioContinuePath(portfolios[0])}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900"
-                  >
-                    继续：{portfolios[0].name}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                ) : null}
-              </div>
+          <div>
+            {/* Meta row */}
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+                全部作品集 · {portfolios.length} 份
+              </p>
+              {portfolios[0] && portfolios[0].status !== "DRAFT" ? (
+                <Link
+                  href={getPortfolioContinuePath(portfolios[0])}
+                  className="group inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                >
+                  继续：{portfolios[0].name}
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ) : null}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -102,21 +101,22 @@ export default async function PortfoliosPage() {
                   <Link
                     key={portfolio.id}
                     href={continuePath}
-                    className="group flex flex-col border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:border-neutral-400 hover:bg-white"
+                    className="group relative flex flex-col border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:bg-white"
                   >
+                    <span className="absolute left-0 top-0 h-full w-[2px] bg-transparent transition-colors group-hover:bg-brand-red" />
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-neutral-900">
+                        <p className="truncate text-[15px] font-medium text-neutral-900">
                           {portfolio.name}
                         </p>
-                        <p className="mt-1 text-xs text-neutral-400">
+                        <p className="mt-1 text-xs font-mono text-neutral-400">
                           {portfolio.updatedAt.toLocaleDateString("zh-CN", {
                             month: "short",
                             day: "numeric",
                           })} 更新
                         </p>
                       </div>
-                      <span className="shrink-0 border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-500">
+                      <span className="shrink-0 border border-neutral-200 px-2 py-0.5 text-xs font-mono uppercase tracking-wide text-neutral-500">
                         {statusLabel}
                       </span>
                     </div>
@@ -127,7 +127,7 @@ export default async function PortfoliosPage() {
                           ? `已选入 ${projectCount} 个项目`
                           : "尚未选入项目"}
                       </p>
-                      <ArrowRight className="h-4 w-4 text-neutral-400 transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight className="h-3.5 w-3.5 text-neutral-400 transition-transform group-hover:translate-x-0.5" />
                     </div>
                   </Link>
                 );

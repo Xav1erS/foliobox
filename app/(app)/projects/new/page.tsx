@@ -202,12 +202,14 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="px-6 py-10">
       <PageHeader
         eyebrow="Import"
         title="导入项目"
         description="先选择导入方式，再补充最小项目信息，最后进入素材确认页继续整理作品集。"
       />
+
+      <div className="mt-6 -mx-6 border-t-2 border-black" />
 
       {fromScore ? (
         <div className="mt-6">
@@ -230,7 +232,7 @@ export default function NewProjectPage() {
               <div className="space-y-4">
                 <div className="flex flex-col gap-4 border border-neutral-300 bg-neutral-100/85 p-4 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">当前评分结果</p>
+                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">当前评分结果</p>
                     <div className="mt-2 flex items-end gap-2">
                       <span className="text-3xl font-semibold text-neutral-900">{scoreContext.totalScore}</span>
                       <span className="pb-1 text-sm text-neutral-400">/100</span>
@@ -248,7 +250,7 @@ export default function NewProjectPage() {
 
                 {focusPoints.length > 0 ? (
                   <div className="border border-neutral-300 bg-white/88 p-4">
-                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">这次导入时优先关注</p>
+                    <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">这次导入时优先关注</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {focusPoints.map((point) => (
                         <span
@@ -401,17 +403,17 @@ export default function NewProjectPage() {
           >
             <div className="space-y-5">
               <div className="border border-neutral-300 bg-neutral-100/85 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">导入方式</p>
+                <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">导入方式</p>
                 <p className="mt-2 text-sm font-medium text-neutral-900">{summary.methodLabel}</p>
               </div>
 
               <div className="border border-neutral-300 bg-neutral-100/85 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">项目名称</p>
+                <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">项目名称</p>
                 <p className="mt-2 text-sm font-medium text-neutral-900">{projectName || "未填写"}</p>
               </div>
 
               <div className="border border-neutral-300 bg-neutral-100/85 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">
+                <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
                   {method === "figma" ? "来源链接" : "上传素材"}
                 </p>
                 <p className="mt-2 break-all text-sm font-medium text-neutral-900">{summary.sourceText}</p>
@@ -419,7 +421,7 @@ export default function NewProjectPage() {
 
               {tags.length > 0 ? (
                 <div className="border border-neutral-300 bg-neutral-100/85 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">当前理解标签</p>
+                  <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">当前理解标签</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {tags.map((tag) => (
                       <span

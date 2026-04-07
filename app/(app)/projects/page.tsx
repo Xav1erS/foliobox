@@ -19,19 +19,13 @@ export default async function ProjectsPage() {
   const projects = await db.project.findMany({
     where: { userId: session.user.id },
     orderBy: { updatedAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      importStatus: true,
+      updatedAt: true,
       _count: { select: { assets: true } },
-      facts: { select: { updatedAt: true } },
-      outlines: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true },
-        take: 1,
-      },
-      drafts: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true, status: true },
-        take: 1,
-      },
       assets: {
         where: { isCover: true, selected: true },
         take: 1,
@@ -41,7 +35,7 @@ export default async function ProjectsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-6 py-10">
       <PageHeader
         eyebrow="Projects"
         title="我的项目"
@@ -56,7 +50,10 @@ export default async function ProjectsPage() {
         }
       />
 
-      <div className="mt-8">
+      {/* 2px structural divider */}
+      <div className="mt-6 -mx-6 border-t-2 border-black" />
+
+      <div className="mt-6">
         {projects.length === 0 ? (
           <EmptyState
             icon={<FileText className="h-6 w-6 text-neutral-400" />}
@@ -72,25 +69,21 @@ export default async function ProjectsPage() {
             }
           />
         ) : (
-          <div className="space-y-6">
-            <div className="border border-neutral-300 bg-white/88 px-6 py-5 backdrop-blur-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900">全部项目</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-500">
-                    共 {projects.length} 个项目，按最近更新时间倒序排列。每张卡片都会直接落到当前可继续的真实步骤。
-                  </p>
-                </div>
-                {projects[0] ? (
-                  <Link
-                    href={getProjectContinuePath(projects[0]).href}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-neutral-900"
-                  >
-                    继续最近项目：{projects[0].name}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                ) : null}
-              </div>
+          <div>
+            {/* Meta row */}
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+                全部项目 · {projects.length} 个
+              </p>
+              {projects[0] ? (
+                <Link
+                  href={getProjectContinuePath(projects[0]).href}
+                  className="group inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                >
+                  继续最近：{projects[0].name}
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ) : null}
             </div>
 
             <ProjectsCollection

@@ -29,18 +29,9 @@ export default async function PaymentResultPage({
   const isPaid = orderData.status === "PAID";
 
   function buildReturnPath(): string {
-    const { sourceScene, projectId, draftId } = orderData;
-    if (projectId && (sourceScene === "pdf_export" || sourceScene === "publish_link") && draftId) {
-      return `/projects/${projectId}/editor?did=${draftId}`;
-    }
-    if (projectId && sourceScene === "full_rewrite") {
-      return `/projects/${projectId}/outline`;
-    }
-    if (projectId && sourceScene === "multi_variant" && draftId) {
-      return `/projects/${projectId}/editor?did=${draftId}`;
-    }
+    const { projectId } = orderData;
     if (projectId) {
-      return `/projects/${projectId}/assets`;
+      return `/projects/${projectId}/layout`;
     }
     return "/dashboard";
   }
