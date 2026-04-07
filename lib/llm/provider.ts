@@ -1,13 +1,17 @@
 import { z } from "zod";
 
 export type LLMTask =
-  | "outline_generation"      // 生成作品集大纲
-  | "case_study_generation"   // 生成作品集初稿
-  | "resume_parse"            // 简历解析
-  | "portfolio_score"         // 作品集评分
-  | "text_rewrite"            // 文案改写
-  | "label_extraction"        // 标签/标题提取
-  | "consistency_check";      // 简历与作品集一致性检查
+  | "outline_generation"          // 生成作品集大纲
+  | "case_study_generation"       // 生成作品集初稿
+  | "resume_parse"                // 简历解析
+  | "portfolio_score"             // 作品集评分
+  | "text_rewrite"                // 文案改写
+  | "label_extraction"            // 标签/标题提取
+  | "consistency_check"           // 简历与作品集一致性检查
+  | "project_boundary_analysis"   // 项目边界判断（判断层）
+  | "project_completeness_analysis" // 项目完整度分析（判断层）
+  | "project_package_recommendation" // 包装模式推荐（判断层）
+  | "project_layout_generation";  // 项目排版生成（包装层）
 
 export interface LLMTrackContext {
   userId?: string | null;
@@ -72,8 +76,12 @@ export const TASK_MODEL_TIER: Record<LLMTask, "primary" | "lite"> = {
   outline_generation: "primary",
   case_study_generation: "primary",
   text_rewrite: "primary",
+  project_layout_generation: "primary",
   resume_parse: "lite",
   portfolio_score: "lite",
   label_extraction: "lite",
   consistency_check: "lite",
+  project_boundary_analysis: "lite",
+  project_completeness_analysis: "lite",
+  project_package_recommendation: "lite",
 };

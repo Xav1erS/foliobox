@@ -20,6 +20,18 @@ export const PROJECT_STAGE_LABEL: Record<
   READY: { label: "已就绪", variant: "default" },
 };
 
+export const PROJECT_STAGE_ORDER = ["DRAFT", "BOUNDARY", "COMPLETENESS", "PACKAGE", "LAYOUT", "READY"] as const;
+export type ProjectStage = (typeof PROJECT_STAGE_ORDER)[number];
+
+export const STAGE_TRANSITIONS: Record<ProjectStage, ProjectStage | null> = {
+  DRAFT: "BOUNDARY",
+  BOUNDARY: "COMPLETENESS",
+  COMPLETENESS: "PACKAGE",
+  PACKAGE: "LAYOUT",
+  LAYOUT: "READY",
+  READY: null,
+};
+
 export const V3_STAGE_STEPS = [
   { stage: "BOUNDARY", label: "边界确认", step: 1 },
   { stage: "COMPLETENESS", label: "完整度", step: 2 },
@@ -39,9 +51,6 @@ export function formatProjectDate(date: Date) {
 export function getProjectContinuePath(project: {
   id: string;
   stage?: string;
-  facts: { updatedAt: Date } | null;
-  outlines: Array<{ id: string; updatedAt: Date }>;
-  drafts: Array<{ id: string; updatedAt: Date; status: string }>;
 }) {
   // V3 stage routing — takes precedence when project is in V3 flow
   const stage = project.stage;
@@ -51,51 +60,25 @@ export function getProjectContinuePath(project: {
   if (stage === "COMPLETENESS") {
     return { href: `/projects/${project.id}/package`, label: "继续骨架定稿" };
   }
-  if (stage === "PACKAGE" || stage === "LAYOUT" || stage === "READY") {
+  if (stage === "PACKAGE") {
+    return { href: `/projects/${project.id}/package`, label: "继续骨架定稿" };
+  }
+  if (stage === "LAYOUT" || stage === "READY") {
     return { href: `/projects/${project.id}/layout`, label: "继续排版验收" };
   }
 
-  // DRAFT: if no V2 data exists, start V3 flow from boundary
-  const hasV2Data =
-    project.drafts.length > 0 || project.outlines.length > 0 || project.facts !== null;
-
-  if (!hasV2Data) {
-    return { href: `/projects/${project.id}/boundary`, label: "开始整理项目" };
-  }
-
-  // DRAFT with V2 data: continue in V2 flow (backward compat)
-  const latestDraft = project.drafts[0];
-  if (latestDraft) {
-    return { href: `/projects/${project.id}/editor?did=${latestDraft.id}`, label: "继续编辑草稿" };
-  }
-
-  const latestOutline = project.outlines[0];
-  if (latestOutline) {
-    return { href: `/projects/${project.id}/outline?oid=${latestOutline.id}`, label: "继续确认大纲" };
-  }
-
-  if (project.facts) {
-    return { href: `/projects/${project.id}/facts`, label: "继续补充项目事实" };
-  }
-
-  return { href: `/projects/${project.id}/assets`, label: "继续确认素材" };
+  // DRAFT: start V3 flow from boundary
+  return { href: `/projects/${project.id}/boundary`, label: "开始整理项目" };
 }
 
 export function getProjectStageSummary(project: {
   _count: { assets: number };
   stage?: string;
-  facts: { updatedAt: Date } | null;
-  outlines: Array<{ id: string; updatedAt: Date }>;
-  drafts: Array<{ id: string; updatedAt: Date; status: string }>;
 }) {
   const stage = project.stage;
   if (stage && stage !== "DRAFT") {
     const stageInfo = PROJECT_STAGE_LABEL[stage];
     return `${project._count.assets} 张素材 · ${stageInfo?.label ?? stage}`;
   }
-  const parts = [`${project._count.assets} 张素材`];
-  if (project.facts) parts.push("已补充项目事实");
-  if (project.outlines.length > 0) parts.push("已生成大纲");
-  if (project.drafts.length > 0) parts.push("已生成草稿");
-  return parts.join(" · ");
+  return `${project._count.assets} 张素材`;
 }

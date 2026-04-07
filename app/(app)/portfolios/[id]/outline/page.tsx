@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SectionCard } from "@/components/app/SectionCard";
 import { InlineTip } from "@/components/app/InlineTip";
 import { Button } from "@/components/ui/button";
+import { PROJECT_STAGE_LABEL, PROJECT_STATUS_LABEL } from "@/lib/project-workflow";
 
 export default async function PortfolioOutlinePage({
   params,
@@ -83,8 +84,10 @@ export default async function PortfolioOutlinePage({
                           })} 更新
                         </p>
                       </div>
-                      <span className="ml-3 shrink-0 border border-neutral-200 bg-white px-2 py-0.5 text-[11px] text-neutral-500">
-                        {project.stage}
+                      <span className="ml-3 shrink-0 border border-neutral-200 bg-white px-2 py-0.5 text-xs font-mono text-neutral-500">
+                        {project.stage && project.stage !== "DRAFT"
+                          ? (PROJECT_STAGE_LABEL[project.stage]?.label ?? project.stage)
+                          : (PROJECT_STATUS_LABEL[project.importStatus]?.label ?? "草稿")}
                       </span>
                     </div>
                   );

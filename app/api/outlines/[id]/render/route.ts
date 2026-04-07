@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm/openai";
@@ -150,7 +151,7 @@ ${enabledSections.map((s) => `- [${s.type}] ${s.title}（约 ${s.estimatedPages}
 
     await db.portfolioDraft.update({
       where: { id: draft.id },
-      data: { status: "DONE", contentJson: contentData as unknown as Parameters<typeof db.portfolioDraft.update>[0]["data"]["contentJson"] },
+      data: { status: "DONE", contentJson: contentData as Prisma.InputJsonValue },
     });
 
     await db.portfolioOutline.update({ where: { id }, data: { status: "DONE" } });

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronLeft, Loader2, Zap } from "lucide-react";
+import { ChevronLeft, Loader2, Zap, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StickyActionBar } from "@/components/app/StickyActionBar";
 
@@ -18,18 +18,60 @@ export function LayoutClient({
   isReady: boolean;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  // Placeholder: generation not yet implemented
   async function handleGenerate() {
-    setLoading(true);
-    // TODO: call /api/projects/:id/layout/generate when implemented
-    setTimeout(() => setLoading(false), 1500);
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/layout/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setGenerateError(data?.error ?? "生成失败，请重试");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setGenerateError("网络异常，请重试");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleVerify() {
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/stage`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setVerifyError(data?.error ?? "验证失败，请重试");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setVerifyError("网络异常，请重试");
+    } finally {
+      setVerifying(false);
+    }
   }
 
   async function handleJoinPortfolio() {
     router.push("/portfolios");
   }
+
+  const error = generateError || verifyError;
 
   return (
     <StickyActionBar>
@@ -43,34 +85,52 @@ export function LayoutClient({
       </Button>
 
       <div className="flex items-center gap-3">
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
         {isReady ? (
           <Button className="h-11 rounded-none px-5" onClick={handleJoinPortfolio}>
+            <CheckCircle className="mr-2 h-4 w-4" />
             加入作品集
           </Button>
         ) : (
           <>
-            <p className="hidden text-xs text-neutral-400 sm:block">
-              生成排版是高成本动作，完成前请勿关闭页面
-            </p>
+            {/* 风格参考 — 功能建设中 */}
             <Button
               variant="outline"
               className="h-11 rounded-none px-5"
-              disabled={!hasPackageMode || loading}
-              title="选择风格参考（功能建设中）"
+              disabled={!hasPackageMode}
+              title="功能建设中"
+              onClick={() => {}}
             >
               风格参考（可选）
             </Button>
+
+            {/* 生成排版 */}
             <Button
+              variant="outline"
               className="h-11 rounded-none px-5"
-              disabled={!hasPackageMode || loading}
+              disabled={!hasPackageMode || generating}
               onClick={handleGenerate}
             >
-              {loading ? (
+              {generating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Zap className="mr-2 h-4 w-4" />
               )}
-              {hasLayout ? "重新生成排版" : "生成项目排版"}
+              {generating ? "生成中..." : hasLayout ? "重新生成排版" : "生成项目排版"}
+            </Button>
+
+            {/* 验证当前项目 */}
+            <Button
+              className="h-11 rounded-none px-5"
+              disabled={!hasPackageMode || verifying || !hasLayout}
+              onClick={handleVerify}
+              title={!hasLayout ? "请先生成排版再验证" : undefined}
+            >
+              {verifying ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              验证当前项目
             </Button>
           </>
         )}

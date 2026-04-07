@@ -12,19 +12,14 @@ export async function GET() {
   const projects = await db.project.findMany({
     where: { userId: session.user.id },
     orderBy: { updatedAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      sourceType: true,
+      importStatus: true,
+      stage: true,
+      updatedAt: true,
       _count: { select: { assets: true } },
-      facts: { select: { updatedAt: true } },
-      outlines: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true },
-        take: 1,
-      },
-      drafts: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, updatedAt: true, status: true },
-        take: 1,
-      },
     },
   });
 
