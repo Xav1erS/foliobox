@@ -162,7 +162,16 @@ export function PackageClient({
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-mono text-neutral-400">{mode.pageRange}</span>
+                <span
+                  className={cn(
+                    "border px-2 py-0.5 text-xs font-mono transition-colors",
+                    selected
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-200 text-neutral-400"
+                  )}
+                >
+                  {mode.pageRange}
+                </span>
               </div>
               <p className="mt-2 pl-6 text-xs leading-5 text-neutral-500">{mode.description}</p>
             </button>

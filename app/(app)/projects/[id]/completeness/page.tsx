@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/app/PageHeader";
+import { WorkflowProgressBar } from "@/components/app/WorkflowProgressBar";
 import { CompletenessClient } from "./CompletenessClient";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
 
@@ -116,13 +118,35 @@ export default async function CompletenessPage({
       {/* 2px structural divider */}
       <div className="-mx-6 mt-6 border-t-2 border-black" />
 
+      <WorkflowProgressBar currentStep={2} />
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* 主内容区 */}
         <div>
           {/* 五维度检查 */}
           <div className="mt-6 border border-neutral-300 bg-white">
             <div className="border-b border-neutral-300 px-6 py-4">
-              <h2 className="text-[15px] font-semibold text-neutral-900">五维度完整度检查</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-[15px] font-semibold text-neutral-900">五维度完整度检查</h2>
+                <span className="text-xs font-mono text-neutral-400">{completeCount} / 5 完整</span>
+              </div>
+              {/* 5-segment bar */}
+              <div className="mt-3 flex gap-1">
+                {dimensionResults.map((dim) => (
+                  <div
+                    key={dim.key}
+                    title={dim.label}
+                    className={[
+                      "h-1 flex-1",
+                      dim.status === "complete"
+                        ? "bg-neutral-900"
+                        : dim.status === "partial"
+                        ? "bg-amber-400"
+                        : "bg-neutral-200",
+                    ].join(" ")}
+                  />
+                ))}
+              </div>
             </div>
             <div className="divide-y divide-neutral-100">
               {dimensionResults.map((dim, i) => {
@@ -163,10 +187,16 @@ export default async function CompletenessPage({
                   </div>
                 ))}
               </div>
-              <div className="border-t border-neutral-100 px-6 py-3">
+              <div className="flex items-center justify-between gap-4 border-t border-neutral-100 px-6 py-3">
                 <p className="text-xs text-neutral-400">
-                  缺失维度不影响继续流程，但会降低后续生成质量。可以先继续，后续通过重新生成补回。
+                  缺失维度不影响继续流程，但会降低后续生成质量。
                 </p>
+                <Link
+                  href={`/projects/${id}/facts`}
+                  className="shrink-0 text-xs font-medium text-neutral-700 underline-offset-2 hover:underline"
+                >
+                  前往补充项目信息 →
+                </Link>
               </div>
             </div>
           )}
@@ -179,11 +209,39 @@ export default async function CompletenessPage({
             <div className="border-b border-neutral-300 px-5 py-4">
               <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">完整度摘要</p>
             </div>
-            <div className="divide-y divide-neutral-100 px-5">
-              <div className="flex items-center justify-between py-3">
-                <span className="text-xs text-neutral-500">完整维度</span>
-                <span className="text-sm font-semibold text-neutral-900">{completeCount} / 5</span>
+            <div className="px-5 py-4">
+              {/* Dimension mini grid */}
+              <div className="space-y-2">
+                {dimensionResults.map((dim) => (
+                  <div key={dim.key} className="flex items-center gap-2.5">
+                    <span
+                      className={[
+                        "h-1.5 w-1.5 shrink-0",
+                        dim.status === "complete"
+                          ? "bg-neutral-900"
+                          : dim.status === "partial"
+                          ? "bg-amber-400"
+                          : "bg-neutral-200",
+                      ].join(" ")}
+                    />
+                    <span className="text-xs text-neutral-600">{dim.label}</span>
+                    <span
+                      className={[
+                        "ml-auto text-[10px] font-mono",
+                        dim.status === "complete"
+                          ? "text-neutral-500"
+                          : dim.status === "partial"
+                          ? "text-amber-500"
+                          : "text-neutral-300",
+                      ].join(" ")}
+                    >
+                      {dim.status === "complete" ? "完整" : dim.status === "partial" ? "部分" : "缺失"}
+                    </span>
+                  </div>
+                ))}
               </div>
+            </div>
+            <div className="divide-y divide-neutral-100 border-t border-neutral-100 px-5">
               <div className="flex items-center justify-between py-3">
                 <span className="text-xs text-neutral-500">素材数量</span>
                 <span className="text-sm font-semibold text-neutral-900">{project._count.assets} 张</span>

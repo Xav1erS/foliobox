@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/app/PageHeader";
+import { WorkflowProgressBar } from "@/components/app/WorkflowProgressBar";
 import { PackageClient } from "./PackageClient";
 
 const PACKAGE_MODE_DETAIL = [
@@ -69,6 +70,8 @@ export default async function PackagePage({
 
       {/* 2px structural divider */}
       <div className="-mx-6 mt-6 border-t-2 border-black" />
+
+      <WorkflowProgressBar currentStep={3} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* 主内容区 */}

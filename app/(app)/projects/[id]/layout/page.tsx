@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/app/PageHeader";
+import { WorkflowProgressBar } from "@/components/app/WorkflowProgressBar";
 import { LayoutClient } from "./LayoutClient";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 
@@ -12,15 +13,15 @@ const PACKAGE_MODE_LABEL: Record<string, { label: string; pageRange: string }> =
   SUPPORTIVE: { label: "补充展示", pageRange: "1–3 页" },
 };
 
-const PAGE_TYPE_LABEL: Record<string, string> = {
-  cover: "封面",
-  background: "项目背景",
-  problem: "问题定义",
-  process: "设计过程",
-  solution: "解决方案",
-  result: "结果呈现",
-  reflection: "反思复盘",
-  closing: "结尾",
+const PAGE_TYPE_STYLE: Record<string, { label: string; className: string }> = {
+  cover:      { label: "封面",    className: "border-neutral-900 bg-neutral-900 text-white" },
+  background: { label: "项目背景", className: "border-sky-200 bg-sky-50 text-sky-700" },
+  problem:    { label: "问题定义", className: "border-orange-200 bg-orange-50 text-orange-700" },
+  process:    { label: "设计过程", className: "border-violet-200 bg-violet-50 text-violet-700" },
+  solution:   { label: "解决方案", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  result:     { label: "结果呈现", className: "border-teal-200 bg-teal-50 text-teal-700" },
+  reflection: { label: "反思复盘", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  closing:    { label: "结尾",    className: "border-neutral-200 bg-neutral-50 text-neutral-500" },
 };
 
 export default async function LayoutPage({
@@ -66,6 +67,8 @@ export default async function LayoutPage({
 
       {/* 2px structural divider */}
       <div className="-mx-6 mt-6 border-t-2 border-black" />
+
+      <WorkflowProgressBar currentStep={4} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* 主内容区 */}
@@ -137,66 +140,78 @@ export default async function LayoutPage({
                 {hasLayout && layoutJson ? (
                   <div className="divide-y divide-neutral-100">
                     {/* 叙事摘要 */}
-                    <div className="px-6 py-4">
-                      <p className="text-xs font-mono uppercase tracking-[0.15em] text-neutral-400">叙事弧度</p>
-                      <p className="mt-2 text-sm leading-6 text-neutral-700">{layoutJson.narrativeSummary}</p>
+                    <div className="bg-neutral-50 px-6 py-5">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">叙事弧度</p>
+                      <p className="mt-2 text-sm leading-6 text-neutral-800">{layoutJson.narrativeSummary}</p>
                     </div>
 
                     {/* 页面计划 */}
                     <div className="px-6 py-4">
-                      <p className="text-xs font-mono uppercase tracking-[0.15em] text-neutral-400 mb-4">页面计划</p>
-                      <div className="space-y-3">
-                        {layoutJson.pages.map((page) => (
-                          <div
-                            key={page.pageNumber}
-                            className="border border-neutral-200 bg-neutral-50"
-                          >
-                            <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2.5">
-                              <span className="shrink-0 text-xs font-mono text-neutral-400">
-                                P{page.pageNumber}
-                              </span>
-                              <span className="border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-mono text-neutral-500">
-                                {PAGE_TYPE_LABEL[page.type] ?? page.type}
-                              </span>
-                              <span className="text-sm font-medium text-neutral-900">
-                                {page.titleSuggestion}
-                              </span>
-                              {page.wordCountGuideline && (
-                                <span className="ml-auto shrink-0 text-xs font-mono text-neutral-400">
-                                  {page.wordCountGuideline}
+                      <p className="mb-4 text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
+                        页面计划 · {layoutJson.totalPages} 页
+                      </p>
+                      <div className="space-y-2">
+                        {layoutJson.pages.map((page) => {
+                          const typeStyle = PAGE_TYPE_STYLE[page.type] ?? {
+                            label: page.type,
+                            className: "border-neutral-200 bg-neutral-50 text-neutral-500",
+                          };
+                          return (
+                            <div
+                              key={page.pageNumber}
+                              className="border border-neutral-200 bg-white"
+                            >
+                              <div className="flex items-center gap-3 border-b border-neutral-100 px-4 py-2.5">
+                                <span className="shrink-0 text-[11px] font-mono font-bold text-neutral-300">
+                                  {String(page.pageNumber).padStart(2, "0")}
                                 </span>
-                              )}
+                                <span
+                                  className={`border px-1.5 py-0.5 text-[10px] font-mono ${typeStyle.className}`}
+                                >
+                                  {typeStyle.label}
+                                </span>
+                                <span className="text-sm font-medium text-neutral-900">
+                                  {page.titleSuggestion}
+                                </span>
+                                {page.wordCountGuideline && (
+                                  <span className="ml-auto shrink-0 text-[10px] font-mono text-neutral-400">
+                                    {page.wordCountGuideline}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="px-4 py-3">
+                                <p className="text-xs leading-5 text-neutral-500">{page.contentGuidance}</p>
+                                {page.keyPoints.length > 0 && (
+                                  <ul className="mt-2 space-y-1">
+                                    {page.keyPoints.map((point, i) => (
+                                      <li key={i} className="flex items-start gap-2 text-xs text-neutral-400">
+                                        <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-200" />
+                                        {point}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {page.assetHint && (
+                                  <p className="mt-2.5 border-t border-neutral-100 pt-2 text-[10px] font-mono text-neutral-400">
+                                    素材建议 · {page.assetHint}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <div className="px-4 py-3">
-                              <p className="text-xs leading-5 text-neutral-500">{page.contentGuidance}</p>
-                              {page.keyPoints.length > 0 && (
-                                <ul className="mt-2 space-y-0.5">
-                                  {page.keyPoints.map((point, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-xs text-neutral-400">
-                                      <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-300" />
-                                      {point}
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                              {page.assetHint && (
-                                <p className="mt-2 text-[11px] font-mono text-neutral-400">
-                                  素材建议：{page.assetHint}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
                     {/* 质量提示 */}
                     {layoutJson.qualityNotes.length > 0 && (
-                      <div className="px-6 py-4">
-                        <p className="text-xs font-mono uppercase tracking-[0.15em] text-neutral-400 mb-3">质量提示</p>
+                      <div className="bg-amber-50 px-6 py-4">
+                        <p className="mb-3 text-[10px] font-mono uppercase tracking-[0.2em] text-amber-600">
+                          质量提示
+                        </p>
                         <ul className="space-y-2">
                           {layoutJson.qualityNotes.map((note, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-neutral-600">
+                            <li key={i} className="flex items-start gap-2.5 text-sm text-amber-800">
                               <span className="mt-1.5 h-1 w-1 shrink-0 bg-amber-400" />
                               {note}
                             </li>
@@ -206,12 +221,16 @@ export default async function LayoutPage({
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-                    <div className="h-px w-12 bg-neutral-200" />
-                    <p className="text-sm text-neutral-500">
-                      点击「生成项目排版」开始生成。生成完成后将在此展示页面计划。
+                  <div className="px-6 py-10 text-center">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-300">
+                      待生成
                     </p>
-                    <div className="h-px w-12 bg-neutral-200" />
+                    <p className="mt-3 text-sm text-neutral-500">
+                      点击底部「生成项目排版」，AI 将根据包装模式规划逐页叙事结构。
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      生成完成后此处会展示完整页面计划，包含叙事弧度和每页内容指导。
+                    </p>
                   </div>
                 )}
               </div>

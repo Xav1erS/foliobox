@@ -3,6 +3,7 @@ import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { PageHeader } from "@/components/app/PageHeader";
+import { WorkflowProgressBar } from "@/components/app/WorkflowProgressBar";
 import { BoundaryClient } from "./BoundaryClient";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 
@@ -46,6 +47,8 @@ export default async function BoundaryPage({
 
       {/* 2px structural divider */}
       <div className="-mx-6 mt-6 border-t-2 border-black" />
+
+      <WorkflowProgressBar currentStep={1} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
         {/* 主内容区 */}

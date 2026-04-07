@@ -72,58 +72,68 @@ export function BoundaryClient({
       {/* AI 分析结果 */}
       {analysis && (
         <div className="mt-4 border border-neutral-300 bg-white">
-          <div className="border-b border-neutral-300 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-neutral-900">AI 边界分析</h2>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-mono ${CONFIDENCE_COLOR[analysis.confidence]}`}>
-                {CONFIDENCE_LABEL[analysis.confidence]}
-              </span>
+          {/* 结果 header */}
+          <div
+            className={[
+              "flex items-center justify-between px-6 py-4",
+              analysis.isBoundaryClean
+                ? "border-b border-emerald-100 bg-emerald-50"
+                : "border-b border-amber-100 bg-amber-50",
+            ].join(" ")}
+          >
+            <div className="flex items-center gap-3">
               <span
-                className={`border px-2 py-0.5 text-xs font-mono ${
+                className={[
+                  "border px-2 py-0.5 text-xs font-mono font-semibold",
                   analysis.isBoundaryClean
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
-                }`}
+                    ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                    : "border-amber-300 bg-amber-100 text-amber-800",
+                ].join(" ")}
               >
                 {analysis.isBoundaryClean ? "边界清晰" : "边界存疑"}
               </span>
+              <span className="text-sm font-medium text-neutral-700">{analysis.projectSummary}</span>
             </div>
+            <span className={`shrink-0 text-[10px] font-mono ${CONFIDENCE_COLOR[analysis.confidence]}`}>
+              {CONFIDENCE_LABEL[analysis.confidence]}
+            </span>
           </div>
-          <div className="divide-y divide-neutral-100 px-6">
-            {/* 项目摘要 */}
-            <div className="py-4">
-              <p className="text-xs font-mono text-neutral-400 mb-1">项目概况</p>
-              <p className="text-sm leading-6 text-neutral-700">{analysis.projectSummary}</p>
+
+          {/* 风险 + 建议 横排 */}
+          {(analysis.risks.length > 0 || analysis.suggestions.length > 0) && (
+            <div className="grid gap-0 divide-x divide-neutral-100 sm:grid-cols-2">
+              {analysis.risks.length > 0 && (
+                <div className="px-6 py-4">
+                  <p className="mb-2 text-[10px] font-mono uppercase tracking-[0.15em] text-amber-500">
+                    风险与疑点
+                  </p>
+                  <ul className="space-y-2">
+                    {analysis.risks.map((r, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs leading-5 text-amber-700">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 bg-amber-400" />
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {analysis.suggestions.length > 0 && (
+                <div className="px-6 py-4">
+                  <p className="mb-2 text-[10px] font-mono uppercase tracking-[0.15em] text-neutral-400">
+                    建议
+                  </p>
+                  <ul className="space-y-2">
+                    {analysis.suggestions.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs leading-5 text-neutral-600">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-300" />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            {/* 风险 */}
-            {analysis.risks.length > 0 && (
-              <div className="py-4">
-                <p className="text-xs font-mono text-neutral-400 mb-2">风险与疑点</p>
-                <ul className="space-y-1.5">
-                  {analysis.risks.map((r, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 bg-amber-400" />
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {/* 建议 */}
-            {analysis.suggestions.length > 0 && (
-              <div className="py-4">
-                <p className="text-xs font-mono text-neutral-400 mb-2">建议</p>
-                <ul className="space-y-1.5">
-                  {analysis.suggestions.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-neutral-600">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-300" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
 

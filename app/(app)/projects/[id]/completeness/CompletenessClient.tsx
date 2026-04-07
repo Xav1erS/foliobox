@@ -8,10 +8,10 @@ import { StickyActionBar } from "@/components/app/StickyActionBar";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
 
 const VERDICT_CONFIG = {
-  ready: { label: "信息完整，可以深讲", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  almost_ready: { label: "基本完整，建议补充后继续", className: "border-amber-200 bg-amber-50 text-amber-700" },
-  needs_work: { label: "信息较少，建议先补充", className: "border-amber-200 bg-amber-50 text-amber-700" },
-  insufficient: { label: "信息不足，建议回去补充", className: "border-red-200 bg-red-50 text-red-700" },
+  ready:        { label: "信息完整，可以深讲",     bgClass: "border-emerald-100 bg-emerald-50", textClass: "text-emerald-800", badgeClass: "border-emerald-300 bg-emerald-100 text-emerald-800" },
+  almost_ready: { label: "基本完整，建议补充后继续", bgClass: "border-amber-100 bg-amber-50",   textClass: "text-amber-800",   badgeClass: "border-amber-300 bg-amber-100 text-amber-800"   },
+  needs_work:   { label: "信息较少，建议先补充",    bgClass: "border-amber-100 bg-amber-50",   textClass: "text-amber-800",   badgeClass: "border-amber-300 bg-amber-100 text-amber-800"   },
+  insufficient: { label: "信息不足，建议回去补充",  bgClass: "border-red-100 bg-red-50",       textClass: "text-red-800",     badgeClass: "border-red-300 bg-red-100 text-red-800"         },
 };
 
 const STATUS_CONFIG = {
@@ -77,58 +77,57 @@ export function CompletenessClient({
       {/* AI 分析结果 */}
       {analysis && (
         <div className="mt-4 border border-neutral-300 bg-white">
-          <div className="border-b border-neutral-300 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-neutral-900">AI 完整度评估</h2>
-            <span
-              className={`border px-2 py-0.5 text-xs font-mono ${VERDICT_CONFIG[analysis.overallVerdict].className}`}
-            >
-              {VERDICT_CONFIG[analysis.overallVerdict].label}
-            </span>
-          </div>
-          <div className="divide-y divide-neutral-100 px-6">
-            {/* 整体评价 */}
-            <div className="py-4">
-              <p className="text-sm leading-6 text-neutral-700">{analysis.overallComment}</p>
-            </div>
+          {/* 总体结论 header */}
+          {(() => {
+            const vcfg = VERDICT_CONFIG[analysis.overallVerdict];
+            return (
+              <div className={`flex items-start justify-between gap-4 border-b px-6 py-4 ${vcfg.bgClass}`}>
+                <p className={`text-sm leading-6 ${vcfg.textClass}`}>{analysis.overallComment}</p>
+                <span className={`shrink-0 border px-2 py-0.5 text-[10px] font-mono font-semibold ${vcfg.badgeClass}`}>
+                  {vcfg.label}
+                </span>
+              </div>
+            );
+          })()}
 
-            {/* 维度详情 */}
-            <div className="py-4">
-              <p className="text-xs font-mono text-neutral-400 mb-3">维度评估</p>
-              <div className="space-y-2">
-                {analysis.dimensions.map((dim) => {
-                  const cfg = STATUS_CONFIG[dim.status];
-                  return (
-                    <div key={dim.key} className="flex items-start gap-3">
-                      <span className={`shrink-0 text-xs font-mono font-semibold ${cfg.className} w-12`}>
-                        {cfg.label}
-                      </span>
-                      <div className="min-w-0">
-                        <span className="text-xs font-medium text-neutral-700">{dim.label}</span>
-                        {dim.comment && (
-                          <span className="ml-2 text-xs text-neutral-400">— {dim.comment}</span>
-                        )}
-                      </div>
+          {/* 维度评估表格 */}
+          <div className="border-b border-neutral-100">
+            <div className="divide-y divide-neutral-100">
+              {analysis.dimensions.map((dim) => {
+                const cfg = STATUS_CONFIG[dim.status];
+                return (
+                  <div key={dim.key} className="flex items-start gap-4 px-6 py-3">
+                    <span className={`w-12 shrink-0 text-[10px] font-mono font-semibold ${cfg.className}`}>
+                      {cfg.label}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-neutral-700">{dim.label}</span>
+                      {dim.comment && (
+                        <p className="mt-0.5 text-xs leading-5 text-neutral-400">{dim.comment}</p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* 优先建议 */}
-            {analysis.prioritySuggestions.length > 0 && (
-              <div className="py-4">
-                <p className="text-xs font-mono text-neutral-400 mb-2">优先建议</p>
-                <ul className="space-y-1.5">
-                  {analysis.prioritySuggestions.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-neutral-600">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-400" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
+
+          {/* 优先建议 */}
+          {analysis.prioritySuggestions.length > 0 && (
+            <div className="px-6 py-4">
+              <p className="mb-2 text-[10px] font-mono uppercase tracking-[0.15em] text-neutral-400">
+                优先建议
+              </p>
+              <ul className="space-y-2">
+                {analysis.prioritySuggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-neutral-600">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 bg-neutral-400" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
