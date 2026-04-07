@@ -9,6 +9,7 @@ export function getConfiguredAppUrl() {
     process.env.APP_BASE_URL ||
     process.env.NEXTAUTH_URL ||
     process.env.AUTH_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
     (process.env.NODE_ENV === "production" ? "" : DEFAULT_DEV_APP_URL);
 
   if (!raw) return null;
