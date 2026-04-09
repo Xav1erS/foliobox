@@ -11,6 +11,12 @@ import {
   writePrecheckLog,
 } from "@/lib/generation-precheck";
 import {
+  GenerationScopeSchema,
+  hasGeneratedLayoutData,
+  resolveProjectEditorScene,
+  serializeSceneForHash,
+} from "@/lib/project-editor-scene";
+import {
   resolveStyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
@@ -26,9 +32,11 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as {
     styleSelection?: StyleReferenceSelection | null;
+    generationScope?: unknown;
   };
   const styleSelection = body.styleSelection ?? { source: "none" as const };
   const styleProfile = resolveStyleProfile(styleSelection);
+  const parsedScope = GenerationScopeSchema.safeParse(body.generationScope);
   const { id: projectId } = await params;
 
   const project = await db.project.findFirst({
@@ -41,7 +49,7 @@ export async function POST(
       assets: {
         where: { selected: true },
         orderBy: { sortOrder: "asc" },
-        select: { id: true },
+        select: { id: true, title: true, isCover: true, metaJson: true },
       },
     },
   });
@@ -55,7 +63,11 @@ export async function POST(
     getProjectActionSummary(session.user.id, projectId),
   ]);
 
-  const isRegeneration = Boolean(project.layoutJson);
+  const scene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+  });
+  const generationScope = parsedScope.success ? parsedScope.data : scene.generationScope;
+  const isRegeneration = hasGeneratedLayoutData(project.layoutJson);
   const actionType = isRegeneration
     ? "project_layout_regeneration"
     : "project_layout_generation";
@@ -75,6 +87,10 @@ export async function POST(
     styleSelection,
     assetIds: project.assets.map((asset) => asset.id),
     facts: project.facts ?? {},
+    scene: serializeSceneForHash({
+      ...scene,
+      generationScope,
+    }),
   });
   const reusable = await findReusableGeneratedDraft({
     userId: session.user.id,
@@ -111,5 +127,6 @@ export async function POST(
     actionRemaining: actionQuota.remaining,
     reusableDraftId: reusable?.draft.id ?? null,
     reusableTaskId: reusable?.task.id ?? null,
+    generationScope,
   });
 }

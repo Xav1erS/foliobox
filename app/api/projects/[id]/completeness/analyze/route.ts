@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llmLite } from "@/lib/llm";
+import {
+  GenerationScopeSchema,
+  resolveProjectEditorScene,
+  summarizeProjectSceneForAI,
+} from "@/lib/project-editor-scene";
 
 const DimensionAssessmentSchema = z.object({
   key: z.string(),
@@ -23,7 +28,7 @@ const CompletenessAnalysisSchema = z.object({
 export type CompletenessAnalysis = z.infer<typeof CompletenessAnalysisSchema>;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -32,6 +37,10 @@ export async function POST(
   }
   const userId = session.user.id;
   const { id: projectId } = await params;
+  const body = (await request.json().catch(() => ({}))) as {
+    generationScope?: unknown;
+  };
+  const parsedScope = GenerationScopeSchema.safeParse(body.generationScope);
 
   const [project, facts] = await Promise.all([
     db.project.findFirst({
@@ -39,7 +48,13 @@ export async function POST(
       select: {
         id: true,
         name: true,
+        layoutJson: true,
         _count: { select: { assets: true } },
+        assets: {
+          where: { selected: true },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, title: true, imageUrl: true, selected: true, isCover: true, metaJson: true },
+        },
       },
     }),
     db.projectFact.findUnique({ where: { projectId } }),
@@ -61,6 +76,15 @@ export async function POST(
         .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join("、") : String(v)}`)
         .join("\n")
     : "（暂无项目事实数据）";
+  const scene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+    projectName: project.name,
+  });
+  const sceneSummary = summarizeProjectSceneForAI({
+    scene,
+    assets: project.assets,
+    scope: parsedScope.success ? parsedScope.data : scene.generationScope,
+  });
 
   const prompt = `你是一位作品集顾问，帮助设计师评估项目信息的完整度，判断是否足以支撑高质量的作品集表达。
 
@@ -70,6 +94,9 @@ export async function POST(
 
 ## 已填写的项目事实
 ${factsText}
+
+## 当前编辑中的画板上下文
+${sceneSummary}
 
 ## 五个关键维度
 1. 项目边界（projectType, industry, hasLaunched, timeline）

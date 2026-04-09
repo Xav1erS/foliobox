@@ -49,6 +49,8 @@ export default async function ProjectEditorPage({
             title: true,
             selected: true,
             isCover: true,
+            sortOrder: true,
+            metaJson: true,
           },
         },
       },

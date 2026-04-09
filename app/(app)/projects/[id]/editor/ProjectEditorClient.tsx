@@ -1,23 +1,54 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ComponentType,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
-  Check,
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  type DragStartEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowLeft,
+  Copy,
+  GripVertical,
+  History,
+  ImageIcon,
   Loader2,
+  Plus,
   Save,
   Sparkles,
+  Trash2,
+  Type,
   Wand2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -26,14 +57,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import {
   EditorCanvasChip,
   EditorChromeButton,
+  EditorChromeIconButton,
   EditorEmptyState,
   editorFieldClass,
   EditorInfoList,
+  EditorMiniButton,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
@@ -41,20 +84,48 @@ import {
   EditorTabsList,
   EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
-import {
-  PROJECT_STAGE_LABEL,
-  PROJECT_STATUS_LABEL,
-} from "@/lib/project-workflow";
 import type { ObjectActionQuota, PlanSummaryCopy } from "@/lib/entitlement";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
 import type { PackageRecommendation } from "@/app/api/projects/[id]/package/recommend/route";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
+  DEFAULT_BOARD_BACKGROUND,
+  getGenerationScopeBoardIds,
+  getSceneBoardById,
+  mergeProjectAssetMeta,
+  mergeProjectLayoutDocument,
+  normalizeProjectEditorScene,
+  PROJECT_BOARD_HEIGHT,
+  PROJECT_BOARD_STATUSES,
+  PROJECT_BOARD_WIDTH,
+  PROJECT_IMAGE_ROLE_TAGS,
+  PROJECT_TEXT_ROLES,
+  resolveProjectAssetMeta,
+  resolveProjectEditorScene,
+  type GenerationScope,
+  type ProjectBoard,
+  type ProjectBoardImageNode,
+  type ProjectBoardNode,
+  type ProjectBoardStatus,
+  type ProjectBoardTextNode,
+  type ProjectEditorScene,
+  type ProjectImageRoleTag,
+  type ProjectTextRole,
+  createProjectBoard,
+  createProjectImageNode,
+  createProjectTextNode,
+  markBoardsAsAnalyzed,
+} from "@/lib/project-editor-scene";
+import {
   STYLE_PRESETS,
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
+import {
+  PROJECT_STAGE_LABEL,
+  PROJECT_STATUS_LABEL,
+} from "@/lib/project-workflow";
 import { cn } from "@/lib/utils";
 
 type ProjectAsset = {
@@ -63,6 +134,8 @@ type ProjectAsset = {
   title: string | null;
   selected: boolean;
   isCover: boolean;
+  sortOrder: number;
+  metaJson?: unknown;
 };
 
 type ProjectFactsForm = {
@@ -89,18 +162,25 @@ type GeneratePrecheck = {
   activeProjectRemaining: number;
   actionRemaining: number;
   reusableDraftId: string | null;
+  reusableTaskId?: string | null;
+  generationScope?: GenerationScope;
 };
 
-type ProjectCanvasItem = {
-  id: string;
-  kind: "layout_page" | "asset" | "placeholder";
-  frameLabel: string;
-  title: string;
-  summary: string;
-  previewUrl: string | null;
-  accentLabel: string;
-  keyPoints: string[];
-  meta: Array<{ label: string; value: string }>;
+type LeftRailPanel = "project" | "assets" | "notes" | "boards" | "history";
+type RightRailPanel = "inspector" | "ai";
+type SceneSelection = { kind: "board" } | { kind: "node"; nodeId: string };
+
+type InteractionState = {
+  mode: "move" | "resize";
+  nodeId: string;
+  startClientX: number;
+  startClientY: number;
+  originNode: ProjectBoardNode;
+};
+
+type BoardRenderMetrics = {
+  width: number;
+  height: number;
 };
 
 export type ProjectEditorInitialData = {
@@ -126,6 +206,23 @@ export type ProjectEditorInitialData = {
   styleReferenceSets: StyleReferenceSetOption[];
 };
 
+const LEFT_PANEL_ITEMS: Array<{
+  key: LeftRailPanel;
+  label: string;
+  shortLabel: string;
+  icon?: ComponentType<{ className?: string }>;
+}> = [
+  { key: "project", label: "项目", shortLabel: "P" },
+  { key: "assets", label: "素材", shortLabel: "A", icon: ImageIcon },
+  { key: "notes", label: "备注", shortLabel: "N" },
+  { key: "boards", label: "画板", shortLabel: "B" },
+  { key: "history", label: "历史", shortLabel: "H", icon: History },
+];
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 function packageModeLabel(mode: string | null) {
   if (mode === "DEEP") return "深讲";
   if (mode === "LIGHT") return "浅讲";
@@ -147,17 +244,370 @@ function verdictLabel(verdict: string | undefined) {
   return "待判断";
 }
 
+function boardStatusLabel(status: ProjectBoardStatus) {
+  if (status === "empty") return "空白";
+  if (status === "draft") return "草稿";
+  if (status === "analyzed") return "已诊断";
+  if (status === "needs_attention") return "待补强";
+  return "可继续";
+}
+
+function getBoardThumbnailAssetId(board: ProjectBoard) {
+  if (board.thumbnailAssetId) return board.thumbnailAssetId;
+  const imageNode = board.nodes.find(
+    (node): node is ProjectBoardImageNode => node.type === "image"
+  );
+  return imageNode?.assetId ?? null;
+}
+
+function duplicateBoard(board: ProjectBoard) {
+  return createProjectBoard({
+    name: `${board.name} Copy`,
+    intent: board.intent,
+    status: board.nodes.length > 0 ? "draft" : "empty",
+    thumbnailAssetId: getBoardThumbnailAssetId(board),
+    aiMarkers: {
+      hasAnalysis: false,
+      hasPendingSuggestion: board.aiMarkers.hasPendingSuggestion,
+    },
+    nodes: board.nodes.map((node) =>
+      node.type === "text"
+        ? createProjectTextNode({
+            text: node.text,
+            role: node.role,
+            x: node.x + 48,
+            y: node.y + 48,
+            width: node.width,
+            height: node.height,
+            fontSize: node.fontSize,
+            fontWeight: node.fontWeight,
+            lineHeight: node.lineHeight,
+            align: node.align,
+            color: node.color,
+            zIndex: node.zIndex,
+          })
+        : createProjectImageNode(node.assetId, {
+            x: node.x + 48,
+            y: node.y + 48,
+            width: node.width,
+            height: node.height,
+            fit: node.fit,
+            crop: node.crop,
+            note: node.note,
+            roleTag: node.roleTag,
+            zIndex: node.zIndex,
+          })
+    ),
+  });
+}
+
+function getNextStepConclusion(params: {
+  boundaryAnalysis: BoundaryAnalysis | null;
+  completenessAnalysis: CompletenessAnalysis | null;
+  layout: LayoutJson | null;
+  packageMode: string | null;
+  packageRecommendation: PackageRecommendation | null;
+  selectedAssetCount: number;
+}) {
+  const {
+    boundaryAnalysis,
+    completenessAnalysis,
+    layout,
+    packageMode,
+    packageRecommendation,
+    selectedAssetCount,
+  } = params;
+
+  if (layout?.pages?.length) {
+    return "当前项目已经拿到排版建议。继续细调单画板内容，再决定要不要发起新一轮生成。";
+  }
+  if (selectedAssetCount === 0) {
+    return "先把素材上传进左侧素材库，再拖到中间画板里梳理内容。";
+  }
+  if (!boundaryAnalysis || !completenessAnalysis || !packageRecommendation) {
+    return "先运行项目诊断，让系统基于当前画板上下文补齐边界、完整度和包装模式判断。";
+  }
+  if (!completenessAnalysis.canProceed) {
+    return completenessAnalysis.prioritySuggestions[0] ?? "先把当前画板里的关键信息补齐，再继续排版。";
+  }
+  if (!packageMode) {
+    return `建议先确认“${packageModeLabel(packageRecommendation.recommendedMode)}”模式，再生成排版建议。`;
+  }
+  return "当前信息已经够用，可以直接以当前画板范围继续生成排版建议。";
+}
+
+async function parseJsonResponse(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      (data as { error?: string }).error === "quota_exceeded"
+        ? "当前排版次数已用完，请先前往权益页查看剩余次数。"
+        : (data as { error?: string }).error === "upgrade_required"
+          ? "当前套餐还不能执行这个高成本动作，请先升级后再继续。"
+          : (data as { error?: string }).error ?? "请求失败，请稍后重试";
+    throw new Error(message);
+  }
+  return data;
+}
+
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, size] as const;
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+      {children}
+    </p>
+  );
+}
+
 function EditorPanelCard({
   children,
   className,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
     <Card className={cn("border-white/10 bg-white/[0.03] text-white shadow-none", className)}>
       <CardContent className="p-4">{children}</CardContent>
     </Card>
+  );
+}
+
+function LeftRailIconButton({
+  active,
+  label,
+  shortLabel,
+  icon: Icon,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  shortLabel: string;
+  icon?: ComponentType<{ className?: string }>;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group flex w-full flex-col items-center gap-2 rounded-xl border px-2 py-3 text-[10px] font-mono uppercase tracking-[0.16em] transition-colors",
+        active
+          ? "border-lime-300/50 bg-lime-300/10 text-lime-100"
+          : "border-white/10 bg-white/[0.02] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
+      )}
+      aria-label={label}
+      title={label}
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-current/20 bg-black/10">
+        {Icon ? <Icon className="h-4 w-4" /> : <span>{shortLabel}</span>}
+      </span>
+      <span className="[writing-mode:vertical-rl]">{label}</span>
+    </button>
+  );
+}
+
+function DraggableAssetCard({
+  asset,
+  active,
+  used,
+  onToggleSelected,
+  onSetCover,
+}: {
+  asset: ProjectAsset;
+  active?: boolean;
+  used: boolean;
+  onToggleSelected: (assetId: string) => void;
+  onSetCover: (assetId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `asset:${asset.id}`,
+    data: { type: "asset", assetId: asset.id },
+  });
+  const meta = resolveProjectAssetMeta(asset.metaJson);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: transform
+          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+          : undefined,
+      }}
+      className={cn(
+        "rounded-2xl border transition-all",
+        active
+          ? "border-lime-300/50 bg-lime-300/[0.08]"
+          : "border-white/10 bg-white/[0.03]",
+        isDragging && "opacity-70"
+      )}
+    >
+      <button
+        type="button"
+        className="block w-full cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <div className="flex items-start gap-3 p-3">
+          <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+              alt={asset.title ?? "素材"}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap gap-1.5">
+              {asset.selected ? <Badge className="border-none bg-white text-neutral-950">已纳入</Badge> : null}
+              {used ? <Badge variant="outline" className="border-lime-300/40 text-lime-100">已上板</Badge> : null}
+              {asset.isCover ? <Badge variant="outline" className="border-sky-300/40 text-sky-100">封面</Badge> : null}
+              {meta.roleTag ? (
+                <Badge variant="outline" className="border-white/20 text-white/70">
+                  {meta.roleTag}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-3 truncate text-sm font-medium text-white">
+              {asset.title ?? "未命名素材"}
+            </p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
+              {meta.note ?? "拖到中间画板即可放进当前页面。"}
+            </p>
+          </div>
+        </div>
+      </button>
+      <div className="flex items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => onToggleSelected(asset.id)}
+          className="text-xs text-white/54 transition-colors hover:text-white"
+        >
+          {asset.selected ? "从生成中移除" : "纳入生成"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSetCover(asset.id)}
+          className="text-xs text-white/54 transition-colors hover:text-white"
+        >
+          设为封面
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SortableBoardStripItem({
+  board,
+  active,
+  selectedForScope,
+  thumbnailUrl,
+  onClick,
+  onToggleScope,
+}: {
+  board: ProjectBoard;
+  active: boolean;
+  selectedForScope: boolean;
+  thumbnailUrl: string | null;
+  onClick: () => void;
+  onToggleScope: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: board.id,
+    data: { type: "board" },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn("shrink-0", isDragging && "opacity-60")}
+    >
+      <EditorStripButton active={active} className="relative w-48 overflow-hidden p-0" onClick={onClick}>
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleScope();
+            }}
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.14em]",
+              selectedForScope
+                ? "border-lime-300/50 bg-lime-300/10 text-lime-100"
+                : "border-white/10 bg-black/30 text-white/50"
+            )}
+          >
+            批量
+          </button>
+          <button
+            type="button"
+            onClick={(event) => event.stopPropagation()}
+            className="rounded-md border border-white/10 bg-black/30 p-1 text-white/50"
+            aria-label="拖拽排序"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="p-3">
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b0c0f]">
+            {thumbnailUrl ? (
+              <div className="aspect-video">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={buildPrivateBlobProxyUrl(thumbnailUrl)}
+                  alt={board.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.08]">
+                <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/32">
+                  1920 x 1080
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="mt-3">
+            <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] text-white/38">
+              {boardStatusLabel(board.status)}
+            </p>
+            <p className="mt-2 truncate text-sm font-medium text-white">{board.name}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
+              {board.intent || "还没有给这张画板写意图。"}
+            </p>
+          </div>
+        </div>
+      </EditorStripButton>
+    </div>
   );
 }
 
@@ -180,7 +630,16 @@ export function ProjectEditorClient({
   const [packageRecommendation, setPackageRecommendation] = useState(
     initialData.packageRecommendation
   );
-  const [layout, setLayout] = useState(initialData.layout);
+  const [layout, setLayout] = useState<LayoutJson | null>(initialData.layout);
+  const [scene, setScene] = useState<ProjectEditorScene>(() =>
+    resolveProjectEditorScene(initialData.layout, {
+      assets: initialData.assets,
+      projectName: initialData.name,
+    })
+  );
+  const [selection, setSelection] = useState<SceneSelection>({ kind: "board" });
+  const [leftPanel, setLeftPanel] = useState<LeftRailPanel>("assets");
+  const [rightPanel, setRightPanel] = useState<RightRailPanel>("inspector");
   const [savingFacts, setSavingFacts] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [factsMessage, setFactsMessage] = useState("");
@@ -188,11 +647,11 @@ export function ProjectEditorClient({
   const [notesDraft, setNotesDraft] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadingAssets, setUploadingAssets] = useState(false);
+  const [updatingAssetFlags, setUpdatingAssetFlags] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generatingLayout, setGeneratingLayout] = useState(false);
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
   const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
-  const [selectedCanvasItemId, setSelectedCanvasItemId] = useState<string | null>(null);
   const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
     const styleProfile = initialData.layout?.styleProfile;
     if (styleProfile?.source === "preset" && styleProfile.presetKey) {
@@ -207,16 +666,66 @@ export function ProjectEditorClient({
     }
     return { source: "none" };
   });
+  const [sceneSaveState, setSceneSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
+    "saved"
+  );
+  const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(null);
+  const [editingTextDraft, setEditingTextDraft] = useState("");
+  const [interaction, setInteraction] = useState<InteractionState | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [assetMetaSaving, setAssetMetaSaving] = useState(false);
+
+  const [boardViewportRef, boardViewportSize] = useElementSize<HTMLDivElement>();
+  const boardDropRef = useRef<HTMLDivElement | null>(null);
+  const lastSavedSceneRef = useRef(JSON.stringify(scene));
+  const didHydrateSceneRef = useRef(false);
 
   const stageInfo =
     stage && stage !== "DRAFT"
       ? PROJECT_STAGE_LABEL[stage]
       : PROJECT_STATUS_LABEL[initialData.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT;
-  const displayAssets = useMemo(() => {
-    const selectedAssets = assets.filter((asset) => asset.selected);
-    return selectedAssets.length > 0 ? selectedAssets : assets;
-  }, [assets]);
-  const diagnosisHistory = useMemo(
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const assetMap = useMemo(
+    () => new Map(assets.map((asset) => [asset.id, asset])),
+    [assets]
+  );
+  const usedAssetIds = useMemo(() => {
+    return new Set(
+      scene.boards.flatMap((board) =>
+        board.nodes
+          .filter((node): node is ProjectBoardImageNode => node.type === "image")
+          .map((node) => node.assetId)
+      )
+    );
+  }, [scene.boards]);
+  const selectedAssets = useMemo(
+    () => assets.filter((asset) => asset.selected),
+    [assets]
+  );
+  const activeBoard = useMemo(
+    () => getSceneBoardById(scene, scene.activeBoardId) ?? scene.boards[0] ?? null,
+    [scene]
+  );
+  const selectedNode = useMemo(() => {
+    if (!activeBoard || selection.kind !== "node") return null;
+    return (
+      activeBoard.nodes.find((node) => node.id === selection.nodeId) ?? null
+    );
+  }, [activeBoard, selection]);
+  const selectedAsset = useMemo(() => {
+    if (!selectedNode || selectedNode.type !== "image") return null;
+    return assetMap.get(selectedNode.assetId) ?? null;
+  }, [assetMap, selectedNode]);
+  const boardThumbnailMap = useMemo(() => {
+    const entries = scene.boards.map((board) => {
+      const assetId = getBoardThumbnailAssetId(board);
+      return [board.id, assetId ? assetMap.get(assetId)?.imageUrl ?? null : null] as const;
+    });
+    return new Map(entries);
+  }, [assetMap, scene.boards]);
+  const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
+  const aiHistory = useMemo(
     () =>
       [
         boundaryAnalysis
@@ -236,7 +745,7 @@ export function ProjectEditorClient({
               summary: packageRecommendation.reasoning,
             }
           : null,
-        layout
+        layout?.narrativeSummary
           ? {
               key: "layout",
               label: "排版结果",
@@ -244,188 +753,522 @@ export function ProjectEditorClient({
             }
           : null,
       ].filter(Boolean) as Array<{ key: string; label: string; summary: string }>,
-    [boundaryAnalysis, completenessAnalysis, packageRecommendation, layout]
+    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
   );
-  const factSnapshot = useMemo(
-    () => [
-      { label: "项目类型", value: facts.projectType.trim() || "待补充" },
-      { label: "所属行业", value: facts.industry.trim() || "待补充" },
-      { label: "我的角色", value: facts.roleTitle.trim() || "待补充" },
-      {
-        label: "背景摘要",
-        value: facts.background.trim() ? "已补充背景" : "待补充",
-      },
-      {
-        label: "结果摘要",
-        value: facts.resultSummary.trim() ? "已补充结果" : "待补充",
-      },
-    ],
-    [facts]
+  const currentConclusion = useMemo(
+    () =>
+      layout?.narrativeSummary ??
+      packageRecommendation?.reasoning ??
+      completenessAnalysis?.overallComment ??
+      boundaryAnalysis?.projectSummary ??
+      "先运行项目诊断，系统会基于当前画板上下文返回边界、完整度和包装模式建议。",
+    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
   );
-  const completedFactCount = useMemo(
+  const nextStepConclusion = useMemo(
+    () =>
+      getNextStepConclusion({
+        boundaryAnalysis,
+        completenessAnalysis,
+        layout,
+        packageMode,
+        packageRecommendation,
+        selectedAssetCount: selectedAssets.length,
+      }),
+    [boundaryAnalysis, completenessAnalysis, layout, packageMode, packageRecommendation, selectedAssets.length]
+  );
+  const aiHighlights = useMemo(
     () =>
       [
-        facts.projectType,
-        facts.industry,
-        facts.roleTitle,
-        facts.background,
-        facts.resultSummary,
-      ].filter((value) => value.trim().length > 0).length,
-    [facts]
+        ...(boundaryAnalysis?.suggestions ?? []),
+        ...(packageRecommendation?.reasoning ? [packageRecommendation.reasoning] : []),
+      ].slice(0, 3),
+    [boundaryAnalysis?.suggestions, packageRecommendation?.reasoning]
   );
-  const readinessChecklist = useMemo(
-    () => [
-      {
-        label: "基础 facts",
-        done: completedFactCount >= 3,
-        detail: completedFactCount >= 3 ? "核心项目信息已成型" : "至少补齐类型、行业、角色",
-      },
-      {
-        label: "展示素材",
-        done: displayAssets.length >= 3,
-        detail:
-          displayAssets.length >= 3
-            ? `当前可用 ${displayAssets.length} 张`
-            : "建议先补 3 张以上关键画面",
-      },
-      {
-        label: "项目诊断",
-        done: Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation),
-        detail: boundaryAnalysis && completenessAnalysis && packageRecommendation
-          ? "边界、完整度和包装模式已齐"
-          : "还需要跑一次完整项目诊断",
-      },
-      {
-        label: "排版结果",
-        done: Boolean(layout),
-        detail: layout ? `已生成 ${layout.totalPages} 页首版` : "还没有首版排版结果",
-      },
-    ],
-    [
-      boundaryAnalysis,
-      completenessAnalysis,
-      completedFactCount,
-      displayAssets.length,
-      layout,
-      packageRecommendation,
-    ]
+  const aiIssues = useMemo(
+    () =>
+      [
+        ...(boundaryAnalysis?.risks ?? []),
+        ...(completenessAnalysis?.prioritySuggestions ?? []),
+      ].slice(0, 4),
+    [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
   );
-  const canvasItems = useMemo<ProjectCanvasItem[]>(() => {
-    if (layout?.pages?.length) {
-      return layout.pages.map((page, index) => ({
-        id: `page-${page.pageNumber}`,
-        kind: "layout_page",
-        frameLabel: `Page ${page.pageNumber}`,
-        title: page.titleSuggestion,
-        summary: page.contentGuidance,
-        previewUrl: displayAssets[index]?.imageUrl ?? displayAssets[0]?.imageUrl ?? null,
-        accentLabel: page.type,
-        keyPoints: page.keyPoints.slice(0, 3),
-        meta: [
-          { label: "页面类型", value: page.type },
-          { label: "字数建议", value: page.wordCountGuideline ?? "未提供" },
-          { label: "素材提示", value: page.assetHint ?? "未提供" },
-        ],
-      }));
+  const boardRender = useMemo<BoardRenderMetrics>(() => {
+    const paddingX = 120;
+    const paddingY = 136;
+    const fitWidth = Math.max(boardViewportSize.width - paddingX, 320);
+    const fitHeight = Math.max(boardViewportSize.height - paddingY, 220);
+    const baseScale = Math.min(fitWidth / PROJECT_BOARD_WIDTH, fitHeight / PROJECT_BOARD_HEIGHT, 1);
+    const zoom = scene.viewport.zoom || 1;
+    return {
+      width: Math.round(PROJECT_BOARD_WIDTH * baseScale * zoom),
+      height: Math.round(PROJECT_BOARD_HEIGHT * baseScale * zoom),
+    };
+  }, [boardViewportSize.height, boardViewportSize.width, scene.viewport.zoom]);
+
+  useEffect(() => {
+    if (!activeBoard) return;
+    if (selection.kind === "node") {
+      const exists = activeBoard.nodes.some((node) => node.id === selection.nodeId);
+      if (!exists) {
+        setSelection({ kind: "board" });
+      }
+    }
+  }, [activeBoard, selection]);
+
+  useEffect(() => {
+    if (!editingTextNodeId) return;
+    if (!selectedNode || selectedNode.type !== "text" || selectedNode.id !== editingTextNodeId) {
+      setEditingTextNodeId(null);
+      setEditingTextDraft("");
+    }
+  }, [editingTextNodeId, selectedNode]);
+
+  async function persistScene(sceneToSave: ProjectEditorScene, force = false) {
+    const serialized = JSON.stringify(sceneToSave);
+    if (!force && serialized === lastSavedSceneRef.current) {
+      setSceneSaveState("saved");
+      return;
     }
 
-    if (displayAssets.length > 0) {
-      return displayAssets.map((asset, index) => ({
-        id: `asset-${asset.id}`,
-        kind: "asset",
-        frameLabel: `Asset ${index + 1}`,
-        title: asset.title ?? `素材 ${index + 1}`,
-        summary: asset.isCover
-          ? "当前这张图更像封面候选，适合作为项目进入时的第一视觉。"
-          : asset.selected
-            ? "当前已经进入主画布候选区，后续会参与页面编排。"
-            : "这张图目前还没有被选为主画布素材，可以继续作为候选。",
-        previewUrl: asset.imageUrl,
-        accentLabel: asset.isCover ? "cover" : asset.selected ? "selected" : "candidate",
-        keyPoints: [
-          asset.isCover ? "适合作为封面或章节引导图" : "可作为过程或结果补充图",
-          asset.selected ? "已进入当前主画布候选池" : "仍可手动切换是否参与展示",
-        ],
-        meta: [
-          { label: "素材状态", value: asset.selected ? "已选中" : "未选中" },
-          { label: "封面优先", value: asset.isCover ? "是" : "否" },
-          { label: "对象类型", value: "Project Asset" },
-        ],
-      }));
-    }
+    setSceneSaveState("saving");
+    await parseJsonResponse(
+      await fetch(`/api/projects/${initialData.id}/layout/scene`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ editorScene: sceneToSave }),
+      })
+    );
+    lastSavedSceneRef.current = serialized;
+    setLayout((current) =>
+      mergeProjectLayoutDocument(current, { editorScene: sceneToSave }) as LayoutJson
+    );
+    setSceneSaveState("saved");
+  }
 
-    return [
-      {
-        id: "starter",
-        kind: "placeholder",
-        frameLabel: "Start",
-        title: "先把素材和项目事实放进画布",
-        summary:
-          "当前还没有可展示的项目画板。先在左侧补 facts、上传展示素材，再发起项目诊断和首版排版生成。",
-        previewUrl: null,
-        accentLabel: "draft",
-        keyPoints: [
-          "左侧先补项目类型、行业、角色和结果摘要",
-          "至少准备 3 张可代表项目过程与结果的素材",
-          "跑一次项目诊断后，再生成首版排版",
-        ],
-        meta: [
-          { label: "当前阶段", value: stageInfo?.label ?? "草稿" },
-          { label: "主画布素材", value: `${displayAssets.length} 张` },
-          { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
-        ],
+  useEffect(() => {
+    if (!didHydrateSceneRef.current) {
+      didHydrateSceneRef.current = true;
+      return;
+    }
+    const serialized = JSON.stringify(scene);
+    if (serialized === lastSavedSceneRef.current) return;
+
+    setSceneSaveState("dirty");
+    const timeout = window.setTimeout(() => {
+      persistScene(scene).catch((error) => {
+        console.error("Project scene save error:", error);
+        setSceneSaveState("error");
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timeout);
+  }, [scene]);
+
+  useEffect(() => {
+    if (!interaction || !activeBoard) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      const scaleX = PROJECT_BOARD_WIDTH / Math.max(boardRender.width, 1);
+      const scaleY = PROJECT_BOARD_HEIGHT / Math.max(boardRender.height, 1);
+      const deltaX = (event.clientX - interaction.startClientX) * scaleX;
+      const deltaY = (event.clientY - interaction.startClientY) * scaleY;
+
+      setScene((currentScene) =>
+        normalizeProjectEditorScene({
+          ...currentScene,
+          boards: currentScene.boards.map((board) => {
+            if (board.id !== currentScene.activeBoardId) return board;
+            return {
+              ...board,
+              nodes: board.nodes.map((node) => {
+                if (node.id !== interaction.nodeId) return node;
+                if (interaction.mode === "move") {
+                  const nextX = clamp(
+                    interaction.originNode.x + deltaX,
+                    0,
+                    PROJECT_BOARD_WIDTH - interaction.originNode.width
+                  );
+                  const nextY = clamp(
+                    interaction.originNode.y + deltaY,
+                    0,
+                    PROJECT_BOARD_HEIGHT - interaction.originNode.height
+                  );
+                  return { ...node, x: nextX, y: nextY };
+                }
+
+                if (node.type !== "image" || interaction.originNode.type !== "image") {
+                  return node;
+                }
+
+                const nextWidth = clamp(interaction.originNode.width + deltaX, 120, PROJECT_BOARD_WIDTH);
+                const nextHeight = clamp(
+                  interaction.originNode.height + deltaY,
+                  120,
+                  PROJECT_BOARD_HEIGHT
+                );
+
+                return {
+                  ...node,
+                  width: Math.min(nextWidth, PROJECT_BOARD_WIDTH - node.x),
+                  height: Math.min(nextHeight, PROJECT_BOARD_HEIGHT - node.y),
+                };
+              }),
+            };
+          }),
+        })
+      );
+    };
+
+    const onPointerUp = () => {
+      setInteraction(null);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [activeBoard, boardRender.height, boardRender.width, interaction]);
+
+  function updateScene(updater: (current: ProjectEditorScene) => ProjectEditorScene) {
+    setScene((current) => normalizeProjectEditorScene(updater(current)));
+  }
+
+  function updateActiveBoard(
+    updater: (board: ProjectBoard) => ProjectBoard,
+    options?: { selectBoard?: boolean }
+  ) {
+    updateScene((current) => ({
+      ...current,
+      boards: current.boards.map((board) =>
+        board.id === current.activeBoardId ? updater(board) : board
+      ),
+    }));
+    if (options?.selectBoard) setSelection({ kind: "board" });
+  }
+
+  function updateSelectedNode(updater: (node: ProjectBoardNode) => ProjectBoardNode) {
+    if (selection.kind !== "node") return;
+    updateActiveBoard((board) => ({
+      ...board,
+      nodes: board.nodes.map((node) => (node.id === selection.nodeId ? updater(node) : node)),
+    }));
+  }
+
+  function setActiveBoard(boardId: string) {
+    updateScene((current) => ({
+      ...current,
+      activeBoardId: boardId,
+      generationScope:
+        current.generationScope.mode === "current"
+          ? { mode: "current", boardIds: [boardId] }
+          : current.generationScope,
+    }));
+    setSelection({ kind: "board" });
+    setEditingTextNodeId(null);
+  }
+
+  function addBoard() {
+    const newBoard = createProjectBoard({
+      name: `Board ${scene.boards.length + 1}`,
+      intent: "",
+      status: "empty",
+    });
+    updateScene((current) => {
+      const currentIndex = current.boardOrder.findIndex((boardId) => boardId === current.activeBoardId);
+      const insertIndex = currentIndex >= 0 ? currentIndex + 1 : current.boardOrder.length;
+      const nextOrder = [...current.boardOrder];
+      nextOrder.splice(insertIndex, 0, newBoard.id);
+      return {
+        ...current,
+        activeBoardId: newBoard.id,
+        boardOrder: nextOrder,
+        boards: [...current.boards, newBoard],
+        generationScope:
+          current.generationScope.mode === "current"
+            ? { mode: "current", boardIds: [newBoard.id] }
+            : current.generationScope,
+      };
+    });
+    setSelection({ kind: "board" });
+    setLeftPanel("boards");
+  }
+
+  function duplicateActiveBoard() {
+    if (!activeBoard) return;
+    const duplicated = duplicateBoard(activeBoard);
+    updateScene((current) => {
+      const currentIndex = current.boardOrder.findIndex((boardId) => boardId === current.activeBoardId);
+      const nextOrder = [...current.boardOrder];
+      nextOrder.splice(currentIndex + 1, 0, duplicated.id);
+      return {
+        ...current,
+        activeBoardId: duplicated.id,
+        boardOrder: nextOrder,
+        boards: [...current.boards, duplicated],
+      };
+    });
+    setSelection({ kind: "board" });
+  }
+
+  function deleteActiveBoard() {
+    if (!activeBoard || scene.boardOrder.length <= 1) return;
+    updateScene((current) => {
+      const currentIndex = current.boardOrder.findIndex((boardId) => boardId === current.activeBoardId);
+      const nextOrder = current.boardOrder.filter((boardId) => boardId !== current.activeBoardId);
+      const nextActive = nextOrder[Math.max(currentIndex - 1, 0)] ?? nextOrder[0];
+      return {
+        ...current,
+        activeBoardId: nextActive,
+        boardOrder: nextOrder,
+        boards: current.boards.filter((board) => board.id !== current.activeBoardId),
+        generationScope:
+          current.generationScope.mode === "selected"
+            ? {
+                mode: nextOrder.some((boardId) => current.generationScope.boardIds.includes(boardId))
+                  ? "selected"
+                  : "current",
+                boardIds: current.generationScope.boardIds.filter((boardId) => boardId !== current.activeBoardId),
+              }
+            : current.generationScope.mode === "current"
+              ? { mode: "current", boardIds: [nextActive] }
+              : {
+                  mode: "all",
+                  boardIds: nextOrder,
+                },
+      };
+    });
+    setSelection({ kind: "board" });
+    setEditingTextNodeId(null);
+  }
+
+  function addTextNode() {
+    const node = createProjectTextNode({
+      text: "新文本",
+      role: "title",
+      x: 160,
+      y: 140,
+      width: 720,
+      height: 140,
+      fontSize: 72,
+      fontWeight: 700,
+      lineHeight: 1.08,
+      zIndex: Math.max(...(activeBoard?.nodes.map((item) => item.zIndex) ?? [0])) + 1,
+    });
+    updateActiveBoard(
+      (board) => ({
+        ...board,
+        status: board.nodes.length === 0 ? "draft" : board.status,
+        nodes: [...board.nodes, node],
+      }),
+      { selectBoard: false }
+    );
+    setSelection({ kind: "node", nodeId: node.id });
+    setEditingTextNodeId(node.id);
+    setEditingTextDraft(node.text);
+  }
+
+  function removeSelectedNode() {
+    if (selection.kind !== "node") return;
+    updateActiveBoard((board) => {
+      const target = board.nodes.find((node) => node.id === selection.nodeId);
+      const nextNodes = board.nodes.filter((node) => node.id !== selection.nodeId);
+      const nextThumbnail =
+        target?.type === "image" && board.thumbnailAssetId === target.assetId
+          ? nextNodes.find((node): node is ProjectBoardImageNode => node.type === "image")?.assetId ?? null
+          : board.thumbnailAssetId;
+      return {
+        ...board,
+        nodes: nextNodes,
+        thumbnailAssetId: nextThumbnail,
+        status: nextNodes.length === 0 ? "empty" : board.status,
+      };
+    });
+    setSelection({ kind: "board" });
+    setEditingTextNodeId(null);
+  }
+
+  function moveSelectedNodeZ(direction: "front" | "back") {
+    if (!activeBoard || selection.kind !== "node") return;
+    const sorted = [...activeBoard.nodes].sort((a, b) => a.zIndex - b.zIndex);
+    const currentIndex = sorted.findIndex((node) => node.id === selection.nodeId);
+    if (currentIndex < 0) return;
+    const targetIndex =
+      direction === "front"
+        ? Math.min(sorted.length - 1, currentIndex + 1)
+        : Math.max(0, currentIndex - 1);
+    if (targetIndex === currentIndex) return;
+
+    const reordered = arrayMove(sorted, currentIndex, targetIndex).map((node, index) => ({
+      ...node,
+      zIndex: index + 1,
+    }));
+    updateActiveBoard((board) => ({ ...board, nodes: reordered }));
+  }
+
+  function setGenerationMode(mode: GenerationScope["mode"]) {
+    updateScene((current) => {
+      if (mode === "all") {
+        return {
+          ...current,
+          generationScope: { mode: "all", boardIds: current.boardOrder },
+        };
+      }
+
+      if (mode === "selected") {
+        const selectedIds =
+          current.generationScope.mode === "selected" && current.generationScope.boardIds.length > 0
+            ? current.generationScope.boardIds
+            : [current.activeBoardId];
+        return {
+          ...current,
+          generationScope: { mode: "selected", boardIds: selectedIds },
+        };
+      }
+
+      return {
+        ...current,
+        generationScope: { mode: "current", boardIds: [current.activeBoardId] },
+      };
+    });
+  }
+
+  function toggleBoardInSelection(boardId: string) {
+    updateScene((current) => {
+      const currentIds =
+        current.generationScope.mode === "selected"
+          ? current.generationScope.boardIds
+          : [boardId];
+      const exists = currentIds.includes(boardId);
+      const nextIds = exists
+        ? currentIds.filter((value) => value !== boardId)
+        : [...currentIds, boardId];
+
+      if (nextIds.length === 0) {
+        return {
+          ...current,
+          generationScope: { mode: "current", boardIds: [current.activeBoardId] },
+        };
+      }
+
+      return {
+        ...current,
+        generationScope: { mode: "selected", boardIds: nextIds },
+      };
+    });
+  }
+
+  function setZoom(delta: number) {
+    updateScene((current) => ({
+      ...current,
+      viewport: {
+        ...current.viewport,
+        zoom: clamp(current.viewport.zoom + delta, 0.55, 1.8),
       },
-    ];
-  }, [displayAssets, layout, stageInfo?.label]);
-  const selectedCanvasItem = useMemo(() => {
-    const fallbackId = canvasItems[0]?.id ?? null;
-    const resolvedId = selectedCanvasItemId ?? fallbackId;
-    return canvasItems.find((item) => item.id === resolvedId) ?? null;
-  }, [canvasItems, selectedCanvasItemId]);
-  const nextStepConclusion = useMemo(() => {
-    if (layout) {
-      return "当前项目已经拿到排版结果，可以继续细看页面结构，并准备把它加入作品集。";
-    }
-    if (displayAssets.length === 0) {
-      return "先补充能代表项目过程与结果的素材，再运行项目诊断。";
-    }
-    if (!boundaryAnalysis || !completenessAnalysis || !packageRecommendation) {
-      return "先运行一次完整项目诊断，把边界、完整度和包装模式结论补齐。";
-    }
-    if (!completenessAnalysis.canProceed) {
-      return completenessAnalysis.prioritySuggestions[0] ?? "先按完整度建议补充关键信息，再进入排版。";
-    }
-    if (!packageMode) {
-      return `建议按“${packageModeLabel(packageRecommendation.recommendedMode)}”模式继续生成排版。`;
-    }
-    return "当前信息已经足够，可以直接从顶部发起排版生成。";
-  }, [
-    boundaryAnalysis,
-    completenessAnalysis,
-    displayAssets.length,
-    layout,
-    packageMode,
-    packageRecommendation,
-  ]);
+    }));
+  }
 
-  async function parseJsonResponse(response: Response) {
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message =
-        (data as { error?: string }).error === "quota_exceeded"
-          ? "当前排版次数已用完，请先前往权益页查看剩余次数。"
-          : (data as { error?: string }).error === "upgrade_required"
-            ? "当前套餐还不能执行这个高成本动作，请先升级后再继续。"
-          : (data as { error?: string }).error ?? "请求失败，请稍后重试";
-      throw new Error(message);
-    }
-    return data;
+  function resetZoom() {
+    updateScene((current) => ({
+      ...current,
+      viewport: {
+        ...current.viewport,
+        zoom: 1,
+      },
+    }));
+  }
+
+  function startNodeMove(event: ReactPointerEvent<HTMLButtonElement>, node: ProjectBoardNode) {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelection({ kind: "node", nodeId: node.id });
+    setInteraction({
+      mode: "move",
+      nodeId: node.id,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      originNode: node,
+    });
+  }
+
+  function startNodeResize(event: ReactPointerEvent<HTMLButtonElement>, node: ProjectBoardImageNode) {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelection({ kind: "node", nodeId: node.id });
+    setInteraction({
+      mode: "resize",
+      nodeId: node.id,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      originNode: node,
+    });
+  }
+
+  function beginInlineTextEdit(node: ProjectBoardTextNode) {
+    setSelection({ kind: "node", nodeId: node.id });
+    setEditingTextNodeId(node.id);
+    setEditingTextDraft(node.text);
+  }
+
+  function commitInlineTextEdit() {
+    if (!editingTextNodeId) return;
+    const nextValue = editingTextDraft.trim();
+    if (!nextValue) return;
+    updateSelectedNode((node) =>
+      node.type === "text" && node.id === editingTextNodeId
+        ? { ...node, text: nextValue }
+        : node
+    );
+    setEditingTextNodeId(null);
+    setEditingTextDraft("");
   }
 
   async function refreshAssets() {
     const response = await fetch(`/api/projects/${initialData.id}/assets`);
     const data = await parseJsonResponse(response);
     setAssets(data.assets as ProjectAsset[]);
+  }
+
+  async function saveAssetFlags(nextAssets: ProjectAsset[]) {
+    setUpdatingAssetFlags(true);
+    try {
+      await parseJsonResponse(
+        await fetch(`/api/projects/${initialData.id}/assets`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: nextAssets.map((asset, index) => ({
+              id: asset.id,
+              selected: asset.selected,
+              sortOrder: asset.sortOrder ?? index,
+              isCover: asset.isCover,
+            })),
+          }),
+        })
+      );
+      setAssets(nextAssets);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "素材状态更新失败");
+    } finally {
+      setUpdatingAssetFlags(false);
+    }
+  }
+
+  function handleToggleAssetSelected(assetId: string) {
+    const nextAssets = assets.map((asset) =>
+      asset.id === assetId ? { ...asset, selected: !asset.selected } : asset
+    );
+    void saveAssetFlags(nextAssets);
+  }
+
+  function handleSetAssetCover(assetId: string) {
+    const nextAssets = assets.map((asset) => ({
+      ...asset,
+      isCover: asset.id === assetId,
+    }));
+    void saveAssetFlags(nextAssets);
   }
 
   async function handleSaveFacts() {
@@ -472,6 +1315,7 @@ export function ProjectEditorClient({
 
       await refreshAssets();
       setPendingFiles([]);
+      setLeftPanel("assets");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "素材上传失败，请稍后重试");
     } finally {
@@ -479,27 +1323,56 @@ export function ProjectEditorClient({
     }
   }
 
+  async function persistCurrentSceneForAction() {
+    try {
+      await persistScene(scene, true);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "画板保存失败，请稍后重试");
+      throw error;
+    }
+  }
+
   async function handleRunDiagnosis() {
     setDiagnosing(true);
     setActionError("");
+    setRightPanel("ai");
 
     try {
+      await persistCurrentSceneForAction();
+
+      const payload = JSON.stringify({ generationScope: scene.generationScope });
       const [boundaryResult, completenessResult, packageResult] = await Promise.allSettled([
         parseJsonResponse(
-          await fetch(`/api/projects/${initialData.id}/boundary/analyze`, { method: "POST" })
+          await fetch(`/api/projects/${initialData.id}/boundary/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })
         ),
         parseJsonResponse(
-          await fetch(`/api/projects/${initialData.id}/completeness/analyze`, { method: "POST" })
+          await fetch(`/api/projects/${initialData.id}/completeness/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })
         ),
         parseJsonResponse(
-          await fetch(`/api/projects/${initialData.id}/package/recommend`, { method: "POST" })
+          await fetch(`/api/projects/${initialData.id}/package/recommend`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })
         ),
       ]);
+
       const failures: string[] = [];
       let successCount = 0;
+      let nextCompleteness: CompletenessAnalysis | null = null;
+      let nextBoundary: BoundaryAnalysis | null = null;
 
       if (boundaryResult.status === "fulfilled") {
-        setBoundaryAnalysis(boundaryResult.value.analysis as BoundaryAnalysis);
+        nextBoundary = boundaryResult.value.analysis as BoundaryAnalysis;
+        setBoundaryAnalysis(nextBoundary);
         successCount += 1;
       } else {
         failures.push(
@@ -508,7 +1381,8 @@ export function ProjectEditorClient({
       }
 
       if (completenessResult.status === "fulfilled") {
-        setCompletenessAnalysis(completenessResult.value.analysis as CompletenessAnalysis);
+        nextCompleteness = completenessResult.value.analysis as CompletenessAnalysis;
+        setCompletenessAnalysis(nextCompleteness);
         successCount += 1;
       } else {
         failures.push(
@@ -525,11 +1399,18 @@ export function ProjectEditorClient({
         );
       }
 
+      if (successCount > 0) {
+        const nextStatus =
+          nextCompleteness?.canProceed === false || nextBoundary?.isBoundaryClean === false
+            ? "needs_attention"
+            : "analyzed";
+        const markedScene = markBoardsAsAnalyzed(scene, generationBoardIds, nextStatus);
+        setScene(markedScene);
+      }
+
       if (failures.length > 0) {
         setActionError(
-          successCount > 0
-            ? `部分诊断已完成；${failures.join("；")}`
-            : failures.join("；")
+          successCount > 0 ? `部分诊断已完成；${failures.join("；")}` : failures.join("；")
         );
       }
     } catch (error) {
@@ -587,17 +1468,19 @@ export function ProjectEditorClient({
     return { source: "none" as const };
   }
 
-  async function handleOpenGenerate() {
-    setGenerateOpen(true);
+  async function refreshGeneratePrecheck() {
     setCheckingPrecheck(true);
     setActionError("");
-
     try {
+      await persistCurrentSceneForAction();
       const data = await parseJsonResponse(
         await fetch(`/api/projects/${initialData.id}/layout/precheck`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ styleSelection: getResolvedStyleSelection() }),
+          body: JSON.stringify({
+            styleSelection: getResolvedStyleSelection(),
+            generationScope: scene.generationScope,
+          }),
         })
       );
       setGeneratePrecheck(data as GeneratePrecheck);
@@ -607,6 +1490,11 @@ export function ProjectEditorClient({
     } finally {
       setCheckingPrecheck(false);
     }
+  }
+
+  async function handleOpenGenerate() {
+    setGenerateOpen(true);
+    await refreshGeneratePrecheck();
   }
 
   async function handleGenerateLayout() {
@@ -621,6 +1509,8 @@ export function ProjectEditorClient({
     setActionError("");
 
     try {
+      await persistCurrentSceneForAction();
+
       if (!packageMode) {
         const stageData = await parseJsonResponse(
           await fetch(`/api/projects/${initialData.id}/stage`, {
@@ -644,15 +1534,26 @@ export function ProjectEditorClient({
         await fetch(`/api/projects/${initialData.id}/layout/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ styleSelection: getResolvedStyleSelection() }),
+          body: JSON.stringify({
+            styleSelection: getResolvedStyleSelection(),
+            generationScope: scene.generationScope,
+          }),
         })
       );
 
-      setLayout(data.layoutJson as LayoutJson);
+      const nextLayout = data.layoutJson as LayoutJson;
+      setLayout(nextLayout);
+      if (nextLayout.editorScene) {
+        setScene(resolveProjectEditorScene(nextLayout, { assets, projectName: initialData.name }));
+        lastSavedSceneRef.current = JSON.stringify(
+          resolveProjectEditorScene(nextLayout, { assets, projectName: initialData.name })
+        );
+      }
       if ((data as { reused?: boolean }).reused) {
         setFactsMessage("命中可复用排版结果，本次没有额外计次。");
       }
       setGenerateOpen(false);
+      setRightPanel("ai");
       router.refresh();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "排版生成失败，请稍后重试");
@@ -661,463 +1562,1130 @@ export function ProjectEditorClient({
     }
   }
 
+  async function handleSaveSelectedAssetMeta() {
+    if (!selectedAsset || !selectedNode || selectedNode.type !== "image") return;
+    setAssetMetaSaving(true);
+    setActionError("");
+
+    const meta = resolveProjectAssetMeta(selectedAsset.metaJson);
+    const note = selectedNode.note ?? meta.note ?? null;
+    const roleTag = selectedNode.roleTag ?? meta.roleTag ?? null;
+
+    try {
+      const data = await parseJsonResponse(
+        await fetch(`/api/projects/${initialData.id}/assets/${selectedAsset.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: selectedAsset.title ?? "",
+            note,
+            roleTag,
+          }),
+        })
+      );
+
+      setAssets((current) =>
+        current.map((asset) => (asset.id === selectedAsset.id ? (data.asset as ProjectAsset) : asset))
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "素材备注保存失败");
+    } finally {
+      setAssetMetaSaving(false);
+    }
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDragId(String(event.active.id));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveDragId(null);
+    const dragType = event.active.data.current?.type;
+    if (!event.over) return;
+
+    if (dragType === "board" && event.active.id !== event.over.id) {
+      const oldIndex = scene.boardOrder.findIndex((boardId) => boardId === event.active.id);
+      const newIndex = scene.boardOrder.findIndex((boardId) => boardId === event.over?.id);
+      if (oldIndex >= 0 && newIndex >= 0) {
+        updateScene((current) => ({
+          ...current,
+          boardOrder: arrayMove(current.boardOrder, oldIndex, newIndex),
+        }));
+      }
+      return;
+    }
+
+    if (dragType !== "asset" || event.over.id !== "project-board-drop" || !boardDropRef.current) {
+      return;
+    }
+
+    const assetId = event.active.data.current?.assetId as string | undefined;
+    const asset = assetId ? assetMap.get(assetId) : null;
+    if (!asset || !activeBoard) return;
+
+    const boardRect = boardDropRef.current.getBoundingClientRect();
+    const translatedRect = event.active.rect.current.translated ?? event.active.rect.current.initial;
+    if (!translatedRect) return;
+    const centerX = translatedRect.left + translatedRect.width / 2;
+    const centerY = translatedRect.top + translatedRect.height / 2;
+    const relativeX = clamp((centerX - boardRect.left) / Math.max(boardRect.width, 1), 0.08, 0.92);
+    const relativeY = clamp((centerY - boardRect.top) / Math.max(boardRect.height, 1), 0.08, 0.92);
+    const meta = resolveProjectAssetMeta(asset.metaJson);
+    const node = createProjectImageNode(asset.id, {
+      x: clamp(relativeX * PROJECT_BOARD_WIDTH - 320, 32, PROJECT_BOARD_WIDTH - 640),
+      y: clamp(relativeY * PROJECT_BOARD_HEIGHT - 220, 32, PROJECT_BOARD_HEIGHT - 440),
+      width: 640,
+      height: 440,
+      note: meta.note ?? null,
+      roleTag: meta.roleTag ?? null,
+      zIndex: Math.max(...activeBoard.nodes.map((item) => item.zIndex), 0) + 1,
+    });
+
+    updateActiveBoard((board) => ({
+      ...board,
+      status: board.nodes.length === 0 ? "draft" : board.status,
+      thumbnailAssetId: board.thumbnailAssetId ?? asset.id,
+      nodes: [...board.nodes, node],
+    }));
+    setSelection({ kind: "node", nodeId: node.id });
+    setRightPanel("inspector");
+  }
+
+  const factsSnapshot = [
+    { label: "项目类型", value: facts.projectType.trim() || "待补充" },
+    { label: "所属行业", value: facts.industry.trim() || "待补充" },
+    { label: "我的角色", value: facts.roleTitle.trim() || "待补充" },
+    { label: "背景摘要", value: facts.background.trim() ? "已补充背景" : "待补充" },
+    { label: "结果摘要", value: facts.resultSummary.trim() ? "已补充结果" : "待补充" },
+  ];
+
+  const readinessChecklist = [
+    {
+      label: "项目事实",
+      done: [facts.projectType, facts.industry, facts.roleTitle].filter(Boolean).length >= 2,
+    },
+    { label: "已选素材", done: selectedAssets.length >= 3 },
+    {
+      label: "项目诊断",
+      done: Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation),
+    },
+    {
+      label: "排版建议",
+      done: Boolean(layout?.pages?.length),
+    },
+  ];
+
   return (
     <>
-      <EditorScaffold
-        objectLabel="Project"
-        objectName={initialData.name}
-        backHref="/projects"
-        backLabel="全部项目"
-        statusLabel={stageInfo?.label ?? "草稿"}
-        statusMeta={layout ? `${layout.totalPages} pages` : `${displayAssets.length} frames`}
-        primaryAction={
-          <Button className="h-9 px-4" onClick={handleOpenGenerate}>
-            <Wand2 className="h-4 w-4" />
-            生成排版
-          </Button>
-        }
-        secondaryAction={
-          <EditorChromeButton
-            className="h-9 px-4"
-            onClick={handleRunDiagnosis}
-            disabled={diagnosing}
-          >
-            {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            项目诊断
-          </EditorChromeButton>
-        }
-        planSummary={planSummary}
-        leftRailLabel="Layers / Assets"
-        rightRailLabel="Inspector / AI"
-        leftRail={
-          <Tabs defaultValue="layers" className="flex h-full flex-col">
-            <div className="border-b border-white/10 p-3">
-              <EditorTabsList className="grid w-full grid-cols-3">
-                <EditorTabsTrigger value="layers">
-                  图层
-                </EditorTabsTrigger>
-                <EditorTabsTrigger value="assets">
-                  素材
-                </EditorTabsTrigger>
-                <EditorTabsTrigger value="facts">
-                  项目
-                </EditorTabsTrigger>
-              </EditorTabsList>
-            </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <EditorScaffold
+          objectLabel="Project"
+          objectName={initialData.name}
+          backHref="/projects"
+          backLabel="全部项目"
+          statusLabel={stageInfo?.label ?? "草稿"}
+          statusMeta={`${scene.boards.length} boards · ${assets.length} assets`}
+          primaryAction={
+            <Button
+              className="h-9 gap-2 border-none bg-lime-300 px-4 text-neutral-950 hover:bg-lime-200"
+              onClick={handleOpenGenerate}
+            >
+              <Wand2 className="h-4 w-4" />
+              生成排版
+            </Button>
+          }
+          secondaryAction={
+            <EditorChromeButton
+              className="h-9 gap-2 px-4"
+              onClick={handleRunDiagnosis}
+              disabled={diagnosing}
+            >
+              {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              项目诊断
+            </EditorChromeButton>
+          }
+          planSummary={planSummary}
+          leftRailLabel="Project Workspace"
+          rightRailLabel="Inspector / AI"
+          leftRail={
+            <div className="flex h-full min-h-0">
+              <div className="flex w-[76px] shrink-0 flex-col gap-2 border-r border-white/10 bg-[#111318] p-3">
+                {LEFT_PANEL_ITEMS.map((item) => (
+                  <LeftRailIconButton
+                    key={item.key}
+                    active={leftPanel === item.key}
+                    label={item.label}
+                    shortLabel={item.shortLabel}
+                    icon={item.icon}
+                    onClick={() => setLeftPanel(item.key)}
+                  />
+                ))}
+              </div>
 
-            <TabsContent value="layers" className="mt-0 flex-1 overflow-y-auto">
-              <EditorRailSection title="Frame List">
-                <div className="space-y-2">
-                  {canvasItems.map((item) => (
-                    <EditorSurfaceButton
-                      key={item.id}
-                      active={selectedCanvasItem?.id === item.id}
-                      onClick={() => setSelectedCanvasItemId(item.id)}
-                    >
-                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
-                        {item.frameLabel}
-                      </p>
-                      <p className="mt-2 text-sm font-medium">{item.title}</p>
-                      <p className="mt-1 text-xs leading-5 opacity-70">{item.accentLabel}</p>
-                    </EditorSurfaceButton>
-                  ))}
-                </div>
-              </EditorRailSection>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {leftPanel === "project" ? (
+                  <>
+                    <EditorRailSection title="项目状态">
+                      <EditorInfoList
+                        items={[
+                          { label: "导入方式", value: sourceTypeLabel(initialData.sourceType) },
+                          { label: "项目阶段", value: stageInfo?.label ?? "草稿" },
+                          { label: "包装模式", value: packageModeLabel(packageMode) },
+                          { label: "排版次数", value: `${initialData.actionSummary.layoutGenerations.remaining} 次剩余` },
+                        ]}
+                      />
+                    </EditorRailSection>
 
-              <EditorRailSection title="项目信息">
-                <EditorInfoList
-                  items={[
-                    { label: "导入方式", value: sourceTypeLabel(initialData.sourceType) },
-                    { label: "包装模式", value: packageModeLabel(packageMode) },
-                    { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
-                    {
-                      label: "当前项目剩余",
-                      value: `生成 ${initialData.actionSummary.layoutGenerations.remaining} / 重生 ${initialData.actionSummary.layoutRegenerations.remaining}`,
-                    },
-                  ]}
-                />
-                {initialData.sourceUrl ? (
-                  <a
-                    href={initialData.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 block truncate text-sm text-white/64 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    {initialData.sourceUrl}
-                  </a>
+                    <EditorRailSection title="项目事实">
+                      <div className="grid gap-2">
+                        {factsSnapshot.map((item) => (
+                          <EditorPanelCard key={item.label} className="bg-white/[0.02]">
+                            <FieldLabel>{item.label}</FieldLabel>
+                            <p className="mt-2 text-sm text-white/78">{item.value}</p>
+                          </EditorPanelCard>
+                        ))}
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="编辑项目">
+                      <div className="space-y-3">
+                        <Input
+                          value={facts.projectType}
+                          onChange={(event) =>
+                            setFacts((current) => ({ ...current, projectType: event.target.value }))
+                          }
+                          placeholder="项目类型"
+                          className={cn("h-10", editorFieldClass)}
+                        />
+                        <Input
+                          value={facts.industry}
+                          onChange={(event) =>
+                            setFacts((current) => ({ ...current, industry: event.target.value }))
+                          }
+                          placeholder="所属行业"
+                          className={cn("h-10", editorFieldClass)}
+                        />
+                        <Input
+                          value={facts.roleTitle}
+                          onChange={(event) =>
+                            setFacts((current) => ({ ...current, roleTitle: event.target.value }))
+                          }
+                          placeholder="我的角色"
+                          className={cn("h-10", editorFieldClass)}
+                        />
+                        <Textarea
+                          value={facts.background}
+                          onChange={(event) =>
+                            setFacts((current) => ({ ...current, background: event.target.value }))
+                          }
+                          placeholder="项目背景"
+                          className={cn("min-h-28", editorFieldClass)}
+                        />
+                        <Textarea
+                          value={facts.resultSummary}
+                          onChange={(event) =>
+                            setFacts((current) => ({ ...current, resultSummary: event.target.value }))
+                          }
+                          placeholder="结果摘要"
+                          className={cn("min-h-24", editorFieldClass)}
+                        />
+                        <Button
+                          variant="outline"
+                          className="h-10 w-full border-white/10 bg-white text-neutral-950 hover:bg-white/90"
+                          onClick={handleSaveFacts}
+                          disabled={savingFacts}
+                        >
+                          {savingFacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          保存项目信息
+                        </Button>
+                        {factsMessage ? <p className="text-xs text-emerald-300">{factsMessage}</p> : null}
+                      </div>
+                    </EditorRailSection>
+                  </>
                 ) : null}
-              </EditorRailSection>
-            </TabsContent>
 
-            <TabsContent value="assets" className="mt-0 flex-1 overflow-y-auto">
-              <EditorRailSection title="上传素材">
-                <ImageUploadZone
-                  files={pendingFiles}
-                  onFilesChange={setPendingFiles}
-                  disabled={uploadingAssets}
-                  onError={(message) => setActionError(message)}
-                />
-                <Button
-                  className="mt-3 h-10 w-full"
-                  onClick={handleUploadAssets}
-                  disabled={uploadingAssets || pendingFiles.length === 0}
-                >
-                  {uploadingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  上传到当前项目
-                </Button>
-              </EditorRailSection>
-
-              <EditorRailSection title="素材列表" className="flex-1">
-                <div className="space-y-2">
-                  {assets.length > 0 ? (
-                    assets.map((asset) => (
-                      <EditorSurfaceButton
-                        key={asset.id}
-                        active={selectedCanvasItem?.id === `asset-${asset.id}`}
-                        className="flex items-center gap-3"
-                        onClick={() => setSelectedCanvasItemId(`asset-${asset.id}`)}
+                {leftPanel === "assets" ? (
+                  <>
+                    <EditorRailSection title="上传素材">
+                      <ImageUploadZone
+                        files={pendingFiles}
+                        onFilesChange={setPendingFiles}
+                        disabled={uploadingAssets}
+                        theme="dark"
+                        onError={(message) => setActionError(message)}
+                      />
+                      <Button
+                        className="mt-3 h-10 w-full border-none bg-white text-neutral-950 hover:bg-white/90"
+                        onClick={handleUploadAssets}
+                        disabled={uploadingAssets || pendingFiles.length === 0}
                       >
-                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/20">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                            alt={asset.title ?? "素材"}
-                            className="h-full w-full object-cover"
+                        {uploadingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        上传到素材库
+                      </Button>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="素材库" className="flex-1">
+                      <div className="space-y-3">
+                        {assets.length > 0 ? (
+                          assets.map((asset) => (
+                            <DraggableAssetCard
+                              key={asset.id}
+                              asset={asset}
+                              active={activeDragId === `asset:${asset.id}`}
+                              used={usedAssetIds.has(asset.id)}
+                              onToggleSelected={handleToggleAssetSelected}
+                              onSetCover={handleSetAssetCover}
+                            />
+                          ))
+                        ) : (
+                          <EditorEmptyState>
+                            还没有素材。先上传过程图、关键界面或结果画面，再拖进当前画板。
+                          </EditorEmptyState>
+                        )}
+                        {updatingAssetFlags ? (
+                          <p className="text-xs text-white/42">正在同步素材状态…</p>
+                        ) : null}
+                      </div>
+                    </EditorRailSection>
+                  </>
+                ) : null}
+
+                {leftPanel === "notes" ? (
+                  <>
+                    <EditorRailSection title="临时备注">
+                      <Textarea
+                        value={notesDraft}
+                        onChange={(event) => setNotesDraft(event.target.value)}
+                        placeholder="记录这次调整的思路、缺口或后续要追问的事实"
+                        className={cn("min-h-40", editorFieldClass)}
+                      />
+                      <p className="mt-3 text-xs leading-5 text-white/34">
+                        这里目前是本地临时便签位，不会参与 AI 生成。等 editor 交互定型后，再拆成正式备注对象。
+                      </p>
+                    </EditorRailSection>
+                    <EditorRailSection title="当前画板意图">
+                      {activeBoard ? (
+                        <EditorPanelCard>
+                          <FieldLabel>{activeBoard.name}</FieldLabel>
+                          <p className="mt-2 text-sm leading-6 text-white/68">
+                            {activeBoard.intent || "这张画板还没有明确意图。"}
+                          </p>
+                        </EditorPanelCard>
+                      ) : (
+                        <EditorEmptyState>当前没有可编辑的画板。</EditorEmptyState>
+                      )}
+                    </EditorRailSection>
+                  </>
+                ) : null}
+
+                {leftPanel === "boards" ? (
+                  <>
+                    <EditorRailSection title="画板操作">
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={addBoard}>
+                          <Plus className="h-4 w-4" />
+                          新建
+                        </EditorChromeButton>
+                        <EditorChromeButton
+                          className="h-10 justify-start px-3"
+                          onClick={duplicateActiveBoard}
+                          disabled={!activeBoard}
+                        >
+                          <Copy className="h-4 w-4" />
+                          复制
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={addTextNode}>
+                          <Type className="h-4 w-4" />
+                          文本
+                        </EditorChromeButton>
+                        <EditorChromeButton
+                          className="h-10 justify-start px-3"
+                          onClick={deleteActiveBoard}
+                          disabled={scene.boardOrder.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          删除
+                        </EditorChromeButton>
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="画板列表">
+                      <div className="space-y-2">
+                        {scene.boardOrder.map((boardId) => {
+                          const board = scene.boards.find((item) => item.id === boardId);
+                          if (!board) return null;
+                          const thumbnailAssetId = getBoardThumbnailAssetId(board);
+                          const thumbnailAsset = thumbnailAssetId ? assetMap.get(thumbnailAssetId) : null;
+                          return (
+                            <EditorSurfaceButton
+                              key={board.id}
+                              active={scene.activeBoardId === board.id}
+                              onClick={() => setActiveBoard(board.id)}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                                  {thumbnailAsset ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={buildPrivateBlobProxyUrl(thumbnailAsset.imageUrl)}
+                                      alt={board.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center text-[10px] font-mono uppercase tracking-[0.16em] text-white/28">
+                                      16:9
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium text-white">{board.name}</p>
+                                  <p className="mt-1 truncate text-xs text-white/46">
+                                    {board.intent || "暂无页面意图"}
+                                  </p>
+                                </div>
+                              </div>
+                            </EditorSurfaceButton>
+                          );
+                        })}
+                      </div>
+                    </EditorRailSection>
+                  </>
+                ) : null}
+
+                {leftPanel === "history" ? (
+                  <>
+                    <EditorRailSection title="AI 历史">
+                      <div className="space-y-3">
+                        {aiHistory.length > 0 ? (
+                          aiHistory.map((item) => (
+                            <EditorPanelCard key={item.key}>
+                              <FieldLabel>{item.label}</FieldLabel>
+                              <p className="mt-2 text-sm leading-6 text-white/68">{item.summary}</p>
+                            </EditorPanelCard>
+                          ))
+                        ) : (
+                          <EditorEmptyState>
+                            还没有历史结果。先运行一次项目诊断或排版生成。
+                          </EditorEmptyState>
+                        )}
+                      </div>
+                    </EditorRailSection>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          }
+          center={
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="border-b border-white/10 bg-[#13151a]/80 px-6 py-4 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <EditorCanvasChip active>{activeBoard?.name ?? "Untitled board"}</EditorCanvasChip>
+                    <EditorCanvasChip active={selectedAssets.length >= 3}>
+                      Assets {selectedAssets.length}
+                    </EditorCanvasChip>
+                    <EditorCanvasChip active={generationBoardIds.length > 0}>
+                      Scope {scene.generationScope.mode}
+                    </EditorCanvasChip>
+                    {readinessChecklist.map((item) => (
+                      <EditorCanvasChip key={item.label} active={item.done}>
+                        {item.label}
+                      </EditorCanvasChip>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <EditorChromeButton className="h-9 gap-2 px-3" onClick={addTextNode}>
+                      <Type className="h-4 w-4" />
+                      添加文本
+                    </EditorChromeButton>
+                    <EditorChromeIconButton onClick={() => setZoom(-0.1)} aria-label="缩小画板">
+                      <ZoomOut className="h-4 w-4" />
+                    </EditorChromeIconButton>
+                    <button
+                      type="button"
+                      onClick={resetZoom}
+                      className="inline-flex h-9 items-center rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-white/68 transition-colors hover:bg-white/[0.08] hover:text-white"
+                    >
+                      {Math.round(scene.viewport.zoom * 100)}%
+                    </button>
+                    <EditorChromeIconButton onClick={() => setZoom(0.1)} aria-label="放大画板">
+                      <ZoomIn className="h-4 w-4" />
+                    </EditorChromeIconButton>
+                  </div>
+                </div>
+              </div>
+
+              <div ref={boardViewportRef} className="relative flex-1 overflow-auto px-8 py-8">
+                <div className="flex min-h-full min-w-full items-center justify-center">
+                  <div className="relative" style={{ width: boardRender.width, height: boardRender.height }}>
+                    <BoardDropSurface
+                      ref={boardDropRef}
+                      board={activeBoard}
+                      assets={assetMap}
+                      render={boardRender}
+                      selection={selection}
+                      editingTextNodeId={editingTextNodeId}
+                      editingTextDraft={editingTextDraft}
+                      onEditingTextChange={setEditingTextDraft}
+                      onCommitInlineText={commitInlineTextEdit}
+                      onCancelInlineText={() => {
+                        setEditingTextNodeId(null);
+                        setEditingTextDraft("");
+                      }}
+                      onSelectBoard={() => {
+                        setSelection({ kind: "board" });
+                        setEditingTextNodeId(null);
+                      }}
+                      onSelectNode={(nodeId) => {
+                        setSelection({ kind: "node", nodeId });
+                        setRightPanel("inspector");
+                      }}
+                      onStartMove={startNodeMove}
+                      onStartResize={startNodeResize}
+                      onBeginInlineEdit={beginInlineTextEdit}
+                    />
+                  </div>
+                </div>
+
+                <EditorMiniButton side="left">
+                  <div className="flex items-center gap-2">
+                    <EditorChromeIconButton onClick={() => window.history.back()} aria-label="返回项目列表">
+                      <ArrowLeft className="h-4 w-4" />
+                    </EditorChromeIconButton>
+                  </div>
+                </EditorMiniButton>
+              </div>
+            </div>
+          }
+          rightRail={
+            <Tabs value={rightPanel} onValueChange={(value) => setRightPanel(value as RightRailPanel)} className="flex h-full flex-col">
+              <div className="border-b border-white/10 p-3">
+                <EditorTabsList className="grid w-full grid-cols-2">
+                  <EditorTabsTrigger value="inspector">Inspector</EditorTabsTrigger>
+                  <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
+                </EditorTabsList>
+              </div>
+
+              <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
+                {selection.kind === "board" && activeBoard ? (
+                  <>
+                    <EditorRailSection title="画板属性">
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <FieldLabel>名称</FieldLabel>
+                          <Input
+                            value={activeBoard.name}
+                            onChange={(event) =>
+                              updateActiveBoard((board) => ({ ...board, name: event.target.value }))
+                            }
+                            className={cn("h-10", editorFieldClass)}
                           />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-white">
-                            {asset.title ?? "未命名素材"}
-                          </p>
-                          <p className="mt-1 text-xs text-white/46">
-                            {asset.isCover ? "封面优先位" : asset.selected ? "当前已选" : "候选素材"}
-                          </p>
+                        <div className="space-y-2">
+                          <FieldLabel>页面意图</FieldLabel>
+                          <Textarea
+                            value={activeBoard.intent}
+                            onChange={(event) =>
+                              updateActiveBoard((board) => ({ ...board, intent: event.target.value }))
+                            }
+                            className={cn("min-h-24", editorFieldClass)}
+                          />
                         </div>
-                      </EditorSurfaceButton>
-                    ))
-                  ) : (
-                    <EditorEmptyState>
-                      还没有素材。先上传过程图、关键界面或结果画面。
-                    </EditorEmptyState>
-                  )}
-                </div>
-              </EditorRailSection>
-            </TabsContent>
-
-            <TabsContent value="facts" className="mt-0 flex-1 overflow-y-auto">
-              <EditorRailSection title="Facts Snapshot">
-                <div className="grid gap-2">
-                  {factSnapshot.map((item) => (
-                    <EditorPanelCard key={item.label} className="bg-white/[0.02]">
-                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/34">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-sm text-white/78">{item.value}</p>
-                    </EditorPanelCard>
-                  ))}
-                </div>
-              </EditorRailSection>
-
-              <EditorRailSection title="项目输入">
-                <div className="space-y-3">
-                  <Input
-                    value={facts.projectType}
-                    onChange={(event) =>
-                      setFacts((current) => ({ ...current, projectType: event.target.value }))
-                    }
-                    placeholder="项目类型"
-                    className={cn("h-10", editorFieldClass)}
-                  />
-                  <Input
-                    value={facts.industry}
-                    onChange={(event) =>
-                      setFacts((current) => ({ ...current, industry: event.target.value }))
-                    }
-                    placeholder="所属行业"
-                    className={cn("h-10", editorFieldClass)}
-                  />
-                  <Input
-                    value={facts.roleTitle}
-                    onChange={(event) =>
-                      setFacts((current) => ({ ...current, roleTitle: event.target.value }))
-                    }
-                    placeholder="我的角色"
-                    className={cn("h-10", editorFieldClass)}
-                  />
-                  <Textarea
-                    value={facts.background}
-                    onChange={(event) =>
-                      setFacts((current) => ({ ...current, background: event.target.value }))
-                    }
-                    placeholder="项目背景"
-                    className={cn("min-h-24", editorFieldClass)}
-                  />
-                  <Textarea
-                    value={facts.resultSummary}
-                    onChange={(event) =>
-                      setFacts((current) => ({ ...current, resultSummary: event.target.value }))
-                    }
-                    placeholder="结果摘要"
-                    className={cn("min-h-20", editorFieldClass)}
-                  />
-                  <Button
-                    variant="outline"
-                    className="h-10 w-full border-white/10 bg-white text-neutral-900 hover:bg-white/90"
-                    onClick={handleSaveFacts}
-                    disabled={savingFacts}
-                  >
-                    {savingFacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    保存项目信息
-                  </Button>
-                  {factsMessage ? <p className="text-xs text-emerald-300">{factsMessage}</p> : null}
-                </div>
-              </EditorRailSection>
-
-              <EditorRailSection title="备注">
-                <Textarea
-                  value={notesDraft}
-                  onChange={(event) => setNotesDraft(event.target.value)}
-                  placeholder="把还没整理进 facts 的线索临时记在这里"
-                  className={cn("min-h-24", editorFieldClass)}
-                />
-                <p className="mt-2 text-xs leading-5 text-white/34">
-                  当前备注仍是本地草稿位，后续会拆成独立备注对象和可引用上下文。
-                </p>
-              </EditorRailSection>
-            </TabsContent>
-          </Tabs>
-        }
-        center={
-          <div className="flex h-full flex-col">
-            <div className="border-b border-white/10 px-6 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <EditorCanvasChip active={completedFactCount >= 3}>
-                  Facts {completedFactCount}/5
-                </EditorCanvasChip>
-                <EditorCanvasChip active={displayAssets.length >= 3}>
-                  Assets {displayAssets.length}
-                </EditorCanvasChip>
-                <EditorCanvasChip active={Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation)}>
-                  Diagnosis {diagnosisHistory.length}
-                </EditorCanvasChip>
-                <EditorCanvasChip active={Boolean(layout)}>
-                  {layout ? `${layout.totalPages} pages` : "No layout"}
-                </EditorCanvasChip>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-auto px-6 py-8">
-              <div className="mx-auto flex min-h-full min-w-max flex-col gap-10">
-                <div className="flex flex-wrap gap-2">
-                  {readinessChecklist.map((item) => (
-                    <EditorCanvasChip key={item.label} active={item.done}>
-                      {item.label}
-                    </EditorCanvasChip>
-                  ))}
-                </div>
-
-                <div
-                  className={cn(
-                    "grid gap-10",
-                    canvasItems.length === 1 ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"
-                  )}
-                >
-                  {canvasItems.map((item) => (
-                    <div key={item.id} className="space-y-2">
-                      <p className="px-1 text-xs font-mono uppercase tracking-[0.16em] text-white/34">
-                        {item.frameLabel}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCanvasItemId(item.id)}
-                        className="block text-left"
-                      >
-                        <div
-                          className={cn(
-                            "w-[344px] overflow-hidden rounded-2xl border bg-white text-neutral-900 shadow-[0_28px_90px_-52px_rgba(0,0,0,0.55)] transition-all",
-                            selectedCanvasItem?.id === item.id
-                              ? "border-sky-400 ring-2 ring-sky-400/70"
-                              : "border-black/10"
-                          )}
-                        >
-                          {item.previewUrl ? (
-                            <div className="aspect-[4/3] overflow-hidden border-b border-neutral-200 bg-neutral-100">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={buildPrivateBlobProxyUrl(item.previewUrl)}
-                                alt={item.title}
-                                className="h-full w-full object-cover"
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <FieldLabel>背景色</FieldLabel>
+                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3">
+                              <input
+                                type="color"
+                                value={activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
+                                onChange={(event) =>
+                                  updateActiveBoard((board) => ({
+                                    ...board,
+                                    frame: { ...board.frame, background: event.target.value },
+                                  }))
+                                }
+                                className="h-5 w-5 rounded border-none bg-transparent p-0"
                               />
-                            </div>
-                          ) : (
-                            <div className="flex h-40 items-center justify-center border-b border-neutral-200 bg-neutral-100 px-6 text-center text-xs font-mono uppercase tracking-[0.18em] text-neutral-400">
-                              {item.accentLabel}
-                            </div>
-                          )}
-
-                          <div className="p-5">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                                  {item.accentLabel}
-                                </p>
-                                <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-950">
-                                  {item.title}
-                                </h2>
-                              </div>
-                            </div>
-                            <p className="mt-4 text-sm leading-6 text-neutral-600">
-                              {item.summary}
-                            </p>
-                            {item.keyPoints.length > 0 ? (
-                              <div className="mt-4 space-y-2">
-                                {item.keyPoints.map((point) => (
-                                  <div
-                                    key={point}
-                                    className="border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600"
-                                  >
-                                    {point}
-                                  </div>
+                              <span className="text-sm text-white/72">
+                                {activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
+                              </span>
+                            </label>
+                          </div>
+                          <div className="space-y-2">
+                            <FieldLabel>状态</FieldLabel>
+                            <Select
+                              value={activeBoard.status}
+                              onValueChange={(value) =>
+                                updateActiveBoard((board) => ({
+                                  ...board,
+                                  status: value as ProjectBoardStatus,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PROJECT_BOARD_STATUSES.map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {boardStatusLabel(status)}
+                                  </SelectItem>
                                 ))}
-                              </div>
-                            ) : null}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        }
-        rightRail={
-          <Tabs defaultValue="inspector" className="flex h-full flex-col">
-            <div className="border-b border-white/10 p-3">
-              <EditorTabsList className="grid w-full grid-cols-2">
-                <EditorTabsTrigger value="inspector">
-                  Inspector
-                </EditorTabsTrigger>
-                <EditorTabsTrigger value="ai">
-                  AI
-                </EditorTabsTrigger>
-              </EditorTabsList>
-            </div>
+                      </div>
+                    </EditorRailSection>
 
-            <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
-              <EditorRailSection title="选中对象">
-                {selectedCanvasItem ? (
-                  <>
-                    <EditorInfoList items={selectedCanvasItem.meta} />
-                    <EditorPanelCard className="mt-4">
-                      <p className="text-sm font-medium text-white">{selectedCanvasItem.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-white/56">{selectedCanvasItem.summary}</p>
-                    </EditorPanelCard>
+                    <EditorRailSection title="项目概况">
+                      <EditorInfoList
+                        items={[
+                          { label: "素材数量", value: `${assets.length} 张` },
+                          { label: "已上板素材", value: `${usedAssetIds.size} 张` },
+                          { label: "包装模式", value: packageModeLabel(packageMode) },
+                          { label: "自动保存", value: sceneSaveState === "error" ? "失败" : sceneSaveState },
+                        ]}
+                      />
+                    </EditorRailSection>
                   </>
-                ) : (
-                  <p className="text-sm leading-6 text-white/46">
-                    先在中间画布或左侧图层列表里选中一个对象。
-                  </p>
-                )}
-              </EditorRailSection>
+                ) : null}
 
-              <EditorRailSection title="关键要点">
-                {selectedCanvasItem?.keyPoints?.length ? (
+                {selection.kind === "node" && selectedNode?.type === "image" ? (
+                  <>
+                    <EditorRailSection title="图片节点">
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <FieldLabel>素材标题</FieldLabel>
+                          <Input
+                            value={selectedAsset?.title ?? ""}
+                            onChange={(event) =>
+                              setAssets((current) =>
+                                current.map((asset) =>
+                                  asset.id === selectedNode.assetId
+                                    ? { ...asset, title: event.target.value }
+                                    : asset
+                                )
+                              )
+                            }
+                            className={cn("h-10", editorFieldClass)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>适配方式</FieldLabel>
+                          <Select
+                            value={selectedNode.fit}
+                            onValueChange={(value) =>
+                              updateSelectedNode((node) =>
+                                node.type === "image"
+                                  ? { ...node, fit: value as ProjectBoardImageNode["fit"] }
+                                  : node
+                              )
+                            }
+                          >
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fill">fill</SelectItem>
+                              <SelectItem value="fit">fit</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>角色标签</FieldLabel>
+                          <Select
+                            value={selectedNode.roleTag ?? "none"}
+                            onValueChange={(value) => {
+                              const nextRoleTag = (value === "none" ? null : value) as ProjectImageRoleTag | null;
+                              updateSelectedNode((node) =>
+                                node.type === "image" ? { ...node, roleTag: nextRoleTag } : node
+                              );
+                              setAssets((current) =>
+                                current.map((asset) =>
+                                  asset.id === selectedNode.assetId
+                                    ? {
+                                        ...asset,
+                                        metaJson: mergeProjectAssetMeta(asset.metaJson, {
+                                          roleTag: nextRoleTag,
+                                        }),
+                                      }
+                                    : asset
+                                )
+                              );
+                            }}
+                          >
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">未设置</SelectItem>
+                              {PROJECT_IMAGE_ROLE_TAGS.map((tag) => (
+                                <SelectItem key={tag} value={tag}>
+                                  {tag}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>备注</FieldLabel>
+                          <Textarea
+                            value={selectedNode.note ?? ""}
+                            onChange={(event) => {
+                              updateSelectedNode((node) =>
+                                node.type === "image" ? { ...node, note: event.target.value } : node
+                              );
+                              setAssets((current) =>
+                                current.map((asset) =>
+                                  asset.id === selectedNode.assetId
+                                    ? {
+                                        ...asset,
+                                        metaJson: mergeProjectAssetMeta(asset.metaJson, {
+                                          note: event.target.value,
+                                        }),
+                                      }
+                                    : asset
+                                )
+                              );
+                            }}
+                            className={cn("min-h-24", editorFieldClass)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>替换素材</FieldLabel>
+                          <Select
+                            value={selectedNode.assetId}
+                            onValueChange={(value) => {
+                              const nextAsset = assetMap.get(value);
+                              const nextMeta = nextAsset ? resolveProjectAssetMeta(nextAsset.metaJson) : null;
+                              updateActiveBoard((board) => ({
+                                ...board,
+                                thumbnailAssetId:
+                                  board.thumbnailAssetId === selectedNode.assetId ? value : board.thumbnailAssetId,
+                                nodes: board.nodes.map((node) =>
+                                  node.id === selectedNode.id && node.type === "image"
+                                    ? {
+                                        ...node,
+                                        assetId: value,
+                                        note: nextMeta?.note ?? null,
+                                        roleTag: nextMeta?.roleTag ?? null,
+                                      }
+                                    : node
+                                ),
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {assets.map((asset) => (
+                                <SelectItem key={asset.id} value={asset.id}>
+                                  {asset.title ?? "未命名素材"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="裁切">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <FieldLabel>缩放</FieldLabel>
+                          <input
+                            type="range"
+                            min="1"
+                            max="2"
+                            step="0.05"
+                            value={selectedNode.crop.scale}
+                            onChange={(event) =>
+                              updateSelectedNode((node) =>
+                                node.type === "image"
+                                  ? {
+                                      ...node,
+                                      crop: { ...node.crop, scale: Number(event.target.value) },
+                                    }
+                                  : node
+                              )
+                            }
+                            className="w-full accent-lime-300"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>水平重心</FieldLabel>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={selectedNode.crop.x}
+                            onChange={(event) =>
+                              updateSelectedNode((node) =>
+                                node.type === "image"
+                                  ? {
+                                      ...node,
+                                      crop: { ...node.crop, x: Number(event.target.value) },
+                                    }
+                                  : node
+                              )
+                            }
+                            className="w-full accent-lime-300"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>垂直重心</FieldLabel>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={selectedNode.crop.y}
+                            onChange={(event) =>
+                              updateSelectedNode((node) =>
+                                node.type === "image"
+                                  ? {
+                                      ...node,
+                                      crop: { ...node.crop, y: Number(event.target.value) },
+                                    }
+                                  : node
+                              )
+                            }
+                            className="w-full accent-lime-300"
+                          />
+                        </div>
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="节点操作">
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={() => moveSelectedNodeZ("front")}>
+                          <Plus className="h-4 w-4" />
+                          前移
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={() => moveSelectedNodeZ("back")}>
+                          <ArrowLeft className="h-4 w-4 rotate-180" />
+                          后移
+                        </EditorChromeButton>
+                        <EditorChromeButton
+                          className="h-10 justify-start px-3"
+                          onClick={handleSaveSelectedAssetMeta}
+                          disabled={assetMetaSaving}
+                        >
+                          {assetMetaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          保存素材
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={removeSelectedNode}>
+                          <Trash2 className="h-4 w-4" />
+                          删除节点
+                        </EditorChromeButton>
+                      </div>
+                    </EditorRailSection>
+                  </>
+                ) : null}
+
+                {selection.kind === "node" && selectedNode?.type === "text" ? (
+                  <>
+                    <EditorRailSection title="文本节点">
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <FieldLabel>内容</FieldLabel>
+                          <Textarea
+                            value={selectedNode.text}
+                            onChange={(event) =>
+                              updateSelectedNode((node) =>
+                                node.type === "text" ? { ...node, text: event.target.value } : node
+                              )
+                            }
+                            className={cn("min-h-28", editorFieldClass)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>文本角色</FieldLabel>
+                          <Select
+                            value={selectedNode.role}
+                            onValueChange={(value) =>
+                              updateSelectedNode((node) =>
+                                node.type === "text"
+                                  ? { ...node, role: value as ProjectTextRole }
+                                  : node
+                              )
+                            }
+                          >
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PROJECT_TEXT_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {role}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <FieldLabel>字号</FieldLabel>
+                            <Input
+                              type="number"
+                              value={selectedNode.fontSize}
+                              onChange={(event) =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text"
+                                    ? { ...node, fontSize: Number(event.target.value) || node.fontSize }
+                                    : node
+                                )
+                              }
+                              className={cn("h-10", editorFieldClass)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <FieldLabel>字重</FieldLabel>
+                            <Input
+                              type="number"
+                              value={selectedNode.fontWeight}
+                              onChange={(event) =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text"
+                                    ? { ...node, fontWeight: Number(event.target.value) || node.fontWeight }
+                                    : node
+                                )
+                              }
+                              className={cn("h-10", editorFieldClass)}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <FieldLabel>行高</FieldLabel>
+                            <Input
+                              type="number"
+                              step="0.05"
+                              value={selectedNode.lineHeight}
+                              onChange={(event) =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text"
+                                    ? { ...node, lineHeight: Number(event.target.value) || node.lineHeight }
+                                    : node
+                                )
+                              }
+                              className={cn("h-10", editorFieldClass)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <FieldLabel>颜色</FieldLabel>
+                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3">
+                              <input
+                                type="color"
+                                value={selectedNode.color}
+                                onChange={(event) =>
+                                  updateSelectedNode((node) =>
+                                    node.type === "text"
+                                      ? { ...node, color: event.target.value }
+                                      : node
+                                  )
+                                }
+                                className="h-5 w-5 rounded border-none bg-transparent p-0"
+                              />
+                              <span className="text-sm text-white/72">{selectedNode.color}</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <FieldLabel>对齐</FieldLabel>
+                          <div className="grid grid-cols-3 gap-2">
+                            <EditorChromeButton
+                              className={cn("h-10", selectedNode.align === "left" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              onClick={() =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text" ? { ...node, align: "left" } : node
+                                )
+                              }
+                            >
+                              <AlignLeft className="h-4 w-4" />
+                            </EditorChromeButton>
+                            <EditorChromeButton
+                              className={cn("h-10", selectedNode.align === "center" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              onClick={() =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text" ? { ...node, align: "center" } : node
+                                )
+                              }
+                            >
+                              <AlignCenter className="h-4 w-4" />
+                            </EditorChromeButton>
+                            <EditorChromeButton
+                              className={cn("h-10", selectedNode.align === "right" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              onClick={() =>
+                                updateSelectedNode((node) =>
+                                  node.type === "text" ? { ...node, align: "right" } : node
+                                )
+                              }
+                            >
+                              <AlignRight className="h-4 w-4" />
+                            </EditorChromeButton>
+                          </div>
+                        </div>
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="节点操作">
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={() => moveSelectedNodeZ("front")}>
+                          <Plus className="h-4 w-4" />
+                          前移
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={() => moveSelectedNodeZ("back")}>
+                          <ArrowLeft className="h-4 w-4 rotate-180" />
+                          后移
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={() => beginInlineTextEdit(selectedNode)}>
+                          <Type className="h-4 w-4" />
+                          画板编辑
+                        </EditorChromeButton>
+                        <EditorChromeButton className="h-10 justify-start px-3" onClick={removeSelectedNode}>
+                          <Trash2 className="h-4 w-4" />
+                          删除节点
+                        </EditorChromeButton>
+                      </div>
+                    </EditorRailSection>
+                  </>
+                ) : null}
+
+                {!activeBoard ? (
+                  <EditorRailSection title="当前对象">
+                    <EditorEmptyState>当前没有可编辑内容。</EditorEmptyState>
+                  </EditorRailSection>
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
+                <EditorRailSection title="看到了什么">
+                  <EditorPanelCard>
+                    <p className="text-sm leading-7 text-white/74">{currentConclusion}</p>
+                  </EditorPanelCard>
+                </EditorRailSection>
+
+                <EditorRailSection title="亮点">
                   <div className="space-y-2">
-                    {selectedCanvasItem.keyPoints.map((point) => (
+                    {aiHighlights.length > 0 ? (
+                      aiHighlights.map((point) => (
+                        <EditorPanelCard key={point} className="bg-white/[0.02]">
+                          {point}
+                        </EditorPanelCard>
+                      ))
+                    ) : (
+                      <EditorEmptyState>先运行项目诊断，系统会返回当前亮点和可讲的重点。</EditorEmptyState>
+                    )}
+                  </div>
+                </EditorRailSection>
+
+                <EditorRailSection title="问题">
+                  <div className="space-y-2">
+                    {aiIssues.map((point) => (
                       <EditorPanelCard key={point} className="bg-white/[0.02]">
                         {point}
                       </EditorPanelCard>
                     ))}
-                  </div>
-                ) : (
-                  <p className="text-sm leading-6 text-white/46">
-                    当前对象还没有可检查的关键点。
-                  </p>
-                )}
-              </EditorRailSection>
-
-              <EditorRailSection title="当前状态">
-                <EditorInfoList
-                  items={[
-                    { label: "对象类型", value: "Project" },
-                    { label: "当前状态", value: stageInfo?.label ?? "草稿" },
-                    { label: "素材数量", value: `${assets.length} 张` },
-                    { label: "包装模式", value: packageModeLabel(packageMode) },
-                  ]}
-                />
-              </EditorRailSection>
-            </TabsContent>
-
-            <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
-              <EditorRailSection title="Current Conclusion">
-                <EditorPanelCard>
-                  <p className="text-sm leading-7 text-white/74">
-                    {layout?.narrativeSummary ??
-                      packageRecommendation?.reasoning ??
-                      completenessAnalysis?.overallComment ??
-                      "先运行项目诊断，系统会在这里返回边界、完整度和包装模式建议。"}
-                  </p>
-                </EditorPanelCard>
-              </EditorRailSection>
-
-              <EditorRailSection title="AI 结果">
-                {diagnosisHistory.length === 0 ? (
-                  <p className="text-sm leading-6 text-white/46">
-                    还没有 AI 结果。点击顶部“项目诊断”，系统会返回边界、完整度和包装模式建议。
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {boundaryAnalysis ? (
-                      <EditorPanelCard>
-                        <p className="text-sm font-medium text-white">边界分析</p>
-                        <p className="mt-2 text-sm leading-6 text-white/56">{boundaryAnalysis.projectSummary}</p>
-                      </EditorPanelCard>
-                    ) : null}
-                    {completenessAnalysis ? (
-                      <EditorPanelCard>
-                        <p className="text-sm font-medium text-white">
-                          完整度检查 · {verdictLabel(completenessAnalysis.overallVerdict)}
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-white/56">{completenessAnalysis.overallComment}</p>
-                      </EditorPanelCard>
-                    ) : null}
-                    {packageRecommendation ? (
-                      <EditorPanelCard>
-                        <p className="text-sm font-medium text-white">
-                          包装模式推荐 · {packageModeLabel(packageRecommendation.recommendedMode)}
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-white/56">{packageRecommendation.reasoning}</p>
-                      </EditorPanelCard>
+                    {aiIssues.length === 0 ? (
+                      <EditorEmptyState>当前还没有明确问题项，或者你还没跑过诊断。</EditorEmptyState>
                     ) : null}
                   </div>
-                )}
-              </EditorRailSection>
+                </EditorRailSection>
 
-              <EditorRailSection title="下一步">
-                <p className="text-sm leading-6 text-white/56">{nextStepConclusion}</p>
-              </EditorRailSection>
-            </TabsContent>
-          </Tabs>
-        }
-        bottomStrip={
-          <div className="flex gap-2 overflow-x-auto">
-            {canvasItems.map((item) => (
-              <EditorStripButton
-                key={item.id}
-                onClick={() => setSelectedCanvasItemId(item.id)}
-                active={selectedCanvasItem?.id === item.id}
-                className="w-40"
-              >
-                <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
-                  {item.frameLabel}
+                <EditorRailSection title="下一步">
+                  <EditorPanelCard>
+                    <p className="text-sm leading-7 text-white/74">{nextStepConclusion}</p>
+                  </EditorPanelCard>
+                </EditorRailSection>
+
+                <EditorRailSection title="和上次相比">
+                  {aiHistory.length > 1 ? (
+                    <EditorPanelCard>
+                      已累计 {aiHistory.length} 条 AI 结果。当前最新结论会优先参考你正在编辑的画板范围。
+                    </EditorPanelCard>
+                  ) : (
+                    <EditorEmptyState>还没有形成可比较的历史版本。</EditorEmptyState>
+                  )}
+                </EditorRailSection>
+
+                <EditorRailSection title="是否可继续排版">
+                  <EditorPanelCard>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">
+                          {layout?.pages?.length
+                            ? "已有排版建议"
+                            : completenessAnalysis?.canProceed
+                              ? "可以继续"
+                              : "建议先补强"}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">
+                          {layout?.pages?.length
+                            ? `当前已有 ${layout.totalPages} 页排版建议，可继续结合单画板细调。`
+                            : completenessAnalysis?.canProceed
+                              ? "当前材料和事实已经够用，可以继续生成。"
+                              : "先补足问题链、角色事实或结果证据，再发起下一轮生成更稳。"}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full border-white/10 px-3 py-1 text-white",
+                          (layout?.pages?.length || completenessAnalysis?.canProceed) &&
+                            "border-lime-300/40 text-lime-100"
+                        )}
+                      >
+                        {layout?.pages?.length
+                          ? "Ready"
+                          : completenessAnalysis?.canProceed
+                            ? "Proceed"
+                            : "Needs work"}
+                      </Badge>
+                    </div>
+                  </EditorPanelCard>
+                </EditorRailSection>
+              </TabsContent>
+            </Tabs>
+          }
+          bottomStrip={
+            <div className="flex items-start gap-3 overflow-x-auto pb-1">
+              <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
+                {scene.boardOrder.map((boardId) => {
+                  const board = scene.boards.find((item) => item.id === boardId);
+                  if (!board) return null;
+                  return (
+                    <SortableBoardStripItem
+                      key={board.id}
+                      board={board}
+                      active={scene.activeBoardId === board.id}
+                      selectedForScope={
+                        scene.generationScope.mode === "all" ||
+                        (scene.generationScope.mode === "selected" &&
+                          scene.generationScope.boardIds.includes(board.id)) ||
+                        (scene.generationScope.mode === "current" && scene.activeBoardId === board.id)
+                      }
+                      thumbnailUrl={boardThumbnailMap.get(board.id) ?? null}
+                      onClick={() => setActiveBoard(board.id)}
+                      onToggleScope={() => toggleBoardInSelection(board.id)}
+                    />
+                  );
+                })}
+              </SortableContext>
+              <EditorStripButton className="w-40 border-dashed" onClick={addBoard}>
+                <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                  New
                 </p>
-                <p className="mt-2 truncate text-sm font-medium">{item.title}</p>
+                <p className="mt-2 text-sm font-medium">新建画板</p>
               </EditorStripButton>
-            ))}
-          </div>
-        }
-      />
+            </div>
+          }
+        />
+      </DndContext>
 
       {actionError ? (
         <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 lg:px-6">
@@ -1126,15 +2694,57 @@ export function ProjectEditorClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription>
-              系统会基于当前素材、facts 和包装模式生成新的项目排版结果。
+              系统会基于当前画板范围、facts 和包装模式生成新的项目排版建议，不会覆盖你已经摆好的单画板内容。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 text-sm text-neutral-600">
+          <div className="space-y-4 text-sm text-neutral-600">
+            <Card className="shadow-none">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                    范围
+                  </Badge>
+                  <Button variant="outline" className="h-9 px-3" onClick={refreshGeneratePrecheck}>
+                    重新检查
+                  </Button>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {[
+                    { mode: "current", label: "当前画板", detail: activeBoard?.name ?? "当前页" },
+                    {
+                      mode: "selected",
+                      label: "已选画板",
+                      detail:
+                        scene.generationScope.mode === "selected"
+                          ? `${scene.generationScope.boardIds.length} 张`
+                          : "从底部缩略图勾选",
+                    },
+                    { mode: "all", label: "全部画板", detail: `${scene.boardOrder.length} 张` },
+                  ].map((item) => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-left transition-colors",
+                        scene.generationScope.mode === item.mode
+                          ? "border-neutral-900 bg-neutral-100"
+                          : "border-neutral-200 bg-white hover:border-neutral-300"
+                      )}
+                      onClick={() => setGenerationMode(item.mode as GenerationScope["mode"])}
+                    >
+                      <p className="text-sm font-medium text-neutral-900">{item.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-neutral-500">{item.detail}</p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -1147,142 +2757,74 @@ export function ProjectEditorClient({
                     </Badge>
                   ) : null}
                 </div>
-              {checkingPrecheck ? (
-                <div className="flex items-center gap-2 text-neutral-500">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  正在检查当前输入是否可复用、是否会计次。
-                </div>
-              ) : generatePrecheck ? (
-                <>
-                  <p>本次属于高成本动作。</p>
-                  <p className="mt-1">
-                    {generatePrecheck.suggestedMode === "reuse"
-                      ? "当前命中了可复用排版结果，这次继续生成不会额外计次。"
-                      : `本次会消耗：${generatePrecheck.actionRemaining > 0 ? "当前项目排版 1 次" : "当前项目排版额度已用完"}`}
-                  </p>
-                  <p className="mt-1">
-                    执行后剩余：{Math.max(generatePrecheck.actionRemaining - (generatePrecheck.consumesQuota ? 1 : 0), 0)} 次
-                  </p>
-                  <p className="mt-1">若失败，不计次。</p>
-                </>
-              ) : (
-                <p>点击生成前会先做一次预检，判断当前是否可复用以及会不会计次。</p>
-              )}
+                {checkingPrecheck ? (
+                  <div className="flex items-center gap-2 text-neutral-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    正在检查当前输入是否可复用、是否会计次。
+                  </div>
+                ) : generatePrecheck ? (
+                  <>
+                    <p>
+                      {generatePrecheck.suggestedMode === "reuse"
+                        ? "当前命中了可复用排版结果，这次继续生成不会额外计次。"
+                        : `本次会消耗：${generatePrecheck.actionRemaining > 0 ? "当前项目排版 1 次" : "当前项目排版额度已用完"}`}
+                    </p>
+                    <p>若失败，不计次。</p>
+                  </>
+                ) : (
+                  <p>打开弹窗后会自动做一次预检。</p>
+                )}
               </CardContent>
             </Card>
-            <Card className="shadow-none">
-              <CardContent className="space-y-3 p-4">
-                <Badge variant="secondary" className="w-fit rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
-                  当前上下文
-                </Badge>
-                <div className="space-y-1">
-                  <p>当前阶段：{stageInfo?.label ?? "草稿"}</p>
-                  <p>
-                    当前包装模式：
-                    {packageModeLabel(packageMode ?? packageRecommendation?.recommendedMode ?? null)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+
             <Card className="shadow-none">
               <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-neutral-900">风格参考</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-500">
-                    风格参考只影响标题层级、留白密度和包装样式，不改变项目讲法。
-                  </p>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">风格参考</p>
+                    <p className="mt-1 text-sm leading-6 text-neutral-500">
+                      风格参考只影响标题层级、留白密度和包装样式，不改变当前画板结构。
+                    </p>
+                  </div>
                 </div>
-                <Button variant="outline" className="h-9 px-3" onClick={handleOpenGenerate}>
-                  重新检查
-                </Button>
-              </div>
 
-              <Separator className="my-4" />
+                <Separator className="my-4" />
 
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <button
-                  type="button"
-                  className={`rounded-xl border px-3 py-3 text-left transition-colors ${
-                    styleSelection.source === "none"
-                      ? "border-neutral-900 bg-neutral-100"
-                      : "border-neutral-200 bg-white hover:border-neutral-300"
-                  }`}
-                  onClick={() => setStyleSelection({ source: "none" })}
-                >
-                  <p className="text-sm font-medium text-neutral-900">不使用风格参考</p>
-                  <p className="mt-1 text-xs leading-5 text-neutral-500">
-                    保持默认中性风格，优先稳定生成结构。
-                  </p>
-                </button>
-                {STYLE_PRESETS.slice(0, 3).map((preset) => (
+                <div className="grid gap-3 md:grid-cols-3">
                   <button
-                    key={preset.key}
                     type="button"
-                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
-                      styleSelection.source === "preset" &&
-                      styleSelection.presetKey === preset.key
+                    className={cn(
+                      "rounded-xl border px-3 py-3 text-left transition-colors",
+                      styleSelection.source === "none"
                         ? "border-neutral-900 bg-neutral-100"
                         : "border-neutral-200 bg-white hover:border-neutral-300"
-                    }`}
-                    onClick={() =>
-                      setStyleSelection({ source: "preset", presetKey: preset.key })
-                    }
+                    )}
+                    onClick={() => setStyleSelection({ source: "none" })}
                   >
-                    <p className="text-sm font-medium text-neutral-900">{preset.label}</p>
+                    <p className="text-sm font-medium text-neutral-900">不使用风格参考</p>
                     <p className="mt-1 text-xs leading-5 text-neutral-500">
-                      {preset.description}
+                      保持默认中性风格，优先稳定生成结构。
                     </p>
                   </button>
-                ))}
-              </div>
-
-              {initialData.styleReferenceSets.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                    我的参考图组
-                  </p>
-                  {initialData.styleReferenceSets.slice(0, 3).map((set) => (
+                  {STYLE_PRESETS.slice(0, 3).map((preset) => (
                     <button
-                      key={set.id}
+                      key={preset.key}
                       type="button"
-                      className={`flex w-full items-start justify-between rounded-xl border px-3 py-3 text-left transition-colors ${
-                        styleSelection.source === "reference_set" &&
-                        styleSelection.referenceSetId === set.id
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-left transition-colors",
+                        styleSelection.source === "preset" && styleSelection.presetKey === preset.key
                           ? "border-neutral-900 bg-neutral-100"
                           : "border-neutral-200 bg-white hover:border-neutral-300"
-                      }`}
-                      onClick={() =>
-                        setStyleSelection({
-                          source: "reference_set",
-                          referenceSetId: set.id,
-                          referenceSetName: set.name,
-                        })
-                      }
+                      )}
+                      onClick={() => setStyleSelection({ source: "preset", presetKey: preset.key })}
                     >
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">{set.name}</p>
-                        <p className="mt-1 text-xs leading-5 text-neutral-500">
-                          {set.description ?? `${set.imageUrls.length} 张参考图`}
-                        </p>
-                      </div>
-                      {styleSelection.source === "reference_set" &&
-                      styleSelection.referenceSetId === set.id ? (
-                        <Check className="h-4 w-4 text-neutral-900" />
-                      ) : null}
+                      <p className="text-sm font-medium text-neutral-900">{preset.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-neutral-500">{preset.description}</p>
                     </button>
                   ))}
                 </div>
-              ) : null}
               </CardContent>
             </Card>
-            {!packageMode && !packageRecommendation ? (
-              <Card className="border-amber-200 bg-amber-50 text-amber-900 shadow-none">
-                <CardContent className="p-4">
-                  还没有包装模式结论。先运行“项目诊断”，拿到包装模式建议后再继续。
-                </CardContent>
-              </Card>
-            ) : null}
           </div>
 
           <DialogFooter className="gap-2 sm:space-x-0">
@@ -1307,3 +2849,280 @@ export function ProjectEditorClient({
     </>
   );
 }
+
+const BoardDropSurface = forwardRef<
+  HTMLDivElement,
+  {
+    board: ProjectBoard | null;
+    assets: Map<string, ProjectAsset>;
+    render: BoardRenderMetrics;
+    selection: SceneSelection;
+    editingTextNodeId: string | null;
+    editingTextDraft: string;
+    onEditingTextChange: (value: string) => void;
+    onCommitInlineText: () => void;
+    onCancelInlineText: () => void;
+    onSelectBoard: () => void;
+    onSelectNode: (nodeId: string) => void;
+    onStartMove: (event: ReactPointerEvent<HTMLButtonElement>, node: ProjectBoardNode) => void;
+    onStartResize: (event: ReactPointerEvent<HTMLButtonElement>, node: ProjectBoardImageNode) => void;
+    onBeginInlineEdit: (node: ProjectBoardTextNode) => void;
+  }
+>(function BoardDropSurface(
+  {
+    board,
+    assets,
+    render,
+    selection,
+    editingTextNodeId,
+    editingTextDraft,
+    onEditingTextChange,
+    onCommitInlineText,
+    onCancelInlineText,
+    onSelectBoard,
+    onSelectNode,
+    onStartMove,
+    onStartResize,
+    onBeginInlineEdit,
+  },
+  ref
+) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: "project-board-drop",
+    data: { type: "canvas" },
+  });
+
+  function assignRefs(node: HTMLDivElement | null) {
+    setNodeRef(node);
+    if (typeof ref === "function") {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  }
+
+  if (!board) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <EditorEmptyState className="max-w-md text-center">
+          当前没有可编辑画板。先新建一张画板或从底部缩略图切换。
+        </EditorEmptyState>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+            Current Board
+          </p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">{board.name}</h2>
+          <p className="mt-1 text-sm text-white/44">{board.intent || "还没有给这张画板定义意图。"}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+            Canvas
+          </p>
+          <p className="mt-2 text-sm text-white/68">
+            {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
+          </p>
+        </div>
+      </div>
+
+      <div
+        ref={assignRefs}
+        onClick={onSelectBoard}
+        className={cn(
+          "relative block overflow-hidden rounded-[30px] border bg-[#0f1013] text-left shadow-[0_60px_140px_-70px_rgba(0,0,0,0.85)] transition-all",
+          isOver ? "border-lime-300/60 ring-2 ring-lime-300/30" : "border-white/10"
+        )}
+        style={{
+          width: render.width,
+          height: render.height,
+          backgroundColor: board.frame.background,
+          backgroundImage:
+            "radial-gradient(circle at top left, rgba(255,255,255,0.06), transparent 28%), radial-gradient(circle at bottom right, rgba(255,255,255,0.04), transparent 24%)",
+        }}
+      >
+        <div
+          className="absolute inset-0 opacity-80"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+
+        {board.nodes.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center px-10">
+            <div className="max-w-xl rounded-[24px] border border-dashed border-white/14 bg-black/20 px-8 py-10 text-center">
+              <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-white/38">
+                Empty board
+              </p>
+              <p className="mt-4 text-lg font-medium text-white">
+                左侧拖一张素材进来，或者先添加文本节点。
+              </p>
+              <p className="mt-3 text-sm leading-7 text-white/52">
+                中央只保留一张 1920×1080 画板，底部缩略图负责切换；当前画板不会被 AI 生成覆盖。
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {board.nodes
+          .slice()
+          .sort((a, b) => a.zIndex - b.zIndex)
+          .map((node) => {
+            const selected = selection.kind === "node" && selection.nodeId === node.id;
+            const nodeStyle = {
+              left: `${(node.x / PROJECT_BOARD_WIDTH) * 100}%`,
+              top: `${(node.y / PROJECT_BOARD_HEIGHT) * 100}%`,
+              width: `${(node.width / PROJECT_BOARD_WIDTH) * 100}%`,
+              height: `${(node.height / PROJECT_BOARD_HEIGHT) * 100}%`,
+            };
+
+            if (node.type === "text") {
+              const isEditing = editingTextNodeId === node.id;
+              return (
+                <div
+                  key={node.id}
+                  className={cn(
+                    "absolute rounded-2xl transition-all",
+                    selected && "ring-2 ring-lime-300/60"
+                  )}
+                  style={nodeStyle}
+                >
+                  {isEditing ? (
+                    <textarea
+                      value={editingTextDraft}
+                      autoFocus
+                      onBlur={onCommitInlineText}
+                      onChange={(event) => onEditingTextChange(event.target.value)}
+                      onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                          event.preventDefault();
+                          onCommitInlineText();
+                        }
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          onCancelInlineText();
+                        }
+                      }}
+                      className="h-full w-full resize-none rounded-2xl border border-lime-300/60 bg-black/50 px-4 py-3 text-white outline-none"
+                      style={{
+                        fontSize: `${(node.fontSize / PROJECT_BOARD_WIDTH) * render.width}px`,
+                        fontWeight: node.fontWeight,
+                        lineHeight: node.lineHeight,
+                        textAlign: node.align,
+                        color: node.color,
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectNode(node.id);
+                      }}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation();
+                        onBeginInlineEdit(node);
+                      }}
+                      className="flex h-full w-full items-start rounded-2xl px-4 py-3 text-left"
+                      style={{
+                        justifyContent:
+                          node.align === "center"
+                            ? "center"
+                            : node.align === "right"
+                              ? "flex-end"
+                              : "flex-start",
+                        fontSize: `${(node.fontSize / PROJECT_BOARD_WIDTH) * render.width}px`,
+                        fontWeight: node.fontWeight,
+                        lineHeight: node.lineHeight,
+                        textAlign: node.align,
+                        color: node.color,
+                      }}
+                    >
+                      <span>{node.text}</span>
+                    </button>
+                  )}
+                  {selected ? (
+                    <button
+                      type="button"
+                      onPointerDown={(event) => onStartMove(event, node)}
+                      className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      aria-label="拖拽文本"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
+
+            const asset = assets.get(node.assetId);
+            const imageScale = node.crop.scale;
+            const backgroundPosition = `${node.crop.x * 100}% ${node.crop.y * 100}%`;
+
+            return (
+              <div
+                key={node.id}
+                className={cn(
+                  "absolute overflow-hidden rounded-[24px] border bg-black/20 transition-all",
+                  selected ? "border-lime-300/70 ring-2 ring-lime-300/40" : "border-white/10"
+                )}
+                style={nodeStyle}
+              >
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectNode(node.id);
+                  }}
+                  onPointerDown={(event) => onStartMove(event, node)}
+                  className="absolute inset-0 cursor-move"
+                  aria-label={asset?.title ?? "图片节点"}
+                >
+                  {asset ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                      alt={asset.title ?? "图片节点"}
+                      className="h-full w-full"
+                      style={{
+                        objectFit: node.fit === "fit" ? "contain" : "cover",
+                        objectPosition: backgroundPosition,
+                        transform: `scale(${imageScale})`,
+                        transformOrigin: backgroundPosition,
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-white/50">
+                      素材缺失
+                    </div>
+                  )}
+                </button>
+                {selected ? (
+                  <>
+                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-white/70">
+                      {node.roleTag ?? "image"}
+                    </div>
+                    <button
+                      type="button"
+                      onPointerDown={(event) => onStartResize(event, node)}
+                      className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      aria-label="缩放图片"
+                    >
+                      <GripVertical className="h-4 w-4 rotate-90" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+});

@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llmLite } from "@/lib/llm";
+import {
+  GenerationScopeSchema,
+  resolveProjectEditorScene,
+  summarizeProjectSceneForAI,
+} from "@/lib/project-editor-scene";
 
 const BoundaryAnalysisSchema = z.object({
   isBoundaryClean: z.boolean(),
@@ -16,7 +21,7 @@ const BoundaryAnalysisSchema = z.object({
 export type BoundaryAnalysis = z.infer<typeof BoundaryAnalysisSchema>;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -25,6 +30,10 @@ export async function POST(
   }
   const userId = session.user.id;
   const { id: projectId } = await params;
+  const body = (await request.json().catch(() => ({}))) as {
+    generationScope?: unknown;
+  };
+  const parsedScope = GenerationScopeSchema.safeParse(body.generationScope);
 
   const project = await db.project.findFirst({
     where: { id: projectId, userId },
@@ -32,8 +41,9 @@ export async function POST(
       id: true,
       name: true,
       sourceType: true,
+      layoutJson: true,
       assets: {
-        select: { id: true, title: true, selected: true, isCover: true },
+        select: { id: true, title: true, selected: true, isCover: true, metaJson: true },
         orderBy: { sortOrder: "asc" },
       },
       facts: {
@@ -52,6 +62,15 @@ export async function POST(
   const assetSummary = project.assets
     .map((a, i) => `第${i + 1}张${a.title ? `（${a.title}）` : ""}${a.isCover ? "【封面】" : ""}`)
     .join("、");
+  const scene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+    projectName: project.name,
+  });
+  const sceneSummary = summarizeProjectSceneForAI({
+    scene,
+    assets: project.assets,
+    scope: parsedScope.success ? parsedScope.data : scene.generationScope,
+  });
 
   const factsText = project.facts
     ? [
@@ -74,6 +93,9 @@ export async function POST(
 
 ## 已知事实
 ${factsText}
+
+## 当前编辑中的画板上下文
+${sceneSummary}
 
 ## 任务
 判断这些素材是否属于同一个项目，边界是否清晰。

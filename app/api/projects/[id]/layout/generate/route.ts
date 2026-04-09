@@ -18,6 +18,17 @@ import {
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
+import type { ProjectEditorScene } from "@/lib/project-editor-scene";
+import {
+  GenerationScopeSchema,
+  getGenerationScopeBoardIds,
+  hasGeneratedLayoutData,
+  markBoardsAfterGeneration,
+  mergeProjectLayoutDocument,
+  resolveProjectEditorScene,
+  serializeSceneForHash,
+  summarizeProjectSceneForAI,
+} from "@/lib/project-editor-scene";
 
 // ─── Layout JSON schema ───────────────────────────────────────────────────────
 
@@ -52,6 +63,7 @@ const LayoutJsonSchema = z.object({
 
 export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
   styleProfile?: StyleProfile;
+  editorScene?: ProjectEditorScene;
 };
 export type LayoutPage = z.infer<typeof LayoutPageSchema>;
 
@@ -63,6 +75,8 @@ function buildPrompt(project: {
   assetCount: number;
   facts: Record<string, unknown> | null;
   styleSummary: string;
+  sceneSummary: string;
+  scopeLabel: string;
 }): string {
   const modeLabel =
     project.packageMode === "DEEP"
@@ -93,6 +107,10 @@ ${factsText}
 
 ## 风格约束
 ${project.styleSummary}
+
+## 当前编辑画板摘要
+本次生成范围：${project.scopeLabel}
+${project.sceneSummary}
 
 ## 要求
 1. 严格按照包装模式的页数范围生成页面计划
@@ -136,8 +154,10 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as {
     styleSelection?: StyleReferenceSelection | null;
+    generationScope?: unknown;
   };
   const styleSelection = body.styleSelection ?? { source: "none" as const };
+  const parsedScope = GenerationScopeSchema.safeParse(body.generationScope);
 
   const project = await db.project.findFirst({
     where: { id: projectId, userId },
@@ -150,7 +170,7 @@ export async function POST(
       facts: true,
       assets: {
         where: { selected: true },
-        select: { id: true, title: true, isCover: true, sortOrder: true },
+        select: { id: true, title: true, isCover: true, sortOrder: true, metaJson: true },
         orderBy: { sortOrder: "asc" },
       },
     },
@@ -177,7 +197,17 @@ export async function POST(
     getProjectActionSummary(userId, projectId),
   ]);
 
-  const isRegeneration = Boolean(project.layoutJson);
+  const scene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+    projectName: project.name,
+  });
+  const generationScope = parsedScope.success ? parsedScope.data : scene.generationScope;
+  const scopedScene = {
+    ...scene,
+    generationScope,
+  };
+  const scopedBoardIds = getGenerationScopeBoardIds(scopedScene);
+  const isRegeneration = hasGeneratedLayoutData(project.layoutJson);
   const actionType = isRegeneration
     ? "project_layout_regeneration"
     : "project_layout_generation";
@@ -204,6 +234,7 @@ export async function POST(
     styleSelection,
     assetIds: project.assets.map((asset) => asset.id),
     facts: project.facts ?? {},
+    scene: serializeSceneForHash(scopedScene),
   });
 
   const reusable = await findReusableGeneratedDraft({
@@ -258,10 +289,13 @@ export async function POST(
       },
     });
 
-    const layoutJson = reusable.draft.contentJson as LayoutJson;
+    const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
+      ...(reusable.draft.contentJson as LayoutJson),
+      editorScene: markBoardsAfterGeneration(scene, scopedBoardIds),
+    }) as LayoutJson;
     await db.project.update({
       where: { id: projectId },
-      data: { layoutJson: reusable.draft.contentJson as Prisma.InputJsonValue },
+      data: { layoutJson: layoutJson as unknown as Prisma.InputJsonValue },
     });
 
     return NextResponse.json({
@@ -316,6 +350,17 @@ export async function POST(
       assetCount: project.assets.length,
       facts: factsRecord,
       styleSummary: `${styleProfile.label}。${styleProfile.summary}`,
+      sceneSummary: summarizeProjectSceneForAI({
+        scene,
+        assets: project.assets,
+        scope: generationScope,
+      }),
+      scopeLabel:
+        generationScope.mode === "all"
+          ? "全部画板"
+          : generationScope.mode === "selected"
+            ? `已选择的 ${scopedBoardIds.length} 个画板`
+            : "当前画板",
     });
 
     const generatedLayout = await llm.generateStructured(prompt, LayoutJsonSchema, {
@@ -323,10 +368,11 @@ export async function POST(
       temperature: 0.4,
       track: { userId, projectId },
     });
-    const layoutJson = {
+    const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
       ...generatedLayout,
       styleProfile,
-    };
+      editorScene: markBoardsAfterGeneration(scene, scopedBoardIds),
+    }) as LayoutJson;
 
     // Persist layout JSON to project
     await db.project.update({

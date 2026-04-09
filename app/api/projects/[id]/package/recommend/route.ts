@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llmLite } from "@/lib/llm";
+import {
+  GenerationScopeSchema,
+  resolveProjectEditorScene,
+  summarizeProjectSceneForAI,
+} from "@/lib/project-editor-scene";
 
 const PackageRecommendationSchema = z.object({
   recommendedMode: z.enum(["DEEP", "LIGHT", "SUPPORTIVE"]),
@@ -16,7 +21,7 @@ const PackageRecommendationSchema = z.object({
 export type PackageRecommendation = z.infer<typeof PackageRecommendationSchema>;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -25,6 +30,10 @@ export async function POST(
   }
   const userId = session.user.id;
   const { id: projectId } = await params;
+  const body = (await request.json().catch(() => ({}))) as {
+    generationScope?: unknown;
+  };
+  const parsedScope = GenerationScopeSchema.safeParse(body.generationScope);
 
   const [project, facts] = await Promise.all([
     db.project.findFirst({
@@ -32,7 +41,13 @@ export async function POST(
       select: {
         id: true,
         name: true,
+        layoutJson: true,
         _count: { select: { assets: true } },
+        assets: {
+          where: { selected: true },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, title: true, imageUrl: true, selected: true, isCover: true, metaJson: true },
+        },
       },
     }),
     db.projectFact.findUnique({
@@ -69,6 +84,15 @@ export async function POST(
         .filter(Boolean)
         .join("\n")
     : "（暂无项目事实数据）";
+  const scene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+    projectName: project.name,
+  });
+  const sceneSummary = summarizeProjectSceneForAI({
+    scene,
+    assets: project.assets,
+    scope: parsedScope.success ? parsedScope.data : scene.generationScope,
+  });
 
   const prompt = `你是一位作品集顾问，帮助设计师选择最合适的项目讲法模式。
 
@@ -83,6 +107,9 @@ export async function POST(
 
 ## 项目事实
 ${factsText}
+
+## 当前编辑中的画板上下文
+${sceneSummary}
 
 ## 任务
 基于以上信息，判断这个项目最适合哪种讲法模式。
