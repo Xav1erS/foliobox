@@ -34,6 +34,7 @@ import {
   getProjectContinuePath,
   getProjectStageSummary,
 } from "@/lib/project-workflow";
+import { getEntitlementSummary } from "@/lib/entitlement";
 import { ProjectsCollection } from "@/components/app/ProjectsCollection";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 
@@ -76,9 +77,9 @@ function getPortfolioNextStep(portfolio: { id: string; status: string }): {
     case "PUBLISHED":
       return { href: `/portfolios/${portfolio.id}/editor`, label: "继续修改作品集" };
     case "OUTLINE":
-      return { href: `/portfolios/${portfolio.id}/outline`, label: "继续确认结构" };
+      return { href: `/portfolios/${portfolio.id}/editor`, label: "回到作品集编辑器" };
     default:
-      return { href: `/portfolios/${portfolio.id}/outline`, label: "开始组装作品集" };
+      return { href: `/portfolios/${portfolio.id}/editor`, label: "开始编辑作品集" };
   }
 }
 
@@ -100,7 +101,7 @@ export default async function DashboardPage({
     projects,
     latestScore,
     focusedScore,
-    userPlan,
+    entitlementSummary,
     profile,
   ] = await Promise.all([
     db.project.count({ where: { userId: session.user.id } }),
@@ -147,11 +148,7 @@ export default async function DashboardPage({
           where: { id: scoreId, userId: session.user.id },
         })
       : Promise.resolve(null),
-    db.userPlan.findFirst({
-      where: { userId: session.user.id, status: "ACTIVE" },
-      orderBy: { createdAt: "desc" },
-      select: { planType: true, expiresAt: true },
-    }),
+    getEntitlementSummary(session.user.id),
     db.designerProfile.findUnique({
       where: { userId: session.user.id },
       select: {
@@ -190,7 +187,7 @@ export default async function DashboardPage({
       ? resolvePortfolioScoreLevel(focusedScoreTotal, focusedScore.level)
       : null;
 
-  const currentPlan = userPlan?.planType ?? "FREE";
+  const currentPlan = entitlementSummary.planType;
   const planCopy = PLAN_COPY[currentPlan] ?? PLAN_COPY.FREE;
   const profileReady = isProfileReadyForGeneration(profile);
   const focusedScoreCoverage = focusedScore
@@ -536,14 +533,32 @@ export default async function DashboardPage({
                   <p className="mt-1.5 text-xs leading-5 text-neutral-500">
                     {planCopy.description}
                   </p>
-                  {userPlan?.expiresAt ? (
+                  {entitlementSummary.expiresAt ? (
                     <p className="mt-2 text-xs font-mono text-neutral-400">
-                      有效期至 {formatProjectDate(userPlan.expiresAt)}
+                      有效期至 {formatProjectDate(entitlementSummary.expiresAt)}
                     </p>
                   ) : null}
-                  <div className="mt-3 flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    <span className="text-xs text-neutral-500">预算充足</span>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {[
+                      entitlementSummary.quotas.activeProjects,
+                      entitlementSummary.quotas.projectLayouts,
+                      entitlementSummary.quotas.portfolioPackagings,
+                      entitlementSummary.quotas.publishLinks,
+                    ].map((quota) => (
+                      <div
+                        key={quota.label}
+                        className="border border-neutral-200 bg-neutral-50 px-3 py-2"
+                      >
+                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
+                          {quota.label}
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-600">
+                          {quota.label === "可激活项目"
+                            ? `${quota.used}/${quota.limit}`
+                            : `${quota.remaining} / ${quota.limit} 次`}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                   {currentPlan === "FREE" ? (
                     <Link

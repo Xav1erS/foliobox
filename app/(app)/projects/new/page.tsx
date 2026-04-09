@@ -168,7 +168,7 @@ export default function NewProjectPage() {
         }
 
         const { project } = await res.json();
-        router.push(`/projects/${project.id}/assets`);
+        router.push(`/projects/${project.id}/editor`);
         return;
       }
 
@@ -193,7 +193,7 @@ export default function NewProjectPage() {
       }
 
       const { projectId } = await res.json();
-      router.push(`/projects/${projectId}/assets`);
+      router.push(`/projects/${projectId}/editor`);
     } catch {
       setError("网络错误，请重试");
     } finally {
@@ -206,7 +206,7 @@ export default function NewProjectPage() {
       <PageHeader
         eyebrow="Import"
         title="导入项目"
-        description="先选择导入方式，再补充最小项目信息，最后进入素材确认页继续整理作品集。"
+        description="先选择导入方式，再补充最小项目信息，最后进入项目编辑器继续整理。"
       />
 
       <div className="mt-6 -mx-6 border-t-2 border-black" />

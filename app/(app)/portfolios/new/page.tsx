@@ -36,7 +36,7 @@ export default function NewPortfolioPage() {
       }
 
       const { id } = await res.json();
-      router.push(`/portfolios/${id}/outline`);
+      router.push(`/portfolios/${id}/editor`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败，请稍后重试");
       setLoading(false);
@@ -48,7 +48,7 @@ export default function NewPortfolioPage() {
       <PageHeader
         eyebrow="新建作品集"
         title="开始整理这份作品集"
-        description="先给作品集起一个名字。后续再选择要放入哪些项目，以及如何排列顺序。"
+        description="先给作品集起一个名字，创建后直接进入作品集编辑器继续整理。"
       />
 
       <div className="mt-8">

@@ -20,9 +20,9 @@ function getPortfolioContinuePath(portfolio: { id: string; status: string }): st
     case "EDITOR":
       return `/portfolios/${portfolio.id}/editor`;
     case "OUTLINE":
-      return `/portfolios/${portfolio.id}/outline`;
+      return `/portfolios/${portfolio.id}/editor`;
     default:
-      return `/portfolios/${portfolio.id}/outline`;
+      return `/portfolios/${portfolio.id}/editor`;
   }
 }
 

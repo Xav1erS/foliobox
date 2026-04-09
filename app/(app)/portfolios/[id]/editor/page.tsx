@@ -1,8 +1,19 @@
 import { notFound } from "next/navigation";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
-import { PageHeader } from "@/components/app/PageHeader";
-import { InlineTip } from "@/components/app/InlineTip";
+import {
+  getEntitlementSummary,
+  getPlanSummaryFromEntitlement,
+} from "@/lib/entitlement";
+import {
+  resolvePortfolioEditorState,
+  type PortfolioDiagnosis,
+  type PortfolioPackagingContent,
+} from "@/lib/portfolio-editor";
+import {
+  PortfolioEditorClient,
+  type PortfolioEditorInitialData,
+} from "./PortfolioEditorClient";
 
 export default async function PortfolioEditorPage({
   params,
@@ -12,27 +23,71 @@ export default async function PortfolioEditorPage({
   const { id } = await params;
   const session = await getRequiredSession(`/portfolios/${id}/editor`);
 
-  const portfolio = await db.portfolio.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  const [portfolio, allProjects, entitlementSummary] = await Promise.all([
+    db.portfolio.findFirst({
+      where: { id, userId: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        projectIds: true,
+        outlineJson: true,
+        contentJson: true,
+        updatedAt: true,
+      },
+    }),
+    db.project.findMany({
+      where: { userId: session.user.id },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        packageMode: true,
+        updatedAt: true,
+        layoutJson: true,
+        facts: {
+          select: {
+            background: true,
+            resultSummary: true,
+          },
+        },
+      },
+    }),
+    getEntitlementSummary(session.user.id),
+  ]);
 
   if (!portfolio) notFound();
 
+  const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
+
+  const initialData: PortfolioEditorInitialData = {
+    id: portfolio.id,
+    name: portfolio.name,
+    status: portfolio.status,
+    updatedAt: portfolio.updatedAt.toISOString(),
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    diagnosis: editorState.diagnosis as PortfolioDiagnosis | null,
+    packaging: portfolio.contentJson as PortfolioPackagingContent | null,
+    allProjects: allProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      stage: project.stage,
+      packageMode: project.packageMode,
+      updatedAt: project.updatedAt.toISOString(),
+      layout: project.layoutJson as { narrativeSummary?: string; totalPages?: number } | null,
+      background: project.facts?.background ?? null,
+      resultSummary: project.facts?.resultSummary ?? null,
+    })),
+    packagingQuota: entitlementSummary.quotas.portfolioPackagings,
+  };
+
   return (
-    <div className="px-6 py-10">
-      <PageHeader
-        eyebrow={`作品集 · ${portfolio.name}`}
-        title="指导式修改"
-        description="在这里对生成结果进行局部修改，系统会在修改后给出验证结论。"
-      />
-
-      <div className="mt-6 -mx-6 border-t-2 border-black" />
-
-      <div className="mt-6">
-        <InlineTip>
-          指导式修改工作台（V3 修改验证层）正在建设中，即将上线。
-        </InlineTip>
-      </div>
-    </div>
+    <PortfolioEditorClient
+      initialData={initialData}
+      planSummary={getPlanSummaryFromEntitlement(entitlementSummary)}
+    />
   );
 }
+

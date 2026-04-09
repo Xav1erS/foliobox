@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { getEntitlementSummary } from "@/lib/entitlement";
 
 export async function GET() {
   const session = await auth();
@@ -8,15 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const plan = await db.userPlan.findFirst({
-    where: { userId: session.user.id, status: "ACTIVE" },
-    orderBy: { createdAt: "desc" },
-    select: { planType: true, status: true, expiresAt: true },
-  });
+  const summary = await getEntitlementSummary(session.user.id);
 
   return NextResponse.json({
-    planType: plan?.planType ?? "FREE",
-    status: plan?.status ?? "ACTIVE",
-    expiresAt: plan?.expiresAt ?? null,
+    planType: summary.planType,
+    status: "ACTIVE",
+    expiresAt: summary.expiresAt,
+    quotas: summary.quotas,
   });
 }

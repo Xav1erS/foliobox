@@ -35,13 +35,18 @@ export default async function PortfolioOutlinePage({
     <div className="mx-auto max-w-4xl px-6 py-10 pb-24">
       <PageHeader
         eyebrow={`作品集 · ${portfolio.name}`}
-        title="选择项目与结构确认"
-        description="选择要放入这份作品集的项目，确认排列顺序，系统将据此生成作品集结构。"
+        title="结构兼容页"
+        description="作品集的项目选择、固定页和顺序调整已经迁回统一 Portfolio Editor；这里仅保留为兼容查看入口。"
+        actions={
+          <Button asChild className="h-10 rounded-none px-4">
+            <Link href={`/portfolios/${portfolio.id}/editor`}>返回作品集编辑器</Link>
+          </Button>
+        }
       />
 
       <div className="mt-8 space-y-6">
         <InlineTip>
-          V3 项目包装流程正在建设中。目前可以先将项目加入作品集，后续排版与包装能力陆续上线。
+          Portfolio Editor 已经成为主入口。建议直接在编辑器里完成项目选入、固定页设置、作品集诊断和包装生成。
         </InlineTip>
 
         <SectionCard>
@@ -98,7 +103,7 @@ export default async function PortfolioOutlinePage({
         </SectionCard>
 
         <p className="text-center text-xs text-neutral-400">
-          项目选择与顺序编辑能力正在建设中，后续版本将支持拖拽排序和包装模式确认。
+          当前页面仅保留为兼容层；真实的项目池和页面条已经迁入 Portfolio Editor。
         </p>
       </div>
     </div>

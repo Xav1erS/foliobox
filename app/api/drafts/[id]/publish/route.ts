@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { requirePlan } from "@/lib/entitlement";
+import { hasRemainingQuota, requirePlan } from "@/lib/entitlement";
 
 type Block = {
   id: string;
@@ -73,6 +73,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { allowed } = await requirePlan(session.user.id, "publish_link");
   if (!allowed) {
     return NextResponse.json({ error: "upgrade_required" }, { status: 403 });
+  }
+
+  const quotaResult = await hasRemainingQuota(session.user.id, "publishLinks");
+  if (!quotaResult.allowed) {
+    return NextResponse.json(
+      { error: "quota_exceeded", summary: quotaResult.summary },
+      { status: 403 }
+    );
   }
 
   const { id } = await params;

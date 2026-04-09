@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llmLite } from "@/lib/llm";
@@ -112,6 +113,11 @@ ${factsText}
         track: { userId, projectId },
       }
     );
+
+    await db.project.update({
+      where: { id: projectId },
+      data: { packageJson: recommendation as unknown as Prisma.InputJsonValue },
+    });
 
     return NextResponse.json({ recommendation });
   } catch (error) {

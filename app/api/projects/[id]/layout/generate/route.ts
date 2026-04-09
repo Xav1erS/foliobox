@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm";
+import { hasRemainingQuota } from "@/lib/entitlement";
 
 // ─── Layout JSON schema ───────────────────────────────────────────────────────
 
@@ -113,6 +114,14 @@ export async function POST(
   }
   const userId = session.user.id;
   const { id: projectId } = await params;
+
+  const quotaResult = await hasRemainingQuota(userId, "projectLayouts");
+  if (!quotaResult.allowed) {
+    return NextResponse.json(
+      { error: "quota_exceeded", summary: quotaResult.summary },
+      { status: 403 }
+    );
+  }
 
   const project = await db.project.findFirst({
     where: { id: projectId, userId },

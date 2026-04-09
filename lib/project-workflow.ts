@@ -52,23 +52,15 @@ export function getProjectContinuePath(project: {
   id: string;
   stage?: string;
 }) {
-  // V3 stage routing — takes precedence when project is in V3 flow
   const stage = project.stage;
-  if (stage === "BOUNDARY") {
-    return { href: `/projects/${project.id}/completeness`, label: "继续完整度检查" };
+  if (stage === "READY") {
+    return { href: `/projects/${project.id}/editor`, label: "继续编辑项目" };
   }
-  if (stage === "COMPLETENESS") {
-    return { href: `/projects/${project.id}/package`, label: "继续骨架定稿" };
-  }
-  if (stage === "PACKAGE") {
-    return { href: `/projects/${project.id}/package`, label: "继续骨架定稿" };
-  }
-  if (stage === "LAYOUT" || stage === "READY") {
-    return { href: `/projects/${project.id}/layout`, label: "继续排版验收" };
+  if (stage && stage !== "DRAFT") {
+    return { href: `/projects/${project.id}/editor`, label: "回到项目编辑器" };
   }
 
-  // DRAFT: start V3 flow from boundary
-  return { href: `/projects/${project.id}/boundary`, label: "开始整理项目" };
+  return { href: `/projects/${project.id}/editor`, label: "开始编辑项目" };
 }
 
 export function getProjectStageSummary(project: {
