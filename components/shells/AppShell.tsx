@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { MobileBanner } from "@/components/app/MobileBanner";
 
@@ -8,6 +11,17 @@ export function AppShell({
   children: React.ReactNode;
   userEmail?: string | null;
 }) {
+  const pathname = usePathname();
+  const isEditorRoute = /^\/(?:projects|portfolios)\/[^/]+\/editor$/.test(pathname);
+
+  if (isEditorRoute) {
+    return (
+      <div className="h-screen overflow-hidden bg-[#101114] text-white">
+        <main className="h-full">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex h-screen overflow-hidden bg-neutral-100 text-neutral-900">
       <div

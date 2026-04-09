@@ -3,8 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +30,8 @@ type EditorScaffoldProps = {
   bottomStrip?: ReactNode;
   topNote?: ReactNode;
   planSummary?: PlanSummaryCopy;
+  leftRailLabel?: string;
+  rightRailLabel?: string;
 };
 
 export function EditorScaffold({
@@ -40,157 +49,176 @@ export function EditorScaffold({
   bottomStrip,
   topNote,
   planSummary,
+  leftRailLabel = "左侧栏",
+  rightRailLabel = "右侧栏",
 }: EditorScaffoldProps) {
-  const [focusMode, setFocusMode] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.96),_rgba(245,245,244,0.95)_42%,_rgba(241,241,241,0.92))]">
-      <header className="border-b-2 border-black bg-white/95 shadow-[0_18px_60px_-52px_rgba(15,23,42,0.45)] backdrop-blur">
-        <div className="flex flex-col gap-4 px-4 py-4 lg:px-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-[0.18em] text-neutral-400">
-                <Link
-                  href={backHref}
-                  className="inline-flex items-center gap-1.5 text-neutral-500 transition-colors hover:text-neutral-900"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  {backLabel}
-                </Link>
-                <span className="text-neutral-300">/</span>
-                <span>{objectLabel}</span>
-              </div>
+    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#101114] text-white">
+      <header className="border-b border-white/10 bg-[#16171b]/96 backdrop-blur">
+        <div className="flex min-h-14 items-center gap-3 px-4 py-2">
+          <Link
+            href={backHref}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Link>
 
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h1 className="truncate text-[2rem] font-semibold tracking-tight text-neutral-950">
-                  {objectName}
-                </h1>
-                {statusLabel ? (
-                  <span className="border border-neutral-300 bg-neutral-950 px-2 py-0.5 text-[11px] font-mono uppercase tracking-wide text-white">
-                    {statusLabel}
-                  </span>
-                ) : null}
-                {statusMeta ? (
-                  <span className="text-sm text-neutral-500">{statusMeta}</span>
-                ) : null}
-              </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-white/32">
+              <span>{objectLabel}</span>
+              {statusLabel ? (
+                <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-white/56">
+                  {statusLabel}
+                </span>
+              ) : null}
+              {statusMeta ? <span>{statusMeta}</span> : null}
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 px-4"
-                onClick={() => setFocusMode((current) => !current)}
-              >
-                {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                {focusMode ? "退出专注模式" : "专注模式"}
-              </Button>
-              {secondaryAction}
-              {primaryAction}
+            <div className="mt-1 flex min-w-0 items-center gap-3">
+              <h1 className="truncate text-xl font-semibold tracking-tight text-white">
+                {objectName}
+              </h1>
+              {topNote ? (
+                <div className="hidden min-w-0 max-w-xl truncate text-sm text-white/44 xl:block">
+                  {topNote}
+                </div>
+              ) : null}
             </div>
           </div>
 
-          {topNote || planSummary ? (
-            <div
-              className={cn(
-                "grid gap-3",
-                topNote && planSummary ? "xl:grid-cols-[minmax(0,1.2fr)_340px]" : "grid-cols-1"
-              )}
+          {planSummary ? (
+            <Link
+              href={planSummary.href}
+              className="hidden rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/64 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
             >
-              {topNote ? (
-                <div className="relative overflow-hidden border border-black bg-[linear-gradient(135deg,_rgba(10,10,10,0.98),_rgba(28,25,23,0.98))] px-5 py-4 text-sm leading-6 text-white shadow-[0_24px_60px_-48px_rgba(15,23,42,0.55)]">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_34%),linear-gradient(135deg,_rgba(248,113,113,0.12),_transparent_42%)]" />
-                  <div className="relative">
-                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/48">
-                      Editor Overview
-                    </p>
-                    <div className="mt-3 max-w-4xl text-sm leading-6 text-white/84">{topNote}</div>
-                    {statusLabel || statusMeta ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {statusLabel ? (
-                          <span className="border border-white/15 bg-white/8 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/76">
-                            {statusLabel}
-                          </span>
-                        ) : null}
-                        {statusMeta ? (
-                          <span className="border border-white/10 bg-black/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/62">
-                            {statusMeta}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-              {planSummary ? (
-                <div className="border border-neutral-300 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(245,245,244,0.96))] px-4 py-4 shadow-[0_24px_60px_-54px_rgba(15,23,42,0.42)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
-                    当前权益
-                  </p>
-                  <p className="mt-2 text-base font-semibold text-neutral-950">{planSummary.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-500">
-                    {planSummary.description}
-                  </p>
-                  {planSummary.metrics && planSummary.metrics.length > 0 ? (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {planSummary.metrics.map((metric) => (
-                        <div
-                          key={metric.label}
-                          className="border border-neutral-200 bg-white px-3 py-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
-                        >
-                          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                            {metric.label}
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-neutral-800">
-                            {metric.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  <Link
-                    href={planSummary.href}
-                    className="mt-3 inline-flex text-sm font-medium text-neutral-800 underline-offset-2 hover:underline"
-                  >
-                    {planSummary.ctaLabel}
-                  </Link>
-                </div>
-              ) : null}
-            </div>
+              {planSummary.title}
+            </Link>
           ) : null}
+
+          <div className="flex shrink-0 items-center gap-2 [&_button]:border-white/10 [&_button]:bg-white [&_button]:text-neutral-900 [&_button]:hover:bg-white/90">
+            {secondaryAction}
+            {primaryAction}
+          </div>
         </div>
       </header>
 
-      <div
-        className={cn(
-          "grid flex-1 grid-cols-1 gap-0",
-          focusMode ? "xl:grid-cols-1" : "xl:grid-cols-[280px_minmax(0,1fr)_320px]"
-        )}
-      >
-        {!focusMode ? (
-          <aside className="border-b border-neutral-300 bg-white/92 xl:border-b-0 xl:border-r xl:border-neutral-300">
-            <div className="flex h-full flex-col">{leftRail}</div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {leftCollapsed ? (
+          <CollapsedRailButton
+            side="left"
+            label={leftRailLabel}
+            onClick={() => setLeftCollapsed(false)}
+          />
+        ) : (
+          <aside className="flex w-[320px] shrink-0 flex-col border-r border-white/10 bg-[#17191d]">
+            <RailHeader
+              label={leftRailLabel}
+              side="left"
+              onCollapse={() => setLeftCollapsed(true)}
+            />
+            <div className="min-h-0 flex-1 overflow-y-auto">{leftRail}</div>
           </aside>
-        ) : null}
+        )}
 
-        <main className="min-w-0 bg-[linear-gradient(180deg,_rgba(250,250,249,0.72),_rgba(244,244,245,0.82))]">
-          <div className="h-full">{center}</div>
+        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#1b1d22]">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-100"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+              maskImage:
+                "radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0.28) 100%)",
+              WebkitMaskImage:
+                "radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0.28) 100%)",
+            }}
+          />
+          <div className="relative h-full overflow-hidden">{center}</div>
         </main>
 
-        {!focusMode ? (
-          <aside className="border-t border-neutral-300 bg-white/92 xl:border-l xl:border-t-0 xl:border-neutral-300">
-            <div className="flex h-full flex-col">{rightRail}</div>
+        {rightCollapsed ? (
+          <CollapsedRailButton
+            side="right"
+            label={rightRailLabel}
+            onClick={() => setRightCollapsed(false)}
+          />
+        ) : (
+          <aside className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-[#17191d]">
+            <RailHeader
+              label={rightRailLabel}
+              side="right"
+              onCollapse={() => setRightCollapsed(true)}
+            />
+            <div className="min-h-0 flex-1 overflow-y-auto">{rightRail}</div>
           </aside>
-        ) : null}
+        )}
       </div>
 
-      {bottomStrip && !focusMode ? (
-        <div className="border-t border-neutral-300 bg-white/95 px-4 py-3 shadow-[0_-18px_60px_-52px_rgba(15,23,42,0.22)] lg:px-6">
-          {bottomStrip}
-        </div>
+      {bottomStrip ? (
+        <div className="border-t border-white/10 bg-[#121317] px-4 py-3">{bottomStrip}</div>
       ) : null}
     </div>
+  );
+}
+
+function RailHeader({
+  label,
+  side,
+  onCollapse,
+}: {
+  label: string;
+  side: "left" | "right";
+  onCollapse: () => void;
+}) {
+  return (
+    <div className="flex h-11 items-center justify-between border-b border-white/10 px-3">
+      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+        {label}
+      </p>
+      <button
+        type="button"
+        onClick={onCollapse}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/54 transition-colors hover:bg-white/[0.06] hover:text-white"
+        aria-label={`折叠${label}`}
+      >
+        {side === "left" ? (
+          <PanelLeftClose className="h-4 w-4" />
+        ) : (
+          <PanelRightClose className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function CollapsedRailButton({
+  side,
+  label,
+  onClick,
+}: {
+  side: "left" | "right";
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-white/10 bg-[#15161a] text-white/48 transition-colors hover:bg-[#1a1c21] hover:text-white"
+      aria-label={`展开${label}`}
+    >
+      {side === "left" ? (
+        <PanelLeftOpen className="h-4 w-4" />
+      ) : (
+        <PanelRightOpen className="h-4 w-4" />
+      )}
+      <span className="rotate-180 text-[10px] font-mono uppercase tracking-[0.18em] [writing-mode:vertical-rl]">
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -204,8 +232,8 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-neutral-200 px-4 py-5", className)}>
-      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+    <section className={cn("border-b border-white/10 px-4 py-4", className)}>
+      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
         {title}
       </p>
       <div className="mt-3">{children}</div>
@@ -222,10 +250,102 @@ export function EditorInfoList({
     <div className="space-y-2.5">
       {items.map((item) => (
         <div key={item.label} className="flex items-start justify-between gap-4 text-sm">
-          <span className="text-neutral-400">{item.label}</span>
-          <span className="text-right text-neutral-700">{item.value}</span>
+          <span className="text-white/36">{item.label}</span>
+          <span className="text-right text-white/78">{item.value}</span>
         </div>
       ))}
     </div>
+  );
+}
+
+export function EditorMiniButton({
+  side,
+  children,
+  className,
+}: {
+  side: "left" | "right";
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute top-4 z-10",
+        side === "left" ? "left-4" : "right-4",
+        className
+      )}
+    >
+      <div className="pointer-events-auto rounded-md border border-white/10 bg-[#17191d]/96 p-1 shadow-[0_18px_60px_-40px_rgba(0,0,0,0.65)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function EditorCanvasChip({
+  children,
+  active = false,
+}: {
+  children: ReactNode;
+  active?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.16em]",
+        active
+          ? "border-sky-400/60 bg-sky-400/14 text-sky-100"
+          : "border-white/10 bg-white/[0.03] text-white/46"
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function EditorSurfaceButton({
+  active,
+  children,
+  className,
+  onClick,
+}: {
+  active?: boolean;
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-xl border px-3 py-3 text-left transition-colors",
+        active
+          ? "border-sky-400/70 bg-sky-400/10 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.16)]"
+          : "border-white/10 bg-white/[0.03] text-white/72 hover:bg-white/[0.05]",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function EditorEdgeToggle({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/54 transition-colors hover:bg-white/[0.06] hover:text-white"
+      aria-label={side === "left" ? "展开左侧栏" : "展开右侧栏"}
+    >
+      {side === "left" ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+    </button>
   );
 }

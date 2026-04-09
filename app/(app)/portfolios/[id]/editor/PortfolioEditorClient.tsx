@@ -27,9 +27,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  EditorCanvasChip,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
+  EditorSurfaceButton,
 } from "@/components/editor/EditorScaffold";
 import type {
   ObjectActionQuota,
@@ -47,6 +49,7 @@ import {
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
+import { cn } from "@/lib/utils";
 
 type PortfolioProject = {
   id: string;
@@ -111,6 +114,22 @@ function projectStageLabel(project: PortfolioProject) {
   if (project.packageMode === "LIGHT") return "已定浅讲";
   if (project.packageMode === "SUPPORTIVE") return "已定补充展示";
   return project.stage;
+}
+
+function portfolioVerdictLabel(verdict: PortfolioDiagnosis["overallVerdict"] | undefined) {
+  if (verdict === "ready") return "可继续";
+  if (verdict === "almost_ready") return "接近可继续";
+  if (verdict === "needs_work") return "仍需补强";
+  if (verdict === "insufficient") return "信息不足";
+  return "待判断";
+}
+
+function pageRoleLabel(role: string) {
+  if (role === "cover") return "封面";
+  if (role === "about") return "关于我";
+  if (role === "closing") return "结尾页";
+  if (role === "project_case") return "项目案例";
+  return role;
 }
 
 export function PortfolioEditorClient({
@@ -203,6 +222,13 @@ export function PortfolioEditorClient({
     const resolvedId = selectedCanvasItemId ?? fallbackId;
     return pages.find((page) => page.id === resolvedId) ?? null;
   }, [pages, selectedCanvasItemId]);
+  const selectedCanvasProject = useMemo(
+    () =>
+      selectedCanvasItem?.projectId
+        ? projectMap.get(selectedCanvasItem.projectId) ?? null
+        : null,
+    [projectMap, selectedCanvasItem]
+  );
   const aiHistory = useMemo(
     () =>
       [
@@ -217,10 +243,6 @@ export function PortfolioEditorClient({
   );
   const enabledFixedPages = useMemo(
     () => fixedPages.filter((page) => page.enabled),
-    [fixedPages]
-  );
-  const disabledFixedPages = useMemo(
-    () => fixedPages.filter((page) => !page.enabled),
     [fixedPages]
   );
   const structureChecklist = useMemo(
@@ -497,10 +519,10 @@ export function PortfolioEditorClient({
         backHref="/portfolios"
         backLabel="全部作品集"
         statusLabel={portfolioStatusLabel(status)}
-        statusMeta={`${selectedProjects.length} 个已选项目`}
+        statusMeta={packaging ? `${packaging.pages.length} pages` : `${selectedProjects.length} projects`}
         primaryAction={
           <Button
-            className="h-10 px-4"
+            className="h-9 px-4"
             onClick={handleOpenGenerate}
             disabled={selectedProjects.length === 0}
           >
@@ -511,7 +533,7 @@ export function PortfolioEditorClient({
         secondaryAction={
           <Button
             variant="outline"
-            className="h-10 px-4"
+            className="h-9 border-white/10 bg-white/[0.03] px-4 text-white hover:bg-white/[0.08] hover:text-white"
             onClick={handleRunDiagnosis}
             disabled={diagnosing}
           >
@@ -519,543 +541,469 @@ export function PortfolioEditorClient({
             作品集诊断
           </Button>
         }
-        topNote={
-          <>
-            这是里程碑 B 的 <strong>Portfolio Editor MVP</strong>。当前已经把项目选入、顺序调整、
-            固定页配置、作品集诊断和整份包装生成收口到单页编辑器里；发布与导出也已经围绕
-            Portfolio 主对象运行。
-          </>
-        }
         planSummary={planSummary}
+        leftRailLabel="Structure / Pages"
+        rightRailLabel="Inspector / AI"
         leftRail={
-          <>
-            <EditorRailSection title="作品集信息">
-              <div className="space-y-3">
-                <Input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="作品集名称"
-                  className="h-10 rounded-none border-neutral-300"
-                />
-                <Button
-                  variant="outline"
-                  className="h-10 w-full"
-                  onClick={handleSaveName}
-                  disabled={savingName}
-                >
-                  {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  保存名称
-                </Button>
-                <EditorInfoList
-                  items={[
-                    { label: "当前状态", value: portfolioStatusLabel(status) },
-                    { label: "包装剩余", value: `${packagingQuota.remaining} / ${packagingQuota.limit}` },
-                    {
-                      label: "作品集级动作",
-                      value: `诊断 ${initialData.actionSummary.diagnoses.remaining} / 包装 ${initialData.actionSummary.packagingGenerations.remaining}`,
-                    },
-                  ]}
-                />
-              </div>
-            </EditorRailSection>
+          <Tabs defaultValue="structure" className="flex h-full flex-col">
+            <div className="border-b border-white/10 p-3">
+              <TabsList className="grid w-full grid-cols-3 rounded-lg bg-white/[0.04] p-1">
+                <TabsTrigger value="structure" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  结构
+                </TabsTrigger>
+                <TabsTrigger value="projects" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  项目
+                </TabsTrigger>
+                <TabsTrigger value="pages" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  页面
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <EditorRailSection title="项目池" className="flex-1">
-              <div className="space-y-2">
-                {selectedProjects.map((project) => (
-                  <div key={project.id} className="border border-neutral-200 bg-white px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-neutral-900">{project.name}</p>
-                        <p className="mt-1 text-xs text-neutral-400">{projectStageLabel(project)}</p>
+            <TabsContent value="structure" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="作品集信息">
+                <div className="space-y-3">
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="作品集名称"
+                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full border-white/10 bg-white text-neutral-900 hover:bg-white/90"
+                    onClick={handleSaveName}
+                    disabled={savingName}
+                  >
+                    {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    保存名称
+                  </Button>
+                  <EditorInfoList
+                    items={[
+                      { label: "当前状态", value: portfolioStatusLabel(status) },
+                      { label: "包装剩余", value: `${packagingQuota.remaining} / ${packagingQuota.limit}` },
+                      { label: "已选项目", value: `${selectedProjects.length} 个` },
+                      { label: "固定页", value: `${enabledFixedPages.length} 个启用` },
+                    ]}
+                  />
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="结构检查">
+                <div className="space-y-2">
+                  {structureChecklist.map((item) => (
+                    <div
+                      key={item.label}
+                      className={cn(
+                        "rounded-xl border px-3 py-3",
+                        item.done
+                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+                          : "border-white/10 bg-white/[0.03] text-white/72"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {item.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-80">
+                          {item.label}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-none"
-                          onClick={() => handleMoveProject(project.id, "up")}
-                          disabled={updatingStructure}
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-none"
-                          onClick={() => handleMoveProject(project.id, "down")}
-                          disabled={updatingStructure}
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-none"
-                          onClick={() => handleToggleProject(project.id)}
-                          disabled={updatingStructure}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <p className="mt-2 text-sm leading-6 opacity-80">{item.detail}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </EditorRailSection>
 
-              {availableProjects.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    可加入项目
-                  </p>
-                  {availableProjects.slice(0, 6).map((project) => (
+              <EditorRailSection title="固定页">
+                <div className="space-y-2">
+                  {fixedPages.map((page) => (
                     <button
-                      key={project.id}
+                      key={page.id}
                       type="button"
-                      className="flex w-full items-center justify-between border border-neutral-200 bg-neutral-50 px-3 py-3 text-left transition-colors hover:bg-white"
-                      onClick={() => handleToggleProject(project.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition-colors",
+                        page.enabled
+                          ? "border-sky-400/35 bg-sky-400/10 text-white"
+                          : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
+                      )}
+                      onClick={() => handleToggleFixedPage(page.id)}
                       disabled={updatingStructure}
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-neutral-800">{project.name}</p>
-                        <p className="mt-1 text-xs text-neutral-400">{projectStageLabel(project)}</p>
+                      <div>
+                        <p className="text-sm font-medium">{page.label}</p>
+                        <p className="mt-1 text-xs opacity-70">
+                          {page.enabled ? "已启用" : "当前关闭"}
+                        </p>
                       </div>
-                      <Plus className="h-4 w-4 shrink-0 text-neutral-400" />
+                      {page.enabled ? <Check className="h-4 w-4" /> : null}
                     </button>
                   ))}
                 </div>
-              ) : null}
-            </EditorRailSection>
+              </EditorRailSection>
+            </TabsContent>
 
-            <EditorRailSection title="固定页">
-              <div className="space-y-2">
-                {fixedPages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className="flex w-full items-center justify-between border border-neutral-200 bg-white px-3 py-3 text-left transition-colors hover:bg-neutral-50"
-                    onClick={() => handleToggleFixedPage(page.id)}
-                    disabled={updatingStructure}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-neutral-800">{page.label}</p>
-                      <p className="mt-1 text-xs text-neutral-400">
-                        {page.enabled ? "已启用" : "已关闭"}
-                      </p>
-                    </div>
-                    {page.enabled ? <Check className="h-4 w-4 text-emerald-600" /> : null}
-                  </button>
-                ))}
-              </div>
-            </EditorRailSection>
-
-            <EditorRailSection title="页面列表">
-              <div className="space-y-2">
-                {pages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className={`block w-full border px-3 py-3 text-left transition-colors ${
-                      selectedCanvasItem?.id === page.id
-                        ? "border-neutral-800 bg-neutral-100"
-                        : "border-neutral-200 bg-white hover:bg-neutral-50"
-                    }`}
-                    onClick={() => setSelectedCanvasItemId(page.id)}
-                  >
-                    <p className="text-sm font-medium text-neutral-800">{page.title}</p>
-                    <p className="mt-1 text-xs text-neutral-400">{page.pageCountSuggestion}</p>
-                  </button>
-                ))}
-              </div>
-            </EditorRailSection>
-
-            <EditorRailSection title="历史">
-              {aiHistory.length > 0 ? (
+            <TabsContent value="projects" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="已选项目">
                 <div className="space-y-2">
-                  {aiHistory.map((item) => (
-                    <div key={item.key} className="border border-neutral-200 bg-white px-3 py-3">
-                      <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-neutral-500">{item.summary}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm leading-6 text-neutral-500">
-                  当前还没有作品集级历史。运行诊断或生成包装后，这里会承接最近结论。
-                </p>
-              )}
-            </EditorRailSection>
-          </>
-        }
-        center={
-          <div className="px-4 py-4 lg:px-6 lg:py-6">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Projects
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {selectedProjects.length}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    当前已选入整份作品集的项目数量。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Fixed Pages
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {enabledFixedPages.length}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    封面、关于我和结尾页等固定结构。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Diagnosis
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {diagnosis ? "Ready" : "Pending"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    当前是否已经得到整份作品集级判断。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
-                    Packaging
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight">
-                    {packaging ? `${packaging.pages.length} 单元` : "待生成"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-white/68">
-                    {packaging ? "已有整份包装结果，可继续发布导出。" : "完成结构判断后即可生成整份包装。"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-none border border-neutral-300 bg-white shadow-[0_32px_90px_-72px_rgba(15,23,42,0.48)]">
-                <div className="flex flex-col gap-3 border-b border-neutral-300 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
-                      Center Canvas
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-900">
-                      整份作品集工作台
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-                      中间区现在负责让你快速判断这份作品集的组成、节奏和下一步，而不是只展示一组占位卡片。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {structureChecklist.map((item) => (
+                  {selectedProjects.length > 0 ? (
+                    selectedProjects.map((project) => (
                       <div
-                        key={item.label}
-                        className={`min-w-32 border px-3 py-2 ${
-                          item.done
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                            : "border-neutral-200 bg-neutral-50 text-neutral-600"
-                        }`}
+                        key={project.id}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
                       >
-                        <div className="flex items-center gap-2">
-                          {item.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                          <span className="text-xs font-mono uppercase tracking-[0.16em]">
-                            {item.label}
-                          </span>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-white">{project.name}</p>
+                            <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              onClick={() => handleMoveProject(project.id, "up")}
+                              disabled={updatingStructure}
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              onClick={() => handleMoveProject(project.id, "down")}
+                              disabled={updatingStructure}
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              onClick={() => handleToggleProject(project.id)}
+                              disabled={updatingStructure}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
-                        <p className="mt-2 text-xs leading-5">{item.detail}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                      还没有选入项目。先从下面加入 2-4 个最能代表能力面的项目。
+                    </div>
+                  )}
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="可加入项目" className="flex-1">
+                <div className="space-y-2">
+                  {availableProjects.length > 0 ? (
+                    availableProjects.map((project) => (
+                      <button
+                        key={project.id}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left text-white/72 transition-colors hover:bg-white/[0.05]"
+                        onClick={() => handleToggleProject(project.id)}
+                        disabled={updatingStructure}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-white">{project.name}</p>
+                          <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
+                        </div>
+                        <Plus className="h-4 w-4 shrink-0 text-white/46" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                      所有可用项目都已经在当前作品集里了。
+                    </div>
+                  )}
+                </div>
+              </EditorRailSection>
+            </TabsContent>
+
+            <TabsContent value="pages" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="页面列表">
+                <div className="space-y-2">
+                  {pages.length > 0 ? (
+                    pages.map((page, index) => (
+                      <EditorSurfaceButton
+                        key={page.id}
+                        active={selectedCanvasItem?.id === page.id}
+                        onClick={() => setSelectedCanvasItemId(page.id)}
+                      >
+                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                          Page {index + 1}
+                        </p>
+                        <p className="mt-2 text-sm font-medium">{page.title}</p>
+                        <p className="mt-1 text-xs leading-5 opacity-70">
+                          {pageRoleLabel(page.pageRole)} · {page.pageCountSuggestion}
+                        </p>
+                      </EditorSurfaceButton>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                      还没有页面结构。先选项目并运行作品集诊断。
+                    </div>
+                  )}
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="历史">
+                {aiHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {aiHistory.map((item) => (
+                      <div
+                        key={item.key}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
+                      >
+                        <p className="text-sm font-medium text-white">{item.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-white/46">{item.summary}</p>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm leading-6 text-white/46">
+                    当前还没有作品集级历史。运行诊断或生成包装后，这里会承接最近结论。
+                  </p>
+                )}
+              </EditorRailSection>
+            </TabsContent>
+          </Tabs>
+        }
+        center={
+          <div className="flex h-full flex-col">
+            <div className="border-b border-white/10 px-6 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <EditorCanvasChip active={selectedProjects.length >= 2}>
+                  Projects {selectedProjects.length}
+                </EditorCanvasChip>
+                <EditorCanvasChip active={enabledFixedPages.length >= 2}>
+                  Fixed Pages {enabledFixedPages.length}
+                </EditorCanvasChip>
+                <EditorCanvasChip active={Boolean(diagnosis)}>
+                  Diagnosis {diagnosis ? portfolioVerdictLabel(diagnosis.overallVerdict) : "Pending"}
+                </EditorCanvasChip>
+                <EditorCanvasChip active={Boolean(packaging)}>
+                  {packaging ? `${packaging.pages.length} pages` : "No packaging"}
+                </EditorCanvasChip>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto px-6 py-8">
+              <div className="mx-auto flex min-h-full min-w-max flex-col gap-10">
+                <div className="flex flex-wrap gap-2">
+                  {narrativeNotes.length > 0 ? (
+                    narrativeNotes.slice(0, 4).map((note) => (
+                      <EditorCanvasChip key={note}>{note}</EditorCanvasChip>
+                    ))
+                  ) : (
+                    structureChecklist.map((item) => (
+                      <EditorCanvasChip key={item.label} active={item.done}>
+                        {item.label}
+                      </EditorCanvasChip>
+                    ))
+                  )}
                 </div>
 
-                <div className="grid gap-4 px-5 py-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.95fr)]">
-                  <div className="space-y-4">
-                    {selectedProjects.length === 0 ? (
-                      <div className="border border-neutral-300 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] p-5">
-                        <p className="text-sm font-medium text-neutral-900">先组一份可讲述的项目组合</p>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-                          当前还没有选入项目，所以中间画布不再展示几张瘦长的占位页，而是先帮你完成这份作品集最关键的第一步。
-                        </p>
-                        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
-                          <div className="border border-neutral-200 bg-white px-4 py-4">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
-                              推荐动作
-                            </p>
-                            <div className="mt-3 space-y-3">
-                              <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
-                                先从左侧项目池加入 2-4 个最能代表能力面的项目。
-                              </div>
-                              <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
-                                优先选择已经有排版结果或已有明确包装模式的项目。
-                              </div>
-                              <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
-                                固定页建议至少保留封面、关于我和结尾页。
-                              </div>
-                            </div>
-                          </div>
-                          <div className="border border-neutral-200 bg-white px-4 py-4">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
-                              固定页草图
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {enabledFixedPages.map((page) => (
-                                <span
-                                  key={page.id}
-                                  className="border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700"
-                                >
-                                  {page.label}
-                                </span>
-                              ))}
-                              {enabledFixedPages.length === 0 ? (
-                                <span className="text-sm leading-6 text-neutral-500">
-                                  当前还没有启用固定页。
-                                </span>
-                              ) : null}
-                            </div>
-                            {disabledFixedPages.length > 0 ? (
-                              <p className="mt-3 text-xs leading-5 text-neutral-400">
-                                已关闭：{disabledFixedPages.map((page) => page.label).join(" / ")}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="border border-neutral-300 bg-neutral-50 p-4">
-                        <div className="flex items-end justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-neutral-900">
-                              {packaging ? "页面顺序预览" : "当前结构预览"}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-neutral-500">
-                              {packaging
-                                ? "当前主画布会直接展示整份包装后的页面单元。"
-                                : "在正式包装之前，先用项目卡和固定页卡判断整体顺序是否顺。"}
-                            </p>
-                          </div>
-                          <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                            {packaging ? `${pages.length} pages` : `${selectedProjects.length} projects`}
-                          </span>
-                        </div>
-
-                        {packaging ? (
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            {pages.map((page, index) => (
-                              <button
-                                key={page.id}
-                                type="button"
-                                className={`border p-4 text-left shadow-[0_18px_50px_-42px_rgba(15,23,42,0.35)] transition-colors ${
-                                  selectedCanvasItem?.id === page.id
-                                    ? "border-neutral-900 bg-white"
-                                    : "border-neutral-200 bg-white hover:bg-neutral-50"
-                                }`}
-                                onClick={() => setSelectedCanvasItemId(page.id)}
-                              >
-                                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
-                                  Page {index + 1}
-                                </p>
-                                <p className="mt-2 text-sm font-medium text-neutral-900">{page.title}</p>
-                                <p className="mt-2 text-sm leading-6 text-neutral-500">{page.summary}</p>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              {selectedProjects.map((project, index) => (
-                                <button
-                                  key={project.id}
-                                  type="button"
-                                  className="border border-neutral-200 bg-white p-4 text-left shadow-[0_18px_50px_-42px_rgba(15,23,42,0.35)] transition-colors hover:bg-neutral-50"
-                                  onClick={() => setSelectedCanvasItemId(`project-${project.id}`)}
-                                >
-                                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                                    Project {index + 1}
-                                  </p>
-                                  <p className="mt-2 text-sm font-medium text-neutral-900">{project.name}</p>
-                                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                                    {project.layout?.narrativeSummary ??
-                                      project.resultSummary ??
-                                      project.background ??
-                                      "当前还没有稳定摘要，建议先回项目侧补齐结论。"}
-                                  </p>
-                                  <p className="mt-3 text-xs text-neutral-400">{projectStageLabel(project)}</p>
-                                </button>
-                              ))}
-                            </div>
-                            <div className="border border-neutral-200 bg-white px-4 py-4">
-                              <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
-                                固定页与节奏
-                              </p>
-                              <div className="mt-3 space-y-2">
-                                {enabledFixedPages.map((page) => (
-                                  <div
-                                    key={page.id}
-                                    className="border border-neutral-200 bg-neutral-50 px-3 py-3"
-                                  >
-                                    <p className="text-sm font-medium text-neutral-900">{page.label}</p>
-                                    <p className="mt-1 text-xs leading-5 text-neutral-500">
-                                      先保留这个节点，生成包装后会补足更具体的页面职责。
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                {pages.length === 0 ? (
+                  <div className="flex w-[720px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-10 py-20 text-center">
+                    <div className="max-w-xl">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+                        Empty Canvas
+                      </p>
+                      <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+                        先组一份能讲故事的作品集结构
+                      </h2>
+                      <p className="mt-4 text-sm leading-7 text-white/56">
+                        左侧先加入 2-4 个项目，保留关键固定页，再运行作品集诊断。生成包装之后，中间画布会变成真正的页面序列。
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "grid gap-10",
+                      pages.length === 1 ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"
                     )}
+                  >
+                    {pages.map((page, index) => {
+                      const relatedProject = page.projectId ? projectMap.get(page.projectId) : null;
+                      const active = selectedCanvasItem?.id === page.id;
 
-                    <div className="border border-neutral-300 bg-white p-4">
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-neutral-900">整份叙事提示</p>
-                          <p className="mt-2 text-sm leading-6 text-neutral-500">
-                            {narrativeNotes.length > 0
-                              ? "这里会浓缩当前作品集最关键的叙事提醒。"
-                              : "当你运行诊断或生成包装后，这里会显示最关键的结构建议。"}
+                      return (
+                        <div key={page.id} className="space-y-2">
+                          <p className="px-1 text-xs font-mono uppercase tracking-[0.16em] text-white/34">
+                            Page {index + 1}
                           </p>
-                        </div>
-                        {packaging ? (
-                          <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                            latest packaging
-                          </span>
-                        ) : null}
-                      </div>
-                      {narrativeNotes.length > 0 ? (
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          {narrativeNotes.map((note) => (
-                            <div key={note} className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-                              <p className="text-sm leading-6 text-neutral-600">{note}</p>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCanvasItemId(page.id)}
+                            className="block text-left"
+                          >
+                            <div
+                              className={cn(
+                                "flex min-h-[430px] w-[344px] flex-col justify-between overflow-hidden rounded-[28px] border bg-white text-neutral-900 shadow-[0_28px_90px_-52px_rgba(0,0,0,0.55)] transition-all",
+                                active ? "border-sky-400 ring-2 ring-sky-400/70" : "border-black/10"
+                              )}
+                            >
+                              <div className="border-b border-neutral-200 px-5 py-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                                      {page.type === "fixed" ? "Fixed Page" : "Project Page"}
+                                    </p>
+                                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-950">
+                                      {page.title}
+                                    </h2>
+                                  </div>
+                                  <span className="rounded-full border border-neutral-200 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-500">
+                                    {page.pageCountSuggestion}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex-1 px-5 py-5">
+                                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+                                  <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
+                                    {pageRoleLabel(page.pageRole)}
+                                  </p>
+                                  <p className="mt-3 text-sm leading-6 text-neutral-600">
+                                    {page.summary}
+                                  </p>
+                                </div>
+
+                                <div className="mt-4 space-y-2">
+                                  <div className="border border-neutral-200 bg-white px-3 py-3 text-sm text-neutral-600">
+                                    页面职责：{pageRoleLabel(page.pageRole)}
+                                  </div>
+                                  <div className="border border-neutral-200 bg-white px-3 py-3 text-sm text-neutral-600">
+                                    页面类型：{page.type === "fixed" ? "固定页" : "项目页"}
+                                  </div>
+                                  <div className="border border-neutral-200 bg-white px-3 py-3 text-sm text-neutral-600">
+                                    {relatedProject
+                                      ? `关联项目：${relatedProject.name}`
+                                      : "固定页会在整份叙事里承担结构锚点。"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="border-t border-neutral-200 px-5 py-4">
+                                <p className="text-xs text-neutral-400">
+                                  {relatedProject
+                                    ? projectStageLabel(relatedProject)
+                                    : "封面 / 关于我 / 结尾等固定结构"}
+                                </p>
+                              </div>
                             </div>
-                          ))}
+                          </button>
                         </div>
-                      ) : (
-                        <div className="mt-4 border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-sm leading-6 text-neutral-500">
-                          先运行“作品集诊断”，系统会判断项目选择、固定页和整份节奏是否足以进入包装。
-                        </div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
-
-                  <div className="space-y-4">
-                    <div className="border border-neutral-300 bg-neutral-950 p-4 text-white">
-                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
-                        Current Conclusion
-                      </p>
-                      <p className="mt-3 text-base font-medium leading-7">
-                        {packaging?.narrativeSummary ??
-                          diagnosis?.summary ??
-                          "先运行作品集诊断，系统会判断当前项目组合和页面组织是否足以进入整份包装。"}
-                      </p>
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">下一步结论</p>
-                      <p className="mt-2 text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">发布与兼容入口</p>
-                      <div className="mt-3 space-y-3">
-                        <Link
-                          href={`/portfolios/${initialData.id}/outline`}
-                          className="flex items-center justify-between border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-white"
-                        >
-                          打开结构兼容页
-                          <ArrowRight className="h-3.5 w-3.5 text-neutral-400" />
-                        </Link>
-                        <Link
-                          href={`/portfolios/${initialData.id}/publish`}
-                          className="flex items-center justify-between border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-white"
-                        >
-                          打开发布与导出页
-                          <ArrowRight className="h-3.5 w-3.5 text-neutral-400" />
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">当前结构概览</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="border border-neutral-200 bg-neutral-50 px-3 py-3">
-                          已选项目：{selectedProjects.length} 个
-                        </div>
-                        <div className="border border-neutral-200 bg-neutral-50 px-3 py-3">
-                          已启用固定页：{enabledFixedPages.length} 个
-                        </div>
-                        <div className="border border-neutral-200 bg-neutral-50 px-3 py-3">
-                          当前状态：{portfolioStatusLabel(status)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
         }
         rightRail={
           <Tabs defaultValue="inspector" className="flex h-full flex-col">
-            <div className="border-b border-neutral-200 px-4 py-4">
-              <TabsList className="grid w-full grid-cols-2 rounded-none bg-neutral-100">
-                <TabsTrigger value="inspector" className="rounded-none">
+            <div className="border-b border-white/10 p-3">
+              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-white/[0.04] p-1">
+                <TabsTrigger value="inspector" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
                   Inspector
                 </TabsTrigger>
-                <TabsTrigger value="ai" className="rounded-none">
+                <TabsTrigger value="ai" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
                   AI
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value="inspector" className="mt-0 flex-1">
-              <EditorRailSection title="Inspector">
+            <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="选中页面">
                 {selectedCanvasItem ? (
-                  <EditorInfoList
-                    items={[
-                      { label: "当前页面", value: selectedCanvasItem.title },
-                      { label: "页面类型", value: selectedCanvasItem.type === "fixed" ? "固定页" : "项目页" },
-                      { label: "建议页数", value: selectedCanvasItem.pageCountSuggestion },
-                    ]}
-                  />
+                  <>
+                    <EditorInfoList
+                      items={[
+                        { label: "页面标题", value: selectedCanvasItem.title },
+                        { label: "页面类型", value: selectedCanvasItem.type === "fixed" ? "固定页" : "项目页" },
+                        { label: "页面角色", value: pageRoleLabel(selectedCanvasItem.pageRole) },
+                        { label: "建议页数", value: selectedCanvasItem.pageCountSuggestion },
+                      ]}
+                    />
+                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                      <p className="text-sm font-medium text-white">{selectedCanvasItem.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-white/56">{selectedCanvasItem.summary}</p>
+                    </div>
+                  </>
                 ) : (
-                  <p className="text-sm leading-6 text-neutral-500">
+                  <p className="text-sm leading-6 text-white/46">
                     当前还没有可检查的页面单元。
                   </p>
                 )}
               </EditorRailSection>
 
-              <EditorRailSection title="页面说明">
-                <p className="text-sm leading-6 text-neutral-500">
-                  {selectedCanvasItem?.summary ?? "先选中一个页面单元，这里会展示它的角色和节奏说明。"}
-                </p>
+              <EditorRailSection title="对象状态">
+                <EditorInfoList
+                  items={[
+                    { label: "对象类型", value: "Portfolio" },
+                    { label: "当前状态", value: portfolioStatusLabel(status) },
+                    { label: "已选项目", value: `${selectedProjects.length} 个` },
+                    { label: "固定页", value: `${enabledFixedPages.length} 个` },
+                  ]}
+                />
+              </EditorRailSection>
+
+              <EditorRailSection title="关联项目">
+                {selectedCanvasProject ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <p className="text-sm font-medium text-white">{selectedCanvasProject.name}</p>
+                    <p className="mt-2 text-sm leading-6 text-white/56">
+                      {selectedCanvasProject.layout?.narrativeSummary ??
+                        selectedCanvasProject.resultSummary ??
+                        selectedCanvasProject.background ??
+                        "当前项目还没有稳定摘要，建议先回项目编辑器补齐项目结论。"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm leading-6 text-white/46">
+                    当前选中的是固定页，它不对应具体项目。
+                  </p>
+                )}
               </EditorRailSection>
             </TabsContent>
 
-            <TabsContent value="ai" className="mt-0 flex-1">
-              <EditorRailSection title="AI 面板">
+            <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="Current Conclusion">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-sm leading-7 text-white/74">
+                    {packaging?.narrativeSummary ??
+                      diagnosis?.summary ??
+                      "先运行作品集诊断，系统会判断当前项目组合、固定页和整体节奏是否足以进入整份包装。"}
+                  </p>
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="AI 结果">
                 {diagnosis ? (
                   <div className="space-y-3">
-                    <div className="border border-neutral-200 bg-neutral-50 p-3">
-                      <p className="text-sm font-medium text-neutral-900">
-                        作品集诊断 · {diagnosis.overallVerdict}
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-sm font-medium text-white">
+                        作品集诊断 · {portfolioVerdictLabel(diagnosis.overallVerdict)}
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-neutral-600">{diagnosis.summary}</p>
+                      <p className="mt-2 text-sm leading-6 text-white/56">{diagnosis.summary}</p>
                     </div>
                     {diagnosis.suggestions.map((suggestion) => (
-                      <div key={suggestion} className="border border-neutral-200 bg-white px-3 py-3">
-                        <p className="text-sm leading-6 text-neutral-500">{suggestion}</p>
+                      <div key={suggestion} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                        <p className="text-sm leading-6 text-white/56">{suggestion}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm leading-6 text-neutral-500">
+                  <p className="text-sm leading-6 text-white/46">
                     还没有作品集级 AI 结果。点击顶部“作品集诊断”，系统会判断项目选择、固定页和整份节奏。
                   </p>
                 )}
@@ -1065,46 +1013,66 @@ export function PortfolioEditorClient({
                 {aiHistory.length > 0 ? (
                   <div className="space-y-2">
                     {aiHistory.map((item) => (
-                      <div key={item.key} className="border border-neutral-200 bg-white px-3 py-3">
-                        <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                        <p className="mt-1 text-sm leading-6 text-neutral-500">{item.summary}</p>
+                      <div key={item.key} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                        <p className="text-sm font-medium text-white">{item.label}</p>
+                        <p className="mt-1 text-sm leading-6 text-white/56">{item.summary}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm leading-6 text-neutral-500">
+                  <p className="text-sm leading-6 text-white/46">
                     当前还没有可回看的作品集级历史。
                   </p>
                 )}
               </EditorRailSection>
 
               <EditorRailSection title="下一步结论">
-                <p className="text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
+                <p className="text-sm leading-6 text-white/56">{nextStepConclusion}</p>
+                <div className="mt-4 space-y-2">
+                  <Link
+                    href={`/portfolios/${initialData.id}/publish`}
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white"
+                  >
+                    打开发布与导出页
+                    <ArrowRight className="h-3.5 w-3.5 text-white/34" />
+                  </Link>
+                  <Link
+                    href={`/portfolios/${initialData.id}/outline`}
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white"
+                  >
+                    打开结构兼容页
+                    <ArrowRight className="h-3.5 w-3.5 text-white/34" />
+                  </Link>
+                </div>
               </EditorRailSection>
             </TabsContent>
           </Tabs>
         }
         bottomStrip={
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto">
             {pages.length > 0 ? (
-              pages.map((page) => (
+              pages.map((page, index) => (
                 <button
                   key={page.id}
                   type="button"
-                  className={`w-40 shrink-0 border px-3 py-3 text-left ${
-                    selectedCanvasItem?.id === page.id
-                      ? "border-neutral-900 bg-white"
-                      : "border-neutral-200 bg-white"
-                  }`}
                   onClick={() => setSelectedCanvasItemId(page.id)}
+                  className={cn(
+                    "w-44 shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
+                    selectedCanvasItem?.id === page.id
+                      ? "border-sky-400/70 bg-sky-400/10 text-white"
+                      : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
+                  )}
                 >
-                  <p className="truncate text-sm font-medium text-neutral-800">{page.title}</p>
-                  <p className="mt-1 text-xs text-neutral-400">{page.pageCountSuggestion}</p>
+                  <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                    Page {index + 1}
+                  </p>
+                  <p className="mt-2 truncate text-sm font-medium">{page.title}</p>
+                  <p className="mt-1 text-xs opacity-70">{page.pageCountSuggestion}</p>
                 </button>
               ))
             ) : (
-              <div className="flex h-20 min-w-full items-center justify-center border border-dashed border-neutral-300 bg-white text-sm text-neutral-400">
-                后续这里会继续增强为真正的页面条与大纲条。
+              <div className="flex h-20 min-w-full items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-sm text-white/40">
+                这里会承接整份作品集的页面条。
               </div>
             )}
           </div>

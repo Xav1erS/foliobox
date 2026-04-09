@@ -27,9 +27,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import {
+  EditorCanvasChip,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
+  EditorSurfaceButton,
 } from "@/components/editor/EditorScaffold";
 import {
   PROJECT_STAGE_LABEL,
@@ -45,6 +47,7 @@ import {
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
+import { cn } from "@/lib/utils";
 
 type ProjectAsset = {
   id: string;
@@ -78,6 +81,18 @@ type GeneratePrecheck = {
   activeProjectRemaining: number;
   actionRemaining: number;
   reusableDraftId: string | null;
+};
+
+type ProjectCanvasItem = {
+  id: string;
+  kind: "layout_page" | "asset" | "placeholder";
+  frameLabel: string;
+  title: string;
+  summary: string;
+  previewUrl: string | null;
+  accentLabel: string;
+  keyPoints: string[];
+  meta: Array<{ label: string; value: string }>;
 };
 
 export type ProjectEditorInitialData = {
@@ -192,6 +207,7 @@ export function ProjectEditorClient({
   const [generatingLayout, setGeneratingLayout] = useState(false);
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
   const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
+  const [selectedCanvasItemId, setSelectedCanvasItemId] = useState<string | null>(null);
   const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
     const styleProfile = initialData.layout?.styleProfile;
     if (styleProfile?.source === "preset" && styleProfile.presetKey) {
@@ -310,7 +326,78 @@ export function ProjectEditorClient({
       packageRecommendation,
     ]
   );
-  const layoutHighlights = layout?.pages.slice(0, 4) ?? [];
+  const canvasItems = useMemo<ProjectCanvasItem[]>(() => {
+    if (layout?.pages?.length) {
+      return layout.pages.map((page, index) => ({
+        id: `page-${page.pageNumber}`,
+        kind: "layout_page",
+        frameLabel: `Page ${page.pageNumber}`,
+        title: page.titleSuggestion,
+        summary: page.contentGuidance,
+        previewUrl: displayAssets[index]?.imageUrl ?? displayAssets[0]?.imageUrl ?? null,
+        accentLabel: page.type,
+        keyPoints: page.keyPoints.slice(0, 3),
+        meta: [
+          { label: "页面类型", value: page.type },
+          { label: "字数建议", value: page.wordCountGuideline ?? "未提供" },
+          { label: "素材提示", value: page.assetHint ?? "未提供" },
+        ],
+      }));
+    }
+
+    if (displayAssets.length > 0) {
+      return displayAssets.map((asset, index) => ({
+        id: `asset-${asset.id}`,
+        kind: "asset",
+        frameLabel: `Asset ${index + 1}`,
+        title: asset.title ?? `素材 ${index + 1}`,
+        summary: asset.isCover
+          ? "当前这张图更像封面候选，适合作为项目进入时的第一视觉。"
+          : asset.selected
+            ? "当前已经进入主画布候选区，后续会参与页面编排。"
+            : "这张图目前还没有被选为主画布素材，可以继续作为候选。",
+        previewUrl: asset.imageUrl,
+        accentLabel: asset.isCover ? "cover" : asset.selected ? "selected" : "candidate",
+        keyPoints: [
+          asset.isCover ? "适合作为封面或章节引导图" : "可作为过程或结果补充图",
+          asset.selected ? "已进入当前主画布候选池" : "仍可手动切换是否参与展示",
+        ],
+        meta: [
+          { label: "素材状态", value: asset.selected ? "已选中" : "未选中" },
+          { label: "封面优先", value: asset.isCover ? "是" : "否" },
+          { label: "对象类型", value: "Project Asset" },
+        ],
+      }));
+    }
+
+    return [
+      {
+        id: "starter",
+        kind: "placeholder",
+        frameLabel: "Start",
+        title: "先把素材和项目事实放进画布",
+        summary:
+          "当前还没有可展示的项目画板。先在左侧补 facts、上传展示素材，再发起项目诊断和首版排版生成。",
+        previewUrl: null,
+        accentLabel: "draft",
+        keyPoints: [
+          "左侧先补项目类型、行业、角色和结果摘要",
+          "至少准备 3 张可代表项目过程与结果的素材",
+          "跑一次项目诊断后，再生成首版排版",
+        ],
+        meta: [
+          { label: "当前阶段", value: stageInfo?.label ?? "草稿" },
+          { label: "主画布素材", value: `${displayAssets.length} 张` },
+          { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
+        ],
+      },
+    ];
+  }, [displayAssets, layout, stageInfo?.label]);
+  const selectedCanvasItem = useMemo(() => {
+    const fallbackId = canvasItems[0]?.id ?? null;
+    const resolvedId = selectedCanvasItemId ?? fallbackId;
+    return canvasItems.find((item) => item.id === resolvedId) ?? null;
+  }, [canvasItems, selectedCanvasItemId]);
   const nextStepConclusion = useMemo(() => {
     if (layout) {
       return "当前项目已经拿到排版结果，可以继续细看页面结构，或回到兼容页补查旧链路结果。";
@@ -598,9 +685,9 @@ export function ProjectEditorClient({
         backHref="/projects"
         backLabel="全部项目"
         statusLabel={stageInfo?.label ?? "草稿"}
-        statusMeta={`${displayAssets.length} 张展示素材`}
+        statusMeta={layout ? `${layout.totalPages} pages` : `${displayAssets.length} frames`}
         primaryAction={
-          <Button className="h-10 px-4" onClick={handleOpenGenerate}>
+          <Button className="h-9 px-4" onClick={handleOpenGenerate}>
             <Wand2 className="h-4 w-4" />
             生成排版
           </Button>
@@ -608,7 +695,7 @@ export function ProjectEditorClient({
         secondaryAction={
           <Button
             variant="outline"
-            className="h-10 px-4"
+            className="h-9 border-white/10 bg-white/[0.03] px-4 text-white hover:bg-white/[0.08] hover:text-white"
             onClick={handleRunDiagnosis}
             disabled={diagnosing}
           >
@@ -616,439 +703,306 @@ export function ProjectEditorClient({
             项目诊断
           </Button>
         }
-        topNote={
-          <>
-            这是里程碑 A 的 <strong>Project Editor MVP</strong>。当前已经把项目入口、核心 facts、
-            素材补充、项目诊断和排版生成统一收口到同一页里；旧的分步页现在只承担历史入口承接，
-            日常整理已经可以直接在这里完成。
-          </>
-        }
         planSummary={planSummary}
+        leftRailLabel="Layers / Assets"
+        rightRailLabel="Inspector / AI"
         leftRail={
-          <>
-            <EditorRailSection title="项目信息">
-              <EditorInfoList
-                items={[
-                  { label: "导入方式", value: sourceTypeLabel(initialData.sourceType) },
-                  { label: "包装模式", value: packageModeLabel(packageMode) },
-                  { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
-                  {
-                    label: "当前项目剩余",
-                    value: `生成 ${initialData.actionSummary.layoutGenerations.remaining} / 重生 ${initialData.actionSummary.layoutRegenerations.remaining}`,
-                  },
-                ]}
-              />
-              {initialData.sourceUrl ? (
-                <a
-                  href={initialData.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 block truncate text-sm text-neutral-700 underline-offset-2 hover:underline"
-                >
-                  {initialData.sourceUrl}
-                </a>
-              ) : null}
-            </EditorRailSection>
+          <Tabs defaultValue="layers" className="flex h-full flex-col">
+            <div className="border-b border-white/10 p-3">
+              <TabsList className="grid w-full grid-cols-3 rounded-lg bg-white/[0.04] p-1">
+                <TabsTrigger value="layers" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  图层
+                </TabsTrigger>
+                <TabsTrigger value="assets" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  素材
+                </TabsTrigger>
+                <TabsTrigger value="facts" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                  项目
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <EditorRailSection title="项目背景">
-              <div className="space-y-3">
-                <Input
-                  value={facts.projectType}
-                  onChange={(event) =>
-                    setFacts((current) => ({ ...current, projectType: event.target.value }))
-                  }
-                  placeholder="项目类型"
-                  className="h-10 rounded-none border-neutral-300"
-                />
-                <Input
-                  value={facts.industry}
-                  onChange={(event) =>
-                    setFacts((current) => ({ ...current, industry: event.target.value }))
-                  }
-                  placeholder="所属行业"
-                  className="h-10 rounded-none border-neutral-300"
-                />
-                <Input
-                  value={facts.roleTitle}
-                  onChange={(event) =>
-                    setFacts((current) => ({ ...current, roleTitle: event.target.value }))
-                  }
-                  placeholder="我的角色"
-                  className="h-10 rounded-none border-neutral-300"
-                />
-                <Textarea
-                  value={facts.background}
-                  onChange={(event) =>
-                    setFacts((current) => ({ ...current, background: event.target.value }))
-                  }
-                  placeholder="项目背景"
-                  className="min-h-24 rounded-none border-neutral-300"
-                />
-                <Textarea
-                  value={facts.resultSummary}
-                  onChange={(event) =>
-                    setFacts((current) => ({ ...current, resultSummary: event.target.value }))
-                  }
-                  placeholder="结果摘要"
-                  className="min-h-20 rounded-none border-neutral-300"
-                />
-
-                <Button
-                  variant="outline"
-                  className="h-10 w-full"
-                  onClick={handleSaveFacts}
-                  disabled={savingFacts}
-                >
-                  {savingFacts ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  保存项目信息
-                </Button>
-                {factsMessage ? (
-                  <p className="text-xs text-emerald-600">{factsMessage}</p>
-                ) : null}
-              </div>
-            </EditorRailSection>
-
-            <EditorRailSection title="素材库" className="flex-1">
-              <ImageUploadZone
-                files={pendingFiles}
-                onFilesChange={setPendingFiles}
-                disabled={uploadingAssets}
-                onError={(message) => setActionError(message)}
-              />
-              <Button
-                className="mt-3 h-10 w-full"
-                onClick={handleUploadAssets}
-                disabled={uploadingAssets || pendingFiles.length === 0}
-              >
-                {uploadingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                上传到当前项目
-              </Button>
-
-              <div className="mt-4 space-y-2">
-                {displayAssets.slice(0, 4).map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center gap-3 border border-neutral-200 bg-neutral-50 px-3 py-2"
-                  >
-                    <div className="h-10 w-10 shrink-0 overflow-hidden border border-neutral-200 bg-white">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                        alt={asset.title ?? "素材"}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-neutral-700">
-                        {asset.title ?? "未命名素材"}
-                      </p>
-                      <p className="text-xs text-neutral-400">
-                        {asset.isCover ? "封面素材" : asset.selected ? "已选中" : "未选中"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </EditorRailSection>
-
-            <EditorRailSection title="备注">
-              <Textarea
-                value={notesDraft}
-                onChange={(event) => setNotesDraft(event.target.value)}
-                placeholder="把还没整理进 facts 的线索临时记在这里"
-                className="min-h-24 rounded-none border-neutral-300"
-              />
-              <p className="mt-2 text-xs leading-5 text-neutral-400">
-                里程碑 A 先用本地备注位承接编辑器语义，当前不会写回项目 facts，后续会拆成独立备注对象与 AI 可引用内容。
-              </p>
-            </EditorRailSection>
-
-            <EditorRailSection title="画板">
-              <EditorInfoList
-                items={[
-                  { label: "主画布素材", value: `${displayAssets.length} 张` },
-                  { label: "最近排版", value: layout ? `${layout.totalPages} 页` : "尚未生成" },
-                ]}
-              />
-            </EditorRailSection>
-
-            <EditorRailSection title="历史">
-              {diagnosisHistory.length > 0 ? (
+            <TabsContent value="layers" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="Frame List">
                 <div className="space-y-2">
-                  {diagnosisHistory.slice(0, 3).map((item) => (
-                    <div key={item.key} className="border border-neutral-200 bg-white px-3 py-3">
-                      <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-neutral-500">{item.summary}</p>
+                  {canvasItems.map((item) => (
+                    <EditorSurfaceButton
+                      key={item.id}
+                      active={selectedCanvasItem?.id === item.id}
+                      onClick={() => setSelectedCanvasItemId(item.id)}
+                    >
+                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                        {item.frameLabel}
+                      </p>
+                      <p className="mt-2 text-sm font-medium">{item.title}</p>
+                      <p className="mt-1 text-xs leading-5 opacity-70">{item.accentLabel}</p>
+                    </EditorSurfaceButton>
+                  ))}
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="项目信息">
+                <EditorInfoList
+                  items={[
+                    { label: "导入方式", value: sourceTypeLabel(initialData.sourceType) },
+                    { label: "包装模式", value: packageModeLabel(packageMode) },
+                    { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
+                    {
+                      label: "当前项目剩余",
+                      value: `生成 ${initialData.actionSummary.layoutGenerations.remaining} / 重生 ${initialData.actionSummary.layoutRegenerations.remaining}`,
+                    },
+                  ]}
+                />
+                {initialData.sourceUrl ? (
+                  <a
+                    href={initialData.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 block truncate text-sm text-white/64 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    {initialData.sourceUrl}
+                  </a>
+                ) : null}
+              </EditorRailSection>
+            </TabsContent>
+
+            <TabsContent value="assets" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="上传素材">
+                <ImageUploadZone
+                  files={pendingFiles}
+                  onFilesChange={setPendingFiles}
+                  disabled={uploadingAssets}
+                  onError={(message) => setActionError(message)}
+                />
+                <Button
+                  className="mt-3 h-10 w-full"
+                  onClick={handleUploadAssets}
+                  disabled={uploadingAssets || pendingFiles.length === 0}
+                >
+                  {uploadingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  上传到当前项目
+                </Button>
+              </EditorRailSection>
+
+              <EditorRailSection title="素材列表" className="flex-1">
+                <div className="space-y-2">
+                  {assets.length > 0 ? (
+                    assets.map((asset) => (
+                      <EditorSurfaceButton
+                        key={asset.id}
+                        active={selectedCanvasItem?.id === `asset-${asset.id}`}
+                        className="flex items-center gap-3"
+                        onClick={() => setSelectedCanvasItemId(`asset-${asset.id}`)}
+                      >
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/20">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                            alt={asset.title ?? "素材"}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-white">
+                            {asset.title ?? "未命名素材"}
+                          </p>
+                          <p className="mt-1 text-xs text-white/46">
+                            {asset.isCover ? "封面优先位" : asset.selected ? "当前已选" : "候选素材"}
+                          </p>
+                        </div>
+                      </EditorSurfaceButton>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                      还没有素材。先上传过程图、关键界面或结果画面。
+                    </div>
+                  )}
+                </div>
+              </EditorRailSection>
+            </TabsContent>
+
+            <TabsContent value="facts" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="Facts Snapshot">
+                <div className="grid gap-2">
+                  {factSnapshot.map((item) => (
+                    <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/34">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 text-sm text-white/78">{item.value}</p>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm leading-6 text-neutral-500">
-                  当前还没有可回看的编辑历史。运行项目诊断后，这里会先承接最近结论。
+              </EditorRailSection>
+
+              <EditorRailSection title="项目输入">
+                <div className="space-y-3">
+                  <Input
+                    value={facts.projectType}
+                    onChange={(event) =>
+                      setFacts((current) => ({ ...current, projectType: event.target.value }))
+                    }
+                    placeholder="项目类型"
+                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Input
+                    value={facts.industry}
+                    onChange={(event) =>
+                      setFacts((current) => ({ ...current, industry: event.target.value }))
+                    }
+                    placeholder="所属行业"
+                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Input
+                    value={facts.roleTitle}
+                    onChange={(event) =>
+                      setFacts((current) => ({ ...current, roleTitle: event.target.value }))
+                    }
+                    placeholder="我的角色"
+                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Textarea
+                    value={facts.background}
+                    onChange={(event) =>
+                      setFacts((current) => ({ ...current, background: event.target.value }))
+                    }
+                    placeholder="项目背景"
+                    className="min-h-24 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Textarea
+                    value={facts.resultSummary}
+                    onChange={(event) =>
+                      setFacts((current) => ({ ...current, resultSummary: event.target.value }))
+                    }
+                    placeholder="结果摘要"
+                    className="min-h-20 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full border-white/10 bg-white text-neutral-900 hover:bg-white/90"
+                    onClick={handleSaveFacts}
+                    disabled={savingFacts}
+                  >
+                    {savingFacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    保存项目信息
+                  </Button>
+                  {factsMessage ? <p className="text-xs text-emerald-300">{factsMessage}</p> : null}
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="备注">
+                <Textarea
+                  value={notesDraft}
+                  onChange={(event) => setNotesDraft(event.target.value)}
+                  placeholder="把还没整理进 facts 的线索临时记在这里"
+                  className="min-h-24 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                />
+                <p className="mt-2 text-xs leading-5 text-white/34">
+                  当前备注仍是本地草稿位，后续会拆成独立备注对象和可引用上下文。
                 </p>
-              )}
-            </EditorRailSection>
-          </>
+              </EditorRailSection>
+            </TabsContent>
+          </Tabs>
         }
         center={
-          <div className="px-4 py-4 lg:px-6 lg:py-6">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Facts
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {completedFactCount}/5
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    项目背景、角色与结果摘要的完成度。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Assets
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {displayAssets.length}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    当前主画布会优先展示已选中的展示素材。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
-                    Diagnosis
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-                    {diagnosisHistory.length}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    当前已回收的分析结论与 AI 结果。
-                  </p>
-                </div>
-                <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
-                    Layout
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight">
-                    {layout ? `${layout.totalPages} 页` : "待生成"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-white/68">
-                    {layout ? `当前模式 ${packageModeLabel(layout.packageMode)}` : "完成诊断后即可生成首版排版。"}
-                  </p>
-                </div>
+          <div className="flex h-full flex-col">
+            <div className="border-b border-white/10 px-6 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <EditorCanvasChip active={completedFactCount >= 3}>
+                  Facts {completedFactCount}/5
+                </EditorCanvasChip>
+                <EditorCanvasChip active={displayAssets.length >= 3}>
+                  Assets {displayAssets.length}
+                </EditorCanvasChip>
+                <EditorCanvasChip active={Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation)}>
+                  Diagnosis {diagnosisHistory.length}
+                </EditorCanvasChip>
+                <EditorCanvasChip active={Boolean(layout)}>
+                  {layout ? `${layout.totalPages} pages` : "No layout"}
+                </EditorCanvasChip>
               </div>
+            </div>
 
-              <div className="rounded-none border border-neutral-300 bg-white shadow-[0_32px_90px_-72px_rgba(15,23,42,0.48)]">
-                <div className="flex flex-col gap-3 border-b border-neutral-300 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
-                      Center Canvas
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-900">
-                      项目工作台与当前结果
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-                      中间区现在承担项目整理的主舞台，会同时显示输入质量、素材画布和最近一次生成结论。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {readinessChecklist.map((item) => (
-                      <div
-                        key={item.label}
-                        className={`min-w-32 border px-3 py-2 ${
-                          item.done
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                            : "border-neutral-200 bg-neutral-50 text-neutral-600"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {item.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                          <span className="text-xs font-mono uppercase tracking-[0.16em]">
-                            {item.label}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs leading-5">{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
+            <div className="flex-1 overflow-auto px-6 py-8">
+              <div className="mx-auto flex min-h-full min-w-max flex-col gap-10">
+                <div className="flex flex-wrap gap-2">
+                  {readinessChecklist.map((item) => (
+                    <EditorCanvasChip key={item.label} active={item.done}>
+                      {item.label}
+                    </EditorCanvasChip>
+                  ))}
                 </div>
 
-                <div className="grid gap-4 px-5 py-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.95fr)]">
-                  <div className="space-y-4">
-                    <div className="border border-neutral-300 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] p-5">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-neutral-900">项目摘要</p>
-                          <p className="mt-2 text-sm leading-6 text-neutral-500">
-                            这里优先把能影响生成质量的输入压缩成一眼能扫完的摘要。
-                          </p>
-                        </div>
-                        <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                          {packageMode ? `模式 ${packageModeLabel(packageMode)}` : "等待包装模式"}
-                        </span>
-                      </div>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {factSnapshot.map((item) => (
-                          <div key={item.label} className="border border-neutral-200 bg-white px-4 py-3">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
-                              {item.label}
-                            </p>
-                            <p className="mt-2 text-sm font-medium text-neutral-800">{item.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="border border-neutral-300 bg-neutral-50 p-4">
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-neutral-900">项目主画布</p>
-                          <p className="mt-2 text-sm leading-6 text-neutral-500">
-                            当前先用真实素材承接画布语义，后续再往页面级编辑和局部修改继续扩展。
-                          </p>
-                        </div>
-                        <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                          {displayAssets.length > 0 ? `${displayAssets.length} 张素材` : "等待上传"}
-                        </span>
-                      </div>
-
-                      {displayAssets.length > 0 ? (
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                          {displayAssets.slice(0, 6).map((asset, index) => (
-                            <div
-                              key={asset.id}
-                              className="overflow-hidden border border-neutral-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.35)]"
-                            >
-                              <div className="relative aspect-[4/3] overflow-hidden border-b border-neutral-200 bg-neutral-100">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                                  alt={asset.title ?? "素材"}
-                                  className="h-full w-full object-cover"
-                                />
-                                <span className="absolute left-2 top-2 border border-black/10 bg-white/92 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-600">
-                                  Frame {index + 1}
-                                </span>
-                              </div>
-                              <div className="px-3 py-3">
-                                <p className="truncate text-sm font-medium text-neutral-800">
-                                  {asset.title ?? "未命名素材"}
-                                </p>
-                                <p className="mt-1 text-xs text-neutral-400">
-                                  {asset.isCover ? "封面优先位" : asset.selected ? "当前已选" : "候选素材"}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-4 border border-dashed border-neutral-300 bg-white px-5 py-8">
-                          <p className="text-sm font-medium text-neutral-900">素材还没进入主画布</p>
-                          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
-                            先在左侧上传过程图、关键界面和结果画面。最理想的是至少准备一张封面候选、两张过程图和一张结果图。
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="border border-neutral-300 bg-white p-4">
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-neutral-900">排版结构速览</p>
-                          <p className="mt-2 text-sm leading-6 text-neutral-500">
-                            {layout
-                              ? "最近一次排版的前几页会显示在这里，方便你快速判断结构是否顺。"
-                              : "当前还没有排版结果，先补齐诊断或直接从顶部发起生成。"}
-                          </p>
-                        </div>
-                        {layout ? (
-                          <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
-                            {layout.totalPages} pages
-                          </span>
-                        ) : null}
-                      </div>
-                      {layout ? (
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          {layoutHighlights.map((page) => (
-                            <div key={page.pageNumber} className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-                              <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
-                                Page {page.pageNumber}
-                              </p>
-                              <p className="mt-2 text-sm font-medium text-neutral-900">
-                                {page.titleSuggestion}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          {readinessChecklist.map((item) => (
-                            <div key={item.label} className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-                              <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                              <p className="mt-2 text-sm leading-6 text-neutral-500">{item.detail}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="border border-neutral-300 bg-neutral-950 p-4 text-white">
-                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
-                        Current Conclusion
+                <div
+                  className={cn(
+                    "grid gap-10",
+                    canvasItems.length === 1 ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"
+                  )}
+                >
+                  {canvasItems.map((item) => (
+                    <div key={item.id} className="space-y-2">
+                      <p className="px-1 text-xs font-mono uppercase tracking-[0.16em] text-white/34">
+                        {item.frameLabel}
                       </p>
-                      <p className="mt-3 text-base font-medium leading-7">
-                        {layout?.narrativeSummary ??
-                          packageRecommendation?.reasoning ??
-                          completenessAnalysis?.overallComment ??
-                          "先运行项目诊断，系统会在右侧 AI 面板和这里给出当前项目的结论与下一步建议。"}
-                      </p>
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">下一步结论</p>
-                      <p className="mt-2 text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">最近的 AI 信号</p>
-                      {diagnosisHistory.length > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          {diagnosisHistory.slice(0, 3).map((item) => (
-                            <div key={item.key} className="border border-neutral-200 bg-neutral-50 px-3 py-3">
-                              <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                              <p className="mt-1 text-sm leading-6 text-neutral-500">{item.summary}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-sm leading-6 text-neutral-500">
-                          先点击顶部“项目诊断”，这里会把当前项目最关键的判断压缩成短结论。
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">历史入口</p>
-                      <p className="mt-2 text-sm leading-6 text-neutral-500">
-                        当前 editor 已经接管主入口；如果你需要回看之前的阶段页，也可以从这里进入。
-                      </p>
-                      <Link
-                        href={legacyEntry.href}
-                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCanvasItemId(item.id)}
+                        className="block text-left"
                       >
-                        {legacyEntry.label}
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
+                        <div
+                          className={cn(
+                            "w-[344px] overflow-hidden rounded-2xl border bg-white text-neutral-900 shadow-[0_28px_90px_-52px_rgba(0,0,0,0.55)] transition-all",
+                            selectedCanvasItem?.id === item.id
+                              ? "border-sky-400 ring-2 ring-sky-400/70"
+                              : "border-black/10"
+                          )}
+                        >
+                          {item.previewUrl ? (
+                            <div className="aspect-[4/3] overflow-hidden border-b border-neutral-200 bg-neutral-100">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={buildPrivateBlobProxyUrl(item.previewUrl)}
+                                alt={item.title}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-40 items-center justify-center border-b border-neutral-200 bg-neutral-100 px-6 text-center text-xs font-mono uppercase tracking-[0.18em] text-neutral-400">
+                              {item.accentLabel}
+                            </div>
+                          )}
+
+                          <div className="p-5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                                  {item.accentLabel}
+                                </p>
+                                <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-950">
+                                  {item.title}
+                                </h2>
+                              </div>
+                            </div>
+                            <p className="mt-4 text-sm leading-6 text-neutral-600">
+                              {item.summary}
+                            </p>
+                            {item.keyPoints.length > 0 ? (
+                              <div className="mt-4 space-y-2">
+                                {item.keyPoints.map((point) => (
+                                  <div
+                                    key={point}
+                                    className="border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600"
+                                  >
+                                    {point}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1056,19 +1010,51 @@ export function ProjectEditorClient({
         }
         rightRail={
           <Tabs defaultValue="inspector" className="flex h-full flex-col">
-            <div className="border-b border-neutral-200 px-4 py-4">
-              <TabsList className="grid w-full grid-cols-2 rounded-none bg-neutral-100">
-                <TabsTrigger value="inspector" className="rounded-none">
+            <div className="border-b border-white/10 p-3">
+              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-white/[0.04] p-1">
+                <TabsTrigger value="inspector" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
                   Inspector
                 </TabsTrigger>
-                <TabsTrigger value="ai" className="rounded-none">
+                <TabsTrigger value="ai" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
                   AI
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value="inspector" className="mt-0 flex-1">
-              <EditorRailSection title="Inspector">
+            <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="选中对象">
+                {selectedCanvasItem ? (
+                  <>
+                    <EditorInfoList items={selectedCanvasItem.meta} />
+                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                      <p className="text-sm font-medium text-white">{selectedCanvasItem.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-white/56">{selectedCanvasItem.summary}</p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm leading-6 text-white/46">
+                    先在中间画布或左侧图层列表里选中一个对象。
+                  </p>
+                )}
+              </EditorRailSection>
+
+              <EditorRailSection title="关键要点">
+                {selectedCanvasItem?.keyPoints?.length ? (
+                  <div className="space-y-2">
+                    {selectedCanvasItem.keyPoints.map((point) => (
+                      <div key={point} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-white/64">
+                        {point}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm leading-6 text-white/46">
+                    当前对象还没有可检查的关键点。
+                  </p>
+                )}
+              </EditorRailSection>
+
+              <EditorRailSection title="当前状态">
                 <EditorInfoList
                   items={[
                     { label: "对象类型", value: "Project" },
@@ -1078,107 +1064,86 @@ export function ProjectEditorClient({
                   ]}
                 />
               </EditorRailSection>
-
-              <EditorRailSection title="排版准备度">
-                <p className="text-sm leading-6 text-neutral-500">
-                  {packageMode || packageRecommendation
-                    ? "当前已经具备包装模式信息，可以直接在顶部发起生成排版。"
-                    : "当前还没有包装模式结论。先运行项目诊断，系统会给出包装模式推荐。"}
-                </p>
-              </EditorRailSection>
             </TabsContent>
 
-            <TabsContent value="ai" className="mt-0 flex-1">
-              <EditorRailSection title="AI 面板">
+            <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
+              <EditorRailSection title="Current Conclusion">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-sm leading-7 text-white/74">
+                    {layout?.narrativeSummary ??
+                      packageRecommendation?.reasoning ??
+                      completenessAnalysis?.overallComment ??
+                      "先运行项目诊断，系统会在这里返回边界、完整度和包装模式建议。"}
+                  </p>
+                </div>
+              </EditorRailSection>
+
+              <EditorRailSection title="AI 结果">
                 {diagnosisHistory.length === 0 ? (
-                  <p className="text-sm leading-6 text-neutral-500">
-                    还没有 AI 结果。点击顶部“项目诊断”，系统会在这里返回边界、完整度和包装模式建议。
+                  <p className="text-sm leading-6 text-white/46">
+                    还没有 AI 结果。点击顶部“项目诊断”，系统会返回边界、完整度和包装模式建议。
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {boundaryAnalysis ? (
-                      <div className="border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-sm font-medium text-neutral-900">边界分析</p>
-                        <p className="mt-2 text-sm leading-6 text-neutral-600">
-                          {boundaryAnalysis.projectSummary}
-                        </p>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-sm font-medium text-white">边界分析</p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">{boundaryAnalysis.projectSummary}</p>
                       </div>
                     ) : null}
-
                     {completenessAnalysis ? (
-                      <div className="border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-sm font-medium text-neutral-900">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-sm font-medium text-white">
                           完整度检查 · {verdictLabel(completenessAnalysis.overallVerdict)}
                         </p>
-                        <p className="mt-2 text-sm leading-6 text-neutral-600">
-                          {completenessAnalysis.overallComment}
-                        </p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">{completenessAnalysis.overallComment}</p>
                       </div>
                     ) : null}
-
                     {packageRecommendation ? (
-                      <div className="border border-neutral-200 bg-neutral-50 p-3">
-                        <p className="text-sm font-medium text-neutral-900">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-sm font-medium text-white">
                           包装模式推荐 · {packageModeLabel(packageRecommendation.recommendedMode)}
                         </p>
-                        <p className="mt-2 text-sm leading-6 text-neutral-600">
-                          {packageRecommendation.reasoning}
-                        </p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">{packageRecommendation.reasoning}</p>
                       </div>
                     ) : null}
                   </div>
                 )}
               </EditorRailSection>
 
-              <EditorRailSection title="AI 历史">
-                {diagnosisHistory.length > 0 ? (
-                  <div className="space-y-2">
-                    {diagnosisHistory.map((item) => (
-                      <div key={item.key} className="border border-neutral-200 bg-white px-3 py-3">
-                        <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                        <p className="mt-1 text-sm leading-6 text-neutral-500">{item.summary}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm leading-6 text-neutral-500">
-                    当前还没有可回看的历史结果。
-                  </p>
-                )}
-              </EditorRailSection>
-
-              <EditorRailSection title="下一步结论">
-                <p className="text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
+              <EditorRailSection title="下一步">
+                <p className="text-sm leading-6 text-white/56">{nextStepConclusion}</p>
+                <Link
+                  href={legacyEntry.href}
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-white"
+                >
+                  {legacyEntry.label}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
               </EditorRailSection>
             </TabsContent>
           </Tabs>
         }
         bottomStrip={
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {displayAssets.length > 0 ? (
-              displayAssets.slice(0, 8).map((asset) => (
-                <div
-                  key={asset.id}
-                  className="w-28 shrink-0 border border-neutral-200 bg-white p-2"
-                >
-                  <div className="aspect-[4/3] overflow-hidden border border-neutral-200 bg-neutral-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                      alt={asset.title ?? "素材"}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <p className="mt-2 truncate text-xs text-neutral-500">
-                    {asset.title ?? "未命名素材"}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <div className="flex h-20 min-w-full items-center justify-center border border-dashed border-neutral-300 bg-white text-sm text-neutral-400">
-                后续这里会继续增强为真正的底部画板条与大纲条。
-              </div>
-            )}
+          <div className="flex gap-2 overflow-x-auto">
+            {canvasItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedCanvasItemId(item.id)}
+                className={cn(
+                  "w-40 shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
+                  selectedCanvasItem?.id === item.id
+                    ? "border-sky-400/70 bg-sky-400/10 text-white"
+                    : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
+                )}
+              >
+                <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                  {item.frameLabel}
+                </p>
+                <p className="mt-2 truncate text-sm font-medium">{item.title}</p>
+              </button>
+            ))}
           </div>
         }
       />
