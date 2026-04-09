@@ -102,41 +102,119 @@ export function PortfolioPublishClient({
 
   return (
     <div className="space-y-4">
-      <div className="border border-neutral-200 bg-white px-4 py-4">
-        <p className="text-sm font-medium text-neutral-900">当前发布状态</p>
-        <p className="mt-2 text-sm leading-6 text-neutral-500">
-          {slug
-            ? "当前作品集已经有可访问的公开链接；再次发布会更新同一份内容。"
-            : "当前还没有公开链接。发布后会基于 Portfolio 对象生成公开页。"}
-        </p>
-        {publicUrl ? (
-          <p className="mt-2 text-xs font-mono text-neutral-400">{publicUrl}</p>
-        ) : null}
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Status
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            {slug ? "Online" : "Draft"}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            {slug ? "当前公开链接已经可访问，再次发布会更新同一条链接。" : "还没有公开链接，发布后会基于当前 Portfolio 生成公开页。"}
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Public URL
+          </p>
+          <p className="mt-2 truncate text-sm font-medium text-neutral-900">
+            {publicUrl ?? "等待发布"}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            发布后可直接复制、分享并回看公开版本。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+            Export
+          </p>
+          <p className="mt-2 text-base font-medium leading-7">
+            {hasPackaging
+              ? "当前已经具备导出条件，可以直接生成正式 PDF。"
+              : "先回编辑器生成作品集包装，再来发布公开链接或导出 PDF。"}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={handlePublish} disabled={publishing || !hasPackaging}>
-          {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-          发布公开链接
-        </Button>
-        <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf || !hasPackaging}>
-          {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-          导出 PDF
-        </Button>
-        {publicUrl ? (
-          <>
-            <Button variant="outline" onClick={handleCopy}>
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              复制链接
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="border border-neutral-300 bg-white p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Process
+          </p>
+          <p className="mt-2 text-lg font-semibold text-neutral-900">发布与导出流程</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
+              <p className="text-sm font-medium text-neutral-900">1. 确认包装</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                当前发布与导出都直接读取 Portfolio 上的包装结果。
+              </p>
+            </div>
+            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
+              <p className="text-sm font-medium text-neutral-900">2. 发布公开页</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                生成后可以反复更新同一条公开链接。
+              </p>
+            </div>
+            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
+              <p className="text-sm font-medium text-neutral-900">3. 导出正式 PDF</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                当前使用正式 PDF 输出，而不是仅打开打印页。
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button onClick={handlePublish} disabled={publishing || !hasPackaging}>
+              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+              发布公开链接
             </Button>
-            <Button asChild variant="outline">
-              <Link href={publicUrl} target="_blank">
-                <ExternalLink className="h-4 w-4" />
-                打开公开页
-              </Link>
+            <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf || !hasPackaging}>
+              {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              导出 PDF
             </Button>
-          </>
-        ) : null}
+            {publicUrl ? (
+              <>
+                <Button variant="outline" onClick={handleCopy}>
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  复制链接
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={publicUrl} target="_blank">
+                    <ExternalLink className="h-4 w-4" />
+                    打开公开页
+                  </Link>
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="border border-neutral-300 bg-[linear-gradient(180deg,_rgba(250,250,249,0.96),_rgba(245,245,244,0.88))] p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Current State
+          </p>
+          <div className="mt-3 space-y-3">
+            <div className="border border-neutral-200 bg-white px-4 py-4">
+              <p className="text-sm font-medium text-neutral-900">公开链接</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                {slug ? "已生成并可继续更新。" : "尚未发布。"}
+              </p>
+            </div>
+            <div className="border border-neutral-200 bg-white px-4 py-4">
+              <p className="text-sm font-medium text-neutral-900">PDF 导出</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                {hasPackaging ? "已满足导出条件。" : "等待作品集包装结果。"}
+              </p>
+            </div>
+            {publicUrl ? (
+              <div className="border border-neutral-200 bg-white px-4 py-4">
+                <p className="text-sm font-medium text-neutral-900">当前链接</p>
+                <p className="mt-2 break-all text-xs font-mono text-neutral-500">{publicUrl}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {!hasPackaging ? (

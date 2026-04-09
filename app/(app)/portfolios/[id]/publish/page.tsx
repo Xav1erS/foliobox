@@ -34,7 +34,7 @@ export default async function PortfolioPublishPage({
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-6 py-10">
       <PageHeader
         eyebrow={`作品集 · ${portfolio.name}`}
         title="发布与导出"
@@ -51,12 +51,35 @@ export default async function PortfolioPublishPage({
           发布主对象已经迁到 Portfolio。这里生成的公开页和正式 PDF 都直接读取当前作品集包装结果。
         </InlineTip>
 
-        <div className="border border-neutral-200 bg-white px-4 py-4 text-sm leading-6 text-neutral-600">
-          <p>已选项目：{portfolio.projectIds.length} 个</p>
-          <p className="mt-1">
-            当前包装状态：
-            {portfolio.contentJson ? " 已生成作品集包装结果，可继续回编辑器调整。" : " 还没有作品集包装结果，建议先回编辑器生成。"}
-          </p>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+              Projects
+            </p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+              {portfolio.projectIds.length}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">当前纳入这份作品集的项目数量。</p>
+          </div>
+          <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+              Packaging
+            </p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+              {portfolio.contentJson ? "Ready" : "Pending"}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              {portfolio.contentJson ? "已生成作品集包装结果，可继续发布与导出。" : "还没有作品集包装结果，建议先回编辑器生成。"}
+            </p>
+          </div>
+          <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+              Output
+            </p>
+            <p className="mt-2 text-base font-medium leading-7">
+              当前页负责公开链接和正式 PDF 的最后一步输出。
+            </p>
+          </div>
         </div>
 
         <PortfolioPublishClient

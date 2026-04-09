@@ -42,6 +42,15 @@ export default async function ProfilePage({
   const quotaStatus = getQuotaStatus(entitlementSummary);
   const quotaStatusClass =
     quotaStatus.tone === "emerald" ? "bg-emerald-400" : "bg-amber-400";
+  const profileReadiness = [
+    profile?.currentTitle,
+    profile?.yearsOfExperience,
+    profile?.industry,
+    profile?.targetRole,
+    profile?.tonePreference,
+    ...(profile?.specialties ?? []),
+    ...(profile?.strengths ?? []),
+  ].filter(Boolean).length;
 
   return (
     <div className="px-6 py-10">
@@ -62,6 +71,39 @@ export default async function ProfilePage({
           </ResumeContextBanner>
         </div>
       )}
+
+      <div className="grid gap-3 pt-6 md:grid-cols-3">
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Profile Readiness
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            {profileReadiness}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            当前已写入的定位、方向和表达偏好数量。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Plan
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            {planDefinition.displayName}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            当前套餐会直接影响高成本动作的剩余额度。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+            Why It Matters
+          </p>
+          <p className="mt-2 text-base font-medium leading-7">
+            档案越清楚，后续项目和作品集生成就越贴近你真实的投递方向。
+          </p>
+        </div>
+      </div>
 
       {/* 01 基础资料 & 02 求职方向 — editable form */}
       <div className="pt-6">

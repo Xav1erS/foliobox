@@ -246,6 +246,71 @@ export function ProjectEditorClient({
       ].filter(Boolean) as Array<{ key: string; label: string; summary: string }>,
     [boundaryAnalysis, completenessAnalysis, packageRecommendation, layout]
   );
+  const factSnapshot = useMemo(
+    () => [
+      { label: "项目类型", value: facts.projectType.trim() || "待补充" },
+      { label: "所属行业", value: facts.industry.trim() || "待补充" },
+      { label: "我的角色", value: facts.roleTitle.trim() || "待补充" },
+      {
+        label: "背景摘要",
+        value: facts.background.trim() ? "已补充背景" : "待补充",
+      },
+      {
+        label: "结果摘要",
+        value: facts.resultSummary.trim() ? "已补充结果" : "待补充",
+      },
+    ],
+    [facts]
+  );
+  const completedFactCount = useMemo(
+    () =>
+      [
+        facts.projectType,
+        facts.industry,
+        facts.roleTitle,
+        facts.background,
+        facts.resultSummary,
+      ].filter((value) => value.trim().length > 0).length,
+    [facts]
+  );
+  const readinessChecklist = useMemo(
+    () => [
+      {
+        label: "基础 facts",
+        done: completedFactCount >= 3,
+        detail: completedFactCount >= 3 ? "核心项目信息已成型" : "至少补齐类型、行业、角色",
+      },
+      {
+        label: "展示素材",
+        done: displayAssets.length >= 3,
+        detail:
+          displayAssets.length >= 3
+            ? `当前可用 ${displayAssets.length} 张`
+            : "建议先补 3 张以上关键画面",
+      },
+      {
+        label: "项目诊断",
+        done: Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation),
+        detail: boundaryAnalysis && completenessAnalysis && packageRecommendation
+          ? "边界、完整度和包装模式已齐"
+          : "还需要跑一次完整项目诊断",
+      },
+      {
+        label: "排版结果",
+        done: Boolean(layout),
+        detail: layout ? `已生成 ${layout.totalPages} 页首版` : "还没有首版排版结果",
+      },
+    ],
+    [
+      boundaryAnalysis,
+      completenessAnalysis,
+      completedFactCount,
+      displayAssets.length,
+      layout,
+      packageRecommendation,
+    ]
+  );
+  const layoutHighlights = layout?.pages.slice(0, 4) ?? [];
   const nextStepConclusion = useMemo(() => {
     if (layout) {
       return "当前项目已经拿到排版结果，可以继续细看页面结构，或回到兼容页补查旧链路结果。";
@@ -731,98 +796,259 @@ export function ProjectEditorClient({
         }
         center={
           <div className="px-4 py-4 lg:px-6 lg:py-6">
-            <div className="rounded-none border border-neutral-300 bg-white">
-              <div className="flex items-center justify-between border-b border-neutral-300 px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
-                    Center Canvas
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                    Facts
                   </p>
-                  <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-900">
-                    项目画布与当前结果
-                  </h2>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+                    {completedFactCount}/5
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-neutral-500">
+                    项目背景、角色与结果摘要的完成度。
+                  </p>
                 </div>
-                <span className="text-sm text-neutral-500">
-                  当前已统一接入 facts、诊断与生成动作
-                </span>
+                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                    Assets
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+                    {displayAssets.length}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-neutral-500">
+                    当前主画布会优先展示已选中的展示素材。
+                  </p>
+                </div>
+                <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                    Diagnosis
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+                    {diagnosisHistory.length}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-neutral-500">
+                    当前已回收的分析结论与 AI 结果。
+                  </p>
+                </div>
+                <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+                    Layout
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight">
+                    {layout ? `${layout.totalPages} 页` : "待生成"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/68">
+                    {layout ? `当前模式 ${packageModeLabel(layout.packageMode)}` : "完成诊断后即可生成首版排版。"}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
-                <div className="border border-dashed border-neutral-300 bg-neutral-50 p-4">
-                  <p className="text-sm font-medium text-neutral-900">项目主画布</p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-500">
-                    这一步先用真实素材和当前 layout 结果承接编辑器主舞台。下一轮会继续补画板语义、对象选中态和更完整的页面编辑能力。
-                  </p>
-
-                  {displayAssets.length > 0 ? (
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {displayAssets.slice(0, 6).map((asset) => (
-                        <div key={asset.id} className="border border-neutral-200 bg-white p-2">
-                          <div className="aspect-[4/3] overflow-hidden border border-neutral-200 bg-neutral-100">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                              alt={asset.title ?? "素材"}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <p className="mt-2 truncate text-sm text-neutral-700">
-                            {asset.title ?? "未命名素材"}
-                          </p>
+              <div className="rounded-none border border-neutral-300 bg-white shadow-[0_32px_90px_-72px_rgba(15,23,42,0.48)]">
+                <div className="flex flex-col gap-3 border-b border-neutral-300 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
+                      Center Canvas
+                    </p>
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-900">
+                      项目工作台与当前结果
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+                      中间区现在承担项目整理的主舞台，会同时显示输入质量、素材画布和最近一次生成结论。
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {readinessChecklist.map((item) => (
+                      <div
+                        key={item.label}
+                        className={`min-w-32 border px-3 py-2 ${
+                          item.done
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                            : "border-neutral-200 bg-neutral-50 text-neutral-600"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {item.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                          <span className="text-xs font-mono uppercase tracking-[0.16em]">
+                            {item.label}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-4 flex min-h-48 items-center justify-center border border-dashed border-neutral-300 bg-white text-sm text-neutral-400">
-                      当前还没有素材，先在左侧素材库上传图片。
-                    </div>
-                  )}
+                        <p className="mt-2 text-xs leading-5">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="border border-neutral-200 bg-white p-4">
-                    <p className="text-sm font-medium text-neutral-900">当前项目结论</p>
-                    <p className="mt-2 text-sm leading-6 text-neutral-500">
-                      {layout?.narrativeSummary ??
-                        packageRecommendation?.reasoning ??
-                        completenessAnalysis?.overallComment ??
-                        "先运行项目诊断，系统会在右侧 AI 面板和这里给出当前项目的结论与下一步建议。"}
-                    </p>
-                  </div>
-
-                  <div className="border border-neutral-200 bg-white p-4">
-                    <p className="text-sm font-medium text-neutral-900">下一步结论</p>
-                    <p className="mt-2 text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
-                  </div>
-
-                  <div className="border border-neutral-200 bg-white p-4">
-                    <p className="text-sm font-medium text-neutral-900">历史入口</p>
-                    <p className="mt-2 text-sm leading-6 text-neutral-500">
-                      当前 editor 已经接管主入口；如果你需要回看之前的阶段页，也可以从这里进入。
-                    </p>
-                    <Link
-                      href={legacyEntry.href}
-                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
-                    >
-                      {legacyEntry.label}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-
-                  {layout ? (
-                    <div className="border border-neutral-200 bg-white p-4">
-                      <p className="text-sm font-medium text-neutral-900">最近一次排版结果</p>
-                      <p className="mt-2 text-sm text-neutral-500">
-                        共 {layout.totalPages} 页 · 模式 {packageModeLabel(layout.packageMode)}
-                      </p>
-                      <ul className="mt-3 space-y-2">
-                        {layout.pages.slice(0, 3).map((page) => (
-                          <li key={page.pageNumber} className="text-sm text-neutral-600">
-                            {page.pageNumber}. {page.titleSuggestion}
-                          </li>
+                <div className="grid gap-4 px-5 py-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.95fr)]">
+                  <div className="space-y-4">
+                    <div className="border border-neutral-300 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] p-5">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">项目摘要</p>
+                          <p className="mt-2 text-sm leading-6 text-neutral-500">
+                            这里优先把能影响生成质量的输入压缩成一眼能扫完的摘要。
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                          {packageMode ? `模式 ${packageModeLabel(packageMode)}` : "等待包装模式"}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {factSnapshot.map((item) => (
+                          <div key={item.label} className="border border-neutral-200 bg-white px-4 py-3">
+                            <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
+                              {item.label}
+                            </p>
+                            <p className="mt-2 text-sm font-medium text-neutral-800">{item.value}</p>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
-                  ) : null}
+
+                    <div className="border border-neutral-300 bg-neutral-50 p-4">
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">项目主画布</p>
+                          <p className="mt-2 text-sm leading-6 text-neutral-500">
+                            当前先用真实素材承接画布语义，后续再往页面级编辑和局部修改继续扩展。
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                          {displayAssets.length > 0 ? `${displayAssets.length} 张素材` : "等待上传"}
+                        </span>
+                      </div>
+
+                      {displayAssets.length > 0 ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {displayAssets.slice(0, 6).map((asset, index) => (
+                            <div
+                              key={asset.id}
+                              className="overflow-hidden border border-neutral-200 bg-white shadow-[0_18px_50px_-42px_rgba(15,23,42,0.35)]"
+                            >
+                              <div className="relative aspect-[4/3] overflow-hidden border-b border-neutral-200 bg-neutral-100">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                                  alt={asset.title ?? "素材"}
+                                  className="h-full w-full object-cover"
+                                />
+                                <span className="absolute left-2 top-2 border border-black/10 bg-white/92 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-600">
+                                  Frame {index + 1}
+                                </span>
+                              </div>
+                              <div className="px-3 py-3">
+                                <p className="truncate text-sm font-medium text-neutral-800">
+                                  {asset.title ?? "未命名素材"}
+                                </p>
+                                <p className="mt-1 text-xs text-neutral-400">
+                                  {asset.isCover ? "封面优先位" : asset.selected ? "当前已选" : "候选素材"}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-4 border border-dashed border-neutral-300 bg-white px-5 py-8">
+                          <p className="text-sm font-medium text-neutral-900">素材还没进入主画布</p>
+                          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+                            先在左侧上传过程图、关键界面和结果画面。最理想的是至少准备一张封面候选、两张过程图和一张结果图。
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border border-neutral-300 bg-white p-4">
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">排版结构速览</p>
+                          <p className="mt-2 text-sm leading-6 text-neutral-500">
+                            {layout
+                              ? "最近一次排版的前几页会显示在这里，方便你快速判断结构是否顺。"
+                              : "当前还没有排版结果，先补齐诊断或直接从顶部发起生成。"}
+                          </p>
+                        </div>
+                        {layout ? (
+                          <span className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                            {layout.totalPages} pages
+                          </span>
+                        ) : null}
+                      </div>
+                      {layout ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          {layoutHighlights.map((page) => (
+                            <div key={page.pageNumber} className="border border-neutral-200 bg-neutral-50 px-4 py-4">
+                              <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
+                                Page {page.pageNumber}
+                              </p>
+                              <p className="mt-2 text-sm font-medium text-neutral-900">
+                                {page.titleSuggestion}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          {readinessChecklist.map((item) => (
+                            <div key={item.label} className="border border-neutral-200 bg-neutral-50 px-4 py-4">
+                              <p className="text-sm font-medium text-neutral-900">{item.label}</p>
+                              <p className="mt-2 text-sm leading-6 text-neutral-500">{item.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="border border-neutral-300 bg-neutral-950 p-4 text-white">
+                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+                        Current Conclusion
+                      </p>
+                      <p className="mt-3 text-base font-medium leading-7">
+                        {layout?.narrativeSummary ??
+                          packageRecommendation?.reasoning ??
+                          completenessAnalysis?.overallComment ??
+                          "先运行项目诊断，系统会在右侧 AI 面板和这里给出当前项目的结论与下一步建议。"}
+                      </p>
+                    </div>
+
+                    <div className="border border-neutral-200 bg-white p-4">
+                      <p className="text-sm font-medium text-neutral-900">下一步结论</p>
+                      <p className="mt-2 text-sm leading-6 text-neutral-500">{nextStepConclusion}</p>
+                    </div>
+
+                    <div className="border border-neutral-200 bg-white p-4">
+                      <p className="text-sm font-medium text-neutral-900">最近的 AI 信号</p>
+                      {diagnosisHistory.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {diagnosisHistory.slice(0, 3).map((item) => (
+                            <div key={item.key} className="border border-neutral-200 bg-neutral-50 px-3 py-3">
+                              <p className="text-sm font-medium text-neutral-900">{item.label}</p>
+                              <p className="mt-1 text-sm leading-6 text-neutral-500">{item.summary}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm leading-6 text-neutral-500">
+                          先点击顶部“项目诊断”，这里会把当前项目最关键的判断压缩成短结论。
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="border border-neutral-200 bg-white p-4">
+                      <p className="text-sm font-medium text-neutral-900">历史入口</p>
+                      <p className="mt-2 text-sm leading-6 text-neutral-500">
+                        当前 editor 已经接管主入口；如果你需要回看之前的阶段页，也可以从这里进入。
+                      </p>
+                      <Link
+                        href={legacyEntry.href}
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                      >
+                        {legacyEntry.label}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

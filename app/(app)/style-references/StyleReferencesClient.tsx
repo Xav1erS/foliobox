@@ -83,11 +83,45 @@ export function StyleReferencesClient({
 
   return (
     <div className="space-y-8">
-      <section className="grid gap-4 border border-neutral-300 bg-white p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div>
-          <p className="text-sm font-medium text-neutral-900">上传参考图组</p>
+      <section className="grid gap-3 md:grid-cols-3">
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            My Sets
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">{sets.length}</p>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
-            一次上传一组风格图。它只会影响包装样式、标题层级和版面密度，不会改动项目结构判断。
+            你自己的图组会在项目排版和作品集包装前作为样式约束被选择。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Presets
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            {STYLE_PRESETS.length}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            系统预制风格更适合快速定调，先判断整份节奏是否合适。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+            Usage
+          </p>
+          <p className="mt-2 text-base font-medium leading-7">
+            风格参考只影响视觉语言、标题层级和版面密度，不会改动项目边界和讲述顺序。
+          </p>
+        </div>
+      </section>
+
+      <section className="grid gap-4 border border-neutral-300 bg-white p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)] lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="border border-neutral-300 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] px-5 py-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Upload Set
+          </p>
+          <p className="mt-2 text-lg font-semibold text-neutral-900">上传参考图组</p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            一次上传一组风格图。推荐把排版气质接近、颜色和版面密度一致的图片放在同一组里，这样生成时更稳定。
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Input
@@ -100,6 +134,20 @@ export function StyleReferencesClient({
               onChange={(event) => setDescription(event.target.value)}
               placeholder="一句描述这组参考更像什么风格"
             />
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="border border-neutral-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-neutral-900">建议数量</p>
+              <p className="mt-1 text-sm leading-6 text-neutral-500">3-8 张，风格尽量统一。</p>
+            </div>
+            <div className="border border-neutral-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-neutral-900">适合内容</p>
+              <p className="mt-1 text-sm leading-6 text-neutral-500">封面、目录、内容页和结尾页参考。</p>
+            </div>
+            <div className="border border-neutral-200 bg-white px-4 py-3">
+              <p className="text-sm font-medium text-neutral-900">不会影响</p>
+              <p className="mt-1 text-sm leading-6 text-neutral-500">项目顺序、页面结构与事实判断。</p>
+            </div>
           </div>
         </div>
 
@@ -137,17 +185,27 @@ export function StyleReferencesClient({
         </p>
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           {STYLE_PRESETS.map((preset) => (
-            <div key={preset.key} className="border border-neutral-300 bg-white p-4">
+            <div
+              key={preset.key}
+              className="overflow-hidden border border-neutral-300 bg-white shadow-[0_24px_60px_-54px_rgba(15,23,42,0.32)]"
+            >
               <div
-                className="h-24 border"
+                className="h-28 border-b"
                 style={{
                   background: `linear-gradient(135deg, ${preset.titleTone} 0%, ${preset.accentColor} 100%)`,
                   borderColor: preset.border,
                 }}
               />
-              <p className="mt-4 text-sm font-medium text-neutral-900">{preset.label}</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">{preset.description}</p>
-              <p className="mt-3 text-xs text-neutral-400">更偏向：{preset.emphasis}</p>
+              <div className="px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-neutral-900">{preset.label}</p>
+                  <span className="border border-neutral-200 bg-neutral-50 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-500">
+                    preset
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-neutral-500">{preset.description}</p>
+                <p className="mt-3 text-xs text-neutral-400">更偏向：{preset.emphasis}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -160,13 +218,19 @@ export function StyleReferencesClient({
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {sets.length > 0 ? (
             sets.map((set) => (
-              <div key={set.id} className="border border-neutral-300 bg-white p-4">
+              <div
+                key={set.id}
+                className="border border-neutral-300 bg-white p-4 shadow-[0_24px_60px_-54px_rgba(15,23,42,0.32)]"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-neutral-900">{set.name}</p>
                     {set.description ? (
                       <p className="mt-1 text-sm leading-6 text-neutral-500">{set.description}</p>
                     ) : null}
+                    <p className="mt-2 text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                      {set.imageUrls.length} images
+                    </p>
                   </div>
                   <Button variant="outline" className="h-9 px-3" onClick={() => handleDelete(set.id)}>
                     <Trash2 className="h-4 w-4" />
@@ -189,8 +253,8 @@ export function StyleReferencesClient({
               </div>
             ))
           ) : (
-            <div className="border border-dashed border-neutral-300 bg-white px-5 py-10 text-sm text-neutral-500">
-              你还没有自己的参考图组。先上传一组，这些图会在生成排版或作品集包装前作为样式约束被选择。
+            <div className="border border-dashed border-neutral-300 bg-white px-5 py-10 text-sm text-neutral-500 lg:col-span-2">
+              你还没有自己的参考图组。先上传一组，这些图会在生成排版或作品集包装前作为样式约束被选择；如果只是想快速试风格，也可以先用上面的系统预制风格。
             </div>
           )}
         </div>

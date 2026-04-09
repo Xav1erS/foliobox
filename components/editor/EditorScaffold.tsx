@@ -44,8 +44,8 @@ export function EditorScaffold({
   const [focusMode, setFocusMode] = useState(false);
 
   return (
-    <div className="flex min-h-full flex-col bg-neutral-100/70">
-      <header className="border-b-2 border-black bg-neutral-100/95 backdrop-blur">
+    <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.96),_rgba(245,245,244,0.95)_42%,_rgba(241,241,241,0.92))]">
+      <header className="border-b-2 border-black bg-white/95 shadow-[0_18px_60px_-52px_rgba(15,23,42,0.45)] backdrop-blur">
         <div className="flex flex-col gap-4 px-4 py-4 lg:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
@@ -62,11 +62,11 @@ export function EditorScaffold({
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
+                <h1 className="truncate text-[2rem] font-semibold tracking-tight text-neutral-950">
                   {objectName}
                 </h1>
                 {statusLabel ? (
-                  <span className="border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-mono uppercase tracking-wide text-neutral-500">
+                  <span className="border border-neutral-300 bg-neutral-950 px-2 py-0.5 text-[11px] font-mono uppercase tracking-wide text-white">
                     {statusLabel}
                   </span>
                 ) : null}
@@ -95,20 +95,40 @@ export function EditorScaffold({
             <div
               className={cn(
                 "grid gap-3",
-                topNote && planSummary ? "xl:grid-cols-[minmax(0,1fr)_320px]" : "grid-cols-1"
+                topNote && planSummary ? "xl:grid-cols-[minmax(0,1.2fr)_340px]" : "grid-cols-1"
               )}
             >
               {topNote ? (
-                <div className="border border-neutral-300 bg-white/85 px-4 py-3 text-sm leading-6 text-neutral-600">
-                  {topNote}
+                <div className="relative overflow-hidden border border-black bg-neutral-950 px-5 py-4 text-sm leading-6 text-white/76">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.14),_transparent_38%),linear-gradient(135deg,_rgba(239,68,68,0.14),_transparent_48%)]" />
+                  <div className="relative">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">
+                      Editor Overview
+                    </p>
+                    <div className="mt-3 max-w-4xl">{topNote}</div>
+                    {statusLabel || statusMeta ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {statusLabel ? (
+                          <span className="border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/72">
+                            {statusLabel}
+                          </span>
+                        ) : null}
+                        {statusMeta ? (
+                          <span className="border border-white/10 bg-black/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/56">
+                            {statusMeta}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               {planSummary ? (
-                <div className="border border-neutral-300 bg-white px-4 py-3">
+                <div className="border border-neutral-300 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(245,245,244,0.96))] px-4 py-4 shadow-[0_24px_60px_-54px_rgba(15,23,42,0.42)]">
                   <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
                     当前权益
                   </p>
-                  <p className="mt-2 text-sm font-medium text-neutral-900">{planSummary.title}</p>
+                  <p className="mt-2 text-base font-semibold text-neutral-950">{planSummary.title}</p>
                   <p className="mt-1 text-sm leading-6 text-neutral-500">
                     {planSummary.description}
                   </p>
@@ -117,7 +137,7 @@ export function EditorScaffold({
                       {planSummary.metrics.map((metric) => (
                         <div
                           key={metric.label}
-                          className="border border-neutral-200 bg-neutral-50 px-3 py-2"
+                          className="border border-neutral-200 bg-white px-3 py-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
                         >
                           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
                             {metric.label}
@@ -149,24 +169,24 @@ export function EditorScaffold({
         )}
       >
         {!focusMode ? (
-          <aside className="border-b border-neutral-300 bg-white/80 xl:border-b-0 xl:border-r xl:border-neutral-300">
+          <aside className="border-b border-neutral-300 bg-white/92 xl:border-b-0 xl:border-r xl:border-neutral-300">
             <div className="flex h-full flex-col">{leftRail}</div>
           </aside>
         ) : null}
 
-        <main className="min-w-0 bg-neutral-100/65">
+        <main className="min-w-0 bg-[linear-gradient(180deg,_rgba(250,250,249,0.72),_rgba(244,244,245,0.82))]">
           <div className="h-full">{center}</div>
         </main>
 
         {!focusMode ? (
-          <aside className="border-t border-neutral-300 bg-white/80 xl:border-l xl:border-t-0 xl:border-neutral-300">
+          <aside className="border-t border-neutral-300 bg-white/92 xl:border-l xl:border-t-0 xl:border-neutral-300">
             <div className="flex h-full flex-col">{rightRail}</div>
           </aside>
         ) : null}
       </div>
 
       {bottomStrip && !focusMode ? (
-        <div className="border-t border-neutral-300 bg-neutral-100/95 px-4 py-3 lg:px-6">
+        <div className="border-t border-neutral-300 bg-white/95 px-4 py-3 shadow-[0_-18px_60px_-52px_rgba(15,23,42,0.22)] lg:px-6">
           {bottomStrip}
         </div>
       ) : null}
@@ -184,8 +204,8 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-neutral-200 px-4 py-4", className)}>
-      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-neutral-400">
+    <section className={cn("border-b border-neutral-200 px-4 py-5", className)}>
+      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
         {title}
       </p>
       <div className="mt-3">{children}</div>

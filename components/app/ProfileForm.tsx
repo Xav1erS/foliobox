@@ -218,15 +218,65 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
 
   return (
     <div className="space-y-8">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Current Identity
+          </p>
+          <p className="mt-2 text-sm font-medium text-neutral-900">
+            {form.currentTitle || "还没有写当前职位"}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            这是 AI 判断你是谁、适合强调什么的第一层上下文。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            Target Role
+          </p>
+          <p className="mt-2 text-sm font-medium text-neutral-900">
+            {form.targetRole || "还没有写目标岗位"}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            目标岗位会直接影响项目里更偏向强调的方法和能力。
+          </p>
+        </div>
+        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+            Focus Tags
+          </p>
+          <p className="mt-2 text-sm font-medium">
+            {`${form.specialties?.length ?? 0} 个方向标签 · ${form.strengths?.length ?? 0} 个优势标签`}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-white/68">
+            方向和优势的选择会共同决定作品集第一版的叙述重心。
+          </p>
+        </div>
+      </div>
+
       <SectionCard
         title="从简历快速带入"
         description="先上传一份 PDF 简历，我会帮你提取职位、经验年限和部分方向标签，再落到当前档案里。"
       >
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="border border-neutral-200 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] px-5 py-5">
             <p className="text-sm leading-6 text-neutral-500">
               这一步更适合先把基础信息带进来，不会覆盖你后续手动写的项目事实。当前版本优先支持 PDF 简历。
             </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="border border-neutral-200 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-neutral-900">1. 上传 PDF</p>
+                <p className="mt-1 text-sm leading-6 text-neutral-500">先做文本提取和结构解析。</p>
+              </div>
+              <div className="border border-neutral-200 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-neutral-900">2. 预览摘要</p>
+                <p className="mt-1 text-sm leading-6 text-neutral-500">先看系统读到了什么。</p>
+              </div>
+              <div className="border border-neutral-200 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-neutral-900">3. 应用到档案</p>
+                <p className="mt-1 text-sm leading-6 text-neutral-500">再手动微调成你想要的表达。</p>
+              </div>
+            </div>
             {resumeMessage ? (
               <div className="mt-4 border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {resumeMessage}
