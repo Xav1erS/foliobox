@@ -99,22 +99,22 @@ export function EditorScaffold({
               )}
             >
               {topNote ? (
-                <div className="relative overflow-hidden border border-black bg-neutral-950 px-5 py-4 text-sm leading-6 text-white/76">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.14),_transparent_38%),linear-gradient(135deg,_rgba(239,68,68,0.14),_transparent_48%)]" />
+                <div className="relative overflow-hidden border border-black bg-[linear-gradient(135deg,_rgba(10,10,10,0.98),_rgba(28,25,23,0.98))] px-5 py-4 text-sm leading-6 text-white shadow-[0_24px_60px_-48px_rgba(15,23,42,0.55)]">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_34%),linear-gradient(135deg,_rgba(248,113,113,0.12),_transparent_42%)]" />
                   <div className="relative">
-                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/48">
                       Editor Overview
                     </p>
-                    <div className="mt-3 max-w-4xl">{topNote}</div>
+                    <div className="mt-3 max-w-4xl text-sm leading-6 text-white/84">{topNote}</div>
                     {statusLabel || statusMeta ? (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {statusLabel ? (
-                          <span className="border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/72">
+                          <span className="border border-white/15 bg-white/8 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/76">
                             {statusLabel}
                           </span>
                         ) : null}
                         {statusMeta ? (
-                          <span className="border border-white/10 bg-black/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/56">
+                          <span className="border border-white/10 bg-black/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-white/62">
                             {statusMeta}
                           </span>
                         ) : null}

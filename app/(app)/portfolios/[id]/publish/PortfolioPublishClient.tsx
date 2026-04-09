@@ -218,8 +218,23 @@ export function PortfolioPublishClient({
       </div>
 
       {!hasPackaging ? (
-        <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          当前还没有作品集包装结果。先回编辑器生成作品集包装，再来发布或导出。
+        <div className="border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+          <p className="font-medium">当前还没有作品集包装结果。</p>
+          <p className="mt-1 leading-6">先回编辑器生成作品集包装，再来发布或导出。</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="border border-amber-200 bg-white/70 px-4 py-3">
+              <p className="font-medium text-amber-900">1. 选项目</p>
+              <p className="mt-1 leading-6 text-amber-800/80">先挑 2-4 个最能代表能力面的项目。</p>
+            </div>
+            <div className="border border-amber-200 bg-white/70 px-4 py-3">
+              <p className="font-medium text-amber-900">2. 生成包装</p>
+              <p className="mt-1 leading-6 text-amber-800/80">让系统先给出整份作品集的节奏与固定页建议。</p>
+            </div>
+            <div className="border border-amber-200 bg-white/70 px-4 py-3">
+              <p className="font-medium text-amber-900">3. 再来输出</p>
+              <p className="mt-1 leading-6 text-amber-800/80">包装稳定后，再发布公开链接和正式 PDF。</p>
+            </div>
+          </div>
         </div>
       ) : null}
 
