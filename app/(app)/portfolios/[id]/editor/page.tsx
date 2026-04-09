@@ -3,6 +3,7 @@ import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import {
   getEntitlementSummary,
+  getPortfolioActionSummary,
   getPlanSummaryFromEntitlement,
 } from "@/lib/entitlement";
 import {
@@ -23,7 +24,7 @@ export default async function PortfolioEditorPage({
   const { id } = await params;
   const session = await getRequiredSession(`/portfolios/${id}/editor`);
 
-  const [portfolio, allProjects, entitlementSummary] = await Promise.all([
+  const [portfolio, allProjects, entitlementSummary, actionSummary, styleReferenceSets] = await Promise.all([
     db.portfolio.findFirst({
       where: { id, userId: session.user.id },
       select: {
@@ -55,6 +56,17 @@ export default async function PortfolioEditorPage({
       },
     }),
     getEntitlementSummary(session.user.id),
+    getPortfolioActionSummary(session.user.id, id),
+    db.styleReferenceSet.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ lastUsedAt: "desc" }, { updatedAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        imageUrls: true,
+      },
+    }),
   ]);
 
   if (!portfolio) notFound();
@@ -81,6 +93,8 @@ export default async function PortfolioEditorPage({
       resultSummary: project.facts?.resultSummary ?? null,
     })),
     packagingQuota: entitlementSummary.quotas.portfolioPackagings,
+    actionSummary,
+    styleReferenceSets,
   };
 
   return (
@@ -90,4 +104,3 @@ export default async function PortfolioEditorPage({
     />
   );
 }
-

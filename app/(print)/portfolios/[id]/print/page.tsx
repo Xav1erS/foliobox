@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { PortfolioPackagingContent } from "@/lib/portfolio-editor";
-import { renderPortfolioPublishedHtml } from "@/lib/portfolio-publishing";
+import { PortfolioPublishedDocument } from "@/components/viewer/PortfolioPublishedDocument";
 
 export default async function PortfolioPrintPage({
   params,
@@ -28,14 +28,18 @@ export default async function PortfolioPrintPage({
   const content = portfolio.contentJson as PortfolioPackagingContent | null;
   if (!content?.pages?.length) notFound();
 
-  const html = renderPortfolioPublishedHtml({
-    portfolioName: portfolio.name,
-    content,
-  }).replace(
-    "</head>",
-    `<script>window.addEventListener("load", function () { window.print(); });</script></head>`
+  return (
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.addEventListener("load", function () { window.print(); });`,
+        }}
+      />
+      <PortfolioPublishedDocument
+        portfolioName={portfolio.name}
+        content={content}
+        printMode
+      />
+    </>
   );
-
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
 }
-

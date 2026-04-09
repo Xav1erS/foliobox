@@ -38,7 +38,7 @@ export default async function PortfolioPublishPage({
       <PageHeader
         eyebrow={`作品集 · ${portfolio.name}`}
         title="发布与导出"
-        description="直接基于当前 Portfolio 包装结果生成公开链接，或打开打印页导出 PDF。"
+        description="直接基于当前 Portfolio 包装结果生成公开链接，或导出正式 PDF。"
         actions={
           <Button asChild className="h-10 rounded-none px-4">
             <Link href={`/portfolios/${portfolio.id}/editor`}>返回作品集编辑器</Link>
@@ -48,7 +48,7 @@ export default async function PortfolioPublishPage({
 
       <div className="mt-8 space-y-4">
         <InlineTip>
-          发布主对象已经迁到 Portfolio。这里生成的公开页和打印导出都直接读取当前作品集包装结果。
+          发布主对象已经迁到 Portfolio。这里生成的公开页和正式 PDF 都直接读取当前作品集包装结果。
         </InlineTip>
 
         <div className="border border-neutral-200 bg-white px-4 py-4 text-sm leading-6 text-neutral-600">

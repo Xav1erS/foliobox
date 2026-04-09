@@ -3,6 +3,15 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  findReusableGeneratedDraft,
+  hashGenerationInput,
+  writePrecheckLog,
+} from "@/lib/generation-precheck";
+import {
+  getEntitlementSummary,
+  getPortfolioActionSummary,
+} from "@/lib/entitlement";
+import {
   mergePortfolioEditorState,
   resolvePortfolioEditorState,
   type PortfolioDiagnosis,
@@ -28,6 +37,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!portfolio) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const [entitlementSummary, portfolioActionSummary] = await Promise.all([
+    getEntitlementSummary(session.user.id),
+    getPortfolioActionSummary(session.user.id, portfolio.id),
+  ]);
 
   const selectedProjects =
     portfolio.projectIds.length > 0
@@ -137,14 +151,128 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     diagnosis,
   });
 
-  await db.portfolio.update({
-    where: { id: portfolio.id },
+  const requestHash = hashGenerationInput({
+    actionType: "portfolio_diagnosis",
+    portfolioId: portfolio.id,
+    projectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+  });
+
+  const reusable = await findReusableGeneratedDraft({
+    userId: session.user.id,
+    objectType: "portfolio",
+    objectId: portfolio.id,
+    requestHash,
+    draftType: "portfolio_diagnosis",
+  });
+
+  if (!reusable && portfolioActionSummary.diagnoses.remaining <= 0) {
+    return NextResponse.json(
+      { error: "quota_exceeded", summary: entitlementSummary },
+      { status: 403 }
+    );
+  }
+
+  if (reusable) {
+    await writePrecheckLog({
+      userId: session.user.id,
+      objectType: "portfolio",
+      objectId: portfolio.id,
+      actionType: "portfolio_diagnosis",
+      budgetStatus: "healthy",
+      suggestedMode: "reuse",
+      reusableDraftId: reusable.draft.id,
+    });
+
+    const reusedDiagnosis = reusable.draft.contentJson as PortfolioDiagnosis;
+    await db.portfolio.update({
+      where: { id: portfolio.id },
+      data: {
+        outlineJson: mergePortfolioEditorState(portfolio.outlineJson, {
+          diagnosis: reusedDiagnosis,
+        }) as unknown as Prisma.InputJsonValue,
+        status: orderedProjects.length > 0 ? "OUTLINE" : "DRAFT",
+      },
+    });
+
+    await db.generationTask.create({
+      data: {
+        userId: session.user.id,
+        objectType: "portfolio",
+        objectId: portfolio.id,
+        actionType: "portfolio_diagnosis",
+        usageClass: "high_cost",
+        status: "reused",
+        reusedFromTaskId: reusable.task.id,
+        requestHash,
+        provider: reusable.task.provider,
+        model: reusable.task.model,
+        wasSuccessful: true,
+        countedToBudget: false,
+      },
+    });
+
+    return NextResponse.json({ diagnosis: reusedDiagnosis, reused: true });
+  }
+
+  const task = await db.generationTask.create({
     data: {
-      outlineJson: nextEditorState as unknown as Prisma.InputJsonValue,
-      status: orderedProjects.length > 0 ? "OUTLINE" : "DRAFT",
+      userId: session.user.id,
+      objectType: "portfolio",
+      objectId: portfolio.id,
+      actionType: "portfolio_diagnosis",
+      usageClass: "high_cost",
+      status: "running",
+      provider: "system",
+      requestHash,
     },
   });
 
-  return NextResponse.json({ diagnosis });
-}
+  await writePrecheckLog({
+    userId: session.user.id,
+    objectType: "portfolio",
+    objectId: portfolio.id,
+    actionType: "portfolio_diagnosis",
+    budgetStatus: portfolioActionSummary.diagnoses.remaining <= 1 ? "near_limit" : "healthy",
+    suggestedMode: "continue",
+  });
 
+  try {
+    await db.portfolio.update({
+      where: { id: portfolio.id },
+      data: {
+        outlineJson: nextEditorState as unknown as Prisma.InputJsonValue,
+        status: orderedProjects.length > 0 ? "OUTLINE" : "DRAFT",
+      },
+    });
+
+    await db.generatedDraft.create({
+      data: {
+        userId: session.user.id,
+        objectType: "portfolio",
+        objectId: portfolio.id,
+        sourceTaskId: task.id,
+        draftType: "portfolio_diagnosis",
+        versionNumber: 1,
+        contentJson: diagnosis as unknown as Prisma.InputJsonValue,
+        isReusable: true,
+      },
+    });
+
+    await db.generationTask.update({
+      where: { id: task.id },
+      data: { status: "done", wasSuccessful: true, countedToBudget: true },
+    });
+
+    return NextResponse.json({ diagnosis });
+  } catch (error) {
+    await db.generationTask.update({
+      where: { id: task.id },
+      data: { status: "failed", wasSuccessful: false, countedToBudget: false },
+    });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "作品集诊断失败" },
+      { status: 500 }
+    );
+  }
+}

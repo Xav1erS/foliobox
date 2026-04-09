@@ -71,14 +71,28 @@ export function PortfolioPublishClient({
     setExportingPdf(true);
     setMessage("");
     try {
-      const data = await parseJsonResponse(
-        await fetch(`/api/portfolios/${portfolioId}/export-pdf`, { method: "POST" }),
-        "export"
-      );
-      if (typeof window !== "undefined") {
-        window.open(data.printUrl as string, "_blank", "noopener,noreferrer");
+      const response = await fetch(`/api/portfolios/${portfolioId}/export-pdf`, { method: "POST" });
+      if (!response.ok) {
+        const data = await parseJsonResponse(response, "export");
+        setMessage((data.message as string) ?? "导出失败");
+        return;
       }
-      setMessage((data.message as string) ?? "已打开打印页。");
+
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/pdf")) {
+        throw new Error("服务端没有返回 PDF 文件，请稍后重试。");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "portfolio.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setMessage("正式 PDF 已开始下载。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "导出失败");
     } finally {

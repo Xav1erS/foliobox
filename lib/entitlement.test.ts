@@ -1,12 +1,28 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// canDo is a pure function — mock DB so Prisma doesn't need a real connection
-vi.mock("@/lib/db", () => ({ db: {} }));
+const { mockDb } = vi.hoisted(() => ({
+  mockDb: {
+    userPlan: {
+      findFirst: vi.fn(),
+    },
+    generationTask: {
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    publishedPortfolio: {
+      count: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("@/lib/db", () => ({ db: mockDb }));
 
 import {
   canDo,
   formatQuotaLimitLabel,
-  type PlanType,
+  getEntitlementSummary,
+  getPortfolioActionSummary,
+  getProjectActionSummary,
   type EntitlementAction,
 } from "./entitlement";
 
@@ -17,6 +33,10 @@ const PAID_ACTIONS: EntitlementAction[] = [
   "pdf_export",
   "publish_link",
 ];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("canDo", () => {
   describe("FREE plan", () => {
@@ -81,5 +101,57 @@ describe("formatQuotaLimitLabel", () => {
 
   it("returns locked label for zero quota", () => {
     expect(formatQuotaLimitLabel("publishLinks", 0)).toBe("未解锁");
+  });
+});
+
+describe("entitlement contracts", () => {
+  it("builds the summary from counted usage only", async () => {
+    mockDb.userPlan.findFirst.mockResolvedValue({
+      planType: "PRO",
+      expiresAt: new Date("2026-05-01T00:00:00.000Z"),
+    });
+    mockDb.generationTask.findMany.mockResolvedValue([{ objectId: "p-1" }, { objectId: "p-2" }]);
+    mockDb.generationTask.count.mockResolvedValueOnce(4).mockResolvedValueOnce(1);
+    mockDb.publishedPortfolio.count.mockResolvedValue(1);
+
+    const summary = await getEntitlementSummary("user-1");
+
+    expect(summary.planType).toBe("PRO");
+    expect(summary.quotas.activeProjects).toMatchObject({ used: 2, limit: 10, remaining: 8 });
+    expect(summary.quotas.projectLayouts).toMatchObject({ used: 4, limit: 10, remaining: 6 });
+    expect(summary.quotas.portfolioPackagings).toMatchObject({
+      used: 1,
+      limit: 1,
+      remaining: 0,
+    });
+    expect(summary.quotas.publishLinks).toMatchObject({ used: 1, limit: 1, remaining: 0 });
+  });
+
+  it("returns object-level quotas for project actions", async () => {
+    mockDb.userPlan.findFirst.mockResolvedValue({
+      planType: "SPRINT",
+      expiresAt: null,
+    });
+    mockDb.generationTask.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+
+    const summary = await getProjectActionSummary("user-1", "project-1");
+
+    expect(summary.diagnoses).toMatchObject({ limit: 3, used: 1, remaining: 2 });
+    expect(summary.layoutGenerations).toMatchObject({ limit: 3, used: 2, remaining: 1 });
+    expect(summary.layoutRegenerations).toMatchObject({ limit: 3, used: 1, remaining: 2 });
+  });
+
+  it("returns object-level quotas for portfolio actions", async () => {
+    mockDb.userPlan.findFirst.mockResolvedValue({
+      planType: "PRO",
+      expiresAt: null,
+    });
+    mockDb.generationTask.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+    const summary = await getPortfolioActionSummary("user-1", "portfolio-1");
+
+    expect(summary.diagnoses).toMatchObject({ limit: 2, used: 2, remaining: 0 });
+    expect(summary.packagingGenerations).toMatchObject({ limit: 1, used: 1, remaining: 0 });
+    expect(summary.packagingRegenerations).toMatchObject({ limit: 1, used: 0, remaining: 1 });
   });
 });

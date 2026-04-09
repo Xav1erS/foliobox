@@ -2,29 +2,13 @@ import Link from "next/link";
 import { BookOpen, PlusCircle, ArrowRight } from "lucide-react";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
+import {
+  getPortfolioContinuePath,
+  PORTFOLIO_STATUS_LABEL,
+} from "@/lib/portfolio-workflow";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
-
-const PORTFOLIO_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "草稿",
-  SELECTION: "选择项目",
-  OUTLINE: "确认结构",
-  EDITOR: "修改中",
-  PUBLISHED: "已发布",
-};
-
-function getPortfolioContinuePath(portfolio: { id: string; status: string }): string {
-  switch (portfolio.status) {
-    case "PUBLISHED":
-    case "EDITOR":
-      return `/portfolios/${portfolio.id}/editor`;
-    case "OUTLINE":
-      return `/portfolios/${portfolio.id}/editor`;
-    default:
-      return `/portfolios/${portfolio.id}/editor`;
-  }
-}
 
 export default async function PortfoliosPage() {
   const session = await getRequiredSession("/portfolios");
@@ -82,7 +66,7 @@ export default async function PortfoliosPage() {
               </p>
               {portfolios[0] && portfolios[0].status !== "DRAFT" ? (
                 <Link
-                  href={getPortfolioContinuePath(portfolios[0])}
+                  href={getPortfolioContinuePath(portfolios[0]).href}
                   className="group inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
                 >
                   继续：{portfolios[0].name}
@@ -100,7 +84,7 @@ export default async function PortfoliosPage() {
                 return (
                   <Link
                     key={portfolio.id}
-                    href={continuePath}
+                    href={continuePath.href}
                     className="group relative flex flex-col border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:bg-white"
                   >
                     <span className="absolute left-0 top-0 h-full w-[2px] bg-transparent transition-colors group-hover:bg-brand-red" />

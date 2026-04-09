@@ -3,6 +3,7 @@ import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
 import {
   getEntitlementSummary,
+  getProjectActionSummary,
   getPlanSummaryFromEntitlement,
 } from "@/lib/entitlement";
 import { ProjectEditorClient, type ProjectEditorInitialData } from "./ProjectEditorClient";
@@ -15,7 +16,7 @@ export default async function ProjectEditorPage({
   const { id } = await params;
   const session = await getRequiredSession(`/projects/${id}/editor`);
 
-  const [project, entitlementSummary] = await Promise.all([
+  const [project, entitlementSummary, actionSummary, styleReferenceSets] = await Promise.all([
     db.project.findFirst({
       where: { id, userId: session.user.id },
       select: {
@@ -53,6 +54,17 @@ export default async function ProjectEditorPage({
       },
     }),
     getEntitlementSummary(session.user.id),
+    getProjectActionSummary(session.user.id, id),
+    db.styleReferenceSet.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ lastUsedAt: "desc" }, { updatedAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        imageUrls: true,
+      },
+    }),
   ]);
 
   if (!project) notFound();
@@ -80,6 +92,8 @@ export default async function ProjectEditorPage({
     packageRecommendation:
       project.packageJson as ProjectEditorInitialData["packageRecommendation"],
     layout: project.layoutJson as ProjectEditorInitialData["layout"],
+    actionSummary,
+    styleReferenceSets,
   };
 
   return (

@@ -1,6 +1,11 @@
 import { put, del, list, get } from "@vercel/blob";
 
-export type StorageFolder = "resumes" | "project-assets" | "exports" | "score-inputs";
+export type StorageFolder =
+  | "resumes"
+  | "project-assets"
+  | "exports"
+  | "score-inputs"
+  | "style-references";
 const BLOB_HOST_SUFFIX = ".blob.vercel-storage.com";
 const PRIVATE_BLOB_RETRY_DELAYS_MS = [150, 400, 900];
 

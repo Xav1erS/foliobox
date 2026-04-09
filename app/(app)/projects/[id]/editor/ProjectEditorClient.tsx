@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   ArrowRight,
   Loader2,
   Save,
@@ -34,11 +35,16 @@ import {
   PROJECT_STAGE_LABEL,
   PROJECT_STATUS_LABEL,
 } from "@/lib/project-workflow";
-import type { PlanSummaryCopy } from "@/lib/entitlement";
+import type { ObjectActionQuota, PlanSummaryCopy } from "@/lib/entitlement";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
 import type { PackageRecommendation } from "@/app/api/projects/[id]/package/recommend/route";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
+import {
+  STYLE_PRESETS,
+  type StyleProfile,
+  type StyleReferenceSelection,
+} from "@/lib/style-reference-presets";
 
 type ProjectAsset = {
   id: string;
@@ -56,6 +62,24 @@ type ProjectFactsForm = {
   resultSummary: string;
 };
 
+type StyleReferenceSetOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrls: string[];
+};
+
+type GeneratePrecheck = {
+  actionType: string;
+  styleProfile: StyleProfile;
+  suggestedMode: "continue" | "reuse" | "block";
+  consumesQuota: boolean;
+  failureCounts: boolean;
+  activeProjectRemaining: number;
+  actionRemaining: number;
+  reusableDraftId: string | null;
+};
+
 export type ProjectEditorInitialData = {
   id: string;
   name: string;
@@ -71,6 +95,12 @@ export type ProjectEditorInitialData = {
   completenessAnalysis: CompletenessAnalysis | null;
   packageRecommendation: PackageRecommendation | null;
   layout: LayoutJson | null;
+  actionSummary: {
+    diagnoses: ObjectActionQuota;
+    layoutGenerations: ObjectActionQuota;
+    layoutRegenerations: ObjectActionQuota;
+  };
+  styleReferenceSets: StyleReferenceSetOption[];
 };
 
 function getLegacyProjectPath(project: { id: string; stage: string }) {
@@ -160,6 +190,22 @@ export function ProjectEditorClient({
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generatingLayout, setGeneratingLayout] = useState(false);
+  const [checkingPrecheck, setCheckingPrecheck] = useState(false);
+  const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
+  const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
+    const styleProfile = initialData.layout?.styleProfile;
+    if (styleProfile?.source === "preset" && styleProfile.presetKey) {
+      return { source: "preset", presetKey: styleProfile.presetKey };
+    }
+    if (styleProfile?.source === "reference_set" && styleProfile.referenceSetId) {
+      return {
+        source: "reference_set",
+        referenceSetId: styleProfile.referenceSetId,
+        referenceSetName: styleProfile.referenceSetName ?? null,
+      };
+    }
+    return { source: "none" };
+  });
 
   const stageInfo =
     stage && stage !== "DRAFT"
@@ -232,6 +278,8 @@ export function ProjectEditorClient({
       const message =
         (data as { error?: string }).error === "quota_exceeded"
           ? "当前排版次数已用完，请先前往权益页查看剩余次数。"
+          : (data as { error?: string }).error === "upgrade_required"
+            ? "当前套餐还不能执行这个高成本动作，请先升级后再继续。"
           : (data as { error?: string }).error ?? "请求失败，请稍后重试";
       throw new Error(message);
     }
@@ -381,6 +429,50 @@ export function ProjectEditorClient({
     return currentStage;
   }
 
+  function getResolvedStyleSelection() {
+    if (styleSelection.source === "reference_set") {
+      const matched = initialData.styleReferenceSets.find(
+        (item) => item.id === styleSelection.referenceSetId
+      );
+      return {
+        source: "reference_set" as const,
+        referenceSetId: matched?.id ?? styleSelection.referenceSetId ?? null,
+        referenceSetName: matched?.name ?? styleSelection.referenceSetName ?? null,
+      };
+    }
+
+    if (styleSelection.source === "preset") {
+      return {
+        source: "preset" as const,
+        presetKey: styleSelection.presetKey ?? null,
+      };
+    }
+
+    return { source: "none" as const };
+  }
+
+  async function handleOpenGenerate() {
+    setGenerateOpen(true);
+    setCheckingPrecheck(true);
+    setActionError("");
+
+    try {
+      const data = await parseJsonResponse(
+        await fetch(`/api/projects/${initialData.id}/layout/precheck`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ styleSelection: getResolvedStyleSelection() }),
+        })
+      );
+      setGeneratePrecheck(data as GeneratePrecheck);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "生成预检失败");
+      setGeneratePrecheck(null);
+    } finally {
+      setCheckingPrecheck(false);
+    }
+  }
+
   async function handleGenerateLayout() {
     const resolvedMode = packageMode ?? packageRecommendation?.recommendedMode ?? null;
 
@@ -415,10 +507,15 @@ export function ProjectEditorClient({
       const data = await parseJsonResponse(
         await fetch(`/api/projects/${initialData.id}/layout/generate`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ styleSelection: getResolvedStyleSelection() }),
         })
       );
 
       setLayout(data.layoutJson as LayoutJson);
+      if ((data as { reused?: boolean }).reused) {
+        setFactsMessage("命中可复用排版结果，本次没有额外计次。");
+      }
       setGenerateOpen(false);
       router.refresh();
     } catch (error) {
@@ -438,7 +535,7 @@ export function ProjectEditorClient({
         statusLabel={stageInfo?.label ?? "草稿"}
         statusMeta={`${displayAssets.length} 张展示素材`}
         primaryAction={
-          <Button className="h-10 px-4" onClick={() => setGenerateOpen(true)}>
+          <Button className="h-10 px-4" onClick={handleOpenGenerate}>
             <Wand2 className="h-4 w-4" />
             生成排版
           </Button>
@@ -457,8 +554,8 @@ export function ProjectEditorClient({
         topNote={
           <>
             这是里程碑 A 的 <strong>Project Editor MVP</strong>。当前已经把项目入口、核心 facts、
-            素材补充、项目诊断和排版生成统一收口到同一页里；旧的 `boundary / completeness / package / layout`
-            页面暂时保留为兼容层，后续会继续下沉为 editor 内部动作。
+            素材补充、项目诊断和排版生成统一收口到同一页里；旧的分步页现在只承担历史入口承接，
+            日常整理已经可以直接在这里完成。
           </>
         }
         planSummary={planSummary}
@@ -470,6 +567,10 @@ export function ProjectEditorClient({
                   { label: "导入方式", value: sourceTypeLabel(initialData.sourceType) },
                   { label: "包装模式", value: packageModeLabel(packageMode) },
                   { label: "排版状态", value: layout ? `${layout.totalPages} 页` : "未生成" },
+                  {
+                    label: "当前项目剩余",
+                    value: `生成 ${initialData.actionSummary.layoutGenerations.remaining} / 重生 ${initialData.actionSummary.layoutRegenerations.remaining}`,
+                  },
                 ]}
               />
               {initialData.sourceUrl ? (
@@ -694,9 +795,9 @@ export function ProjectEditorClient({
                   </div>
 
                   <div className="border border-neutral-200 bg-white p-4">
-                    <p className="text-sm font-medium text-neutral-900">兼容层入口</p>
+                    <p className="text-sm font-medium text-neutral-900">历史入口</p>
                     <p className="mt-2 text-sm leading-6 text-neutral-500">
-                      当前 editor 已经接管主入口，但旧的分步页面仍保留用于兼容承接。
+                      当前 editor 已经接管主入口；如果你需要回看之前的阶段页，也可以从这里进入。
                     </p>
                     <Link
                       href={legacyEntry.href}
@@ -867,14 +968,33 @@ export function ProjectEditorClient({
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription>
-              当前继续复用旧 layout 生成链路，但入口已经统一收口到 Project Editor。
+              系统会基于当前素材、facts 和包装模式生成新的项目排版结果。
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 text-sm text-neutral-600">
             <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
-              <p>本次属于高成本动作。</p>
-              <p className="mt-1">失败不应计入有效消耗，后续会继续补齐显式配额提示。</p>
+              {checkingPrecheck ? (
+                <div className="flex items-center gap-2 text-neutral-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  正在检查当前输入是否可复用、是否会计次。
+                </div>
+              ) : generatePrecheck ? (
+                <>
+                  <p>本次属于高成本动作。</p>
+                  <p className="mt-1">
+                    {generatePrecheck.suggestedMode === "reuse"
+                      ? "当前命中了可复用排版结果，这次继续生成不会额外计次。"
+                      : `本次会消耗：${generatePrecheck.actionRemaining > 0 ? "当前项目排版 1 次" : "当前项目排版额度已用完"}`}
+                  </p>
+                  <p className="mt-1">
+                    执行后剩余：{Math.max(generatePrecheck.actionRemaining - (generatePrecheck.consumesQuota ? 1 : 0), 0)} 次
+                  </p>
+                  <p className="mt-1">若失败，不计次。</p>
+                </>
+              ) : (
+                <p>点击生成前会先做一次预检，判断当前是否可复用以及会不会计次。</p>
+              )}
             </div>
             <div className="border border-neutral-200 bg-white px-4 py-3">
               <p>当前阶段：{stageInfo?.label ?? "草稿"}</p>
@@ -882,6 +1002,94 @@ export function ProjectEditorClient({
                 当前包装模式：
                 {packageModeLabel(packageMode ?? packageRecommendation?.recommendedMode ?? null)}
               </p>
+            </div>
+            <div className="border border-neutral-200 bg-white px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-neutral-900">风格参考</p>
+                  <p className="mt-1 text-sm leading-6 text-neutral-500">
+                    风格参考只影响标题层级、留白密度和包装样式，不改变项目讲法。
+                  </p>
+                </div>
+                <Button variant="outline" className="h-9 px-3" onClick={handleOpenGenerate}>
+                  重新检查
+                </Button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <button
+                  type="button"
+                  className={`border px-3 py-3 text-left ${
+                    styleSelection.source === "none"
+                      ? "border-neutral-900 bg-neutral-50"
+                      : "border-neutral-200 bg-white"
+                  }`}
+                  onClick={() => setStyleSelection({ source: "none" })}
+                >
+                  <p className="text-sm font-medium text-neutral-900">不使用风格参考</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">
+                    保持默认中性风格，优先稳定生成结构。
+                  </p>
+                </button>
+                {STYLE_PRESETS.slice(0, 3).map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    className={`border px-3 py-3 text-left ${
+                      styleSelection.source === "preset" &&
+                      styleSelection.presetKey === preset.key
+                        ? "border-neutral-900 bg-neutral-50"
+                        : "border-neutral-200 bg-white"
+                    }`}
+                    onClick={() =>
+                      setStyleSelection({ source: "preset", presetKey: preset.key })
+                    }
+                  >
+                    <p className="text-sm font-medium text-neutral-900">{preset.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-neutral-500">
+                      {preset.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              {initialData.styleReferenceSets.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                    我的参考图组
+                  </p>
+                  {initialData.styleReferenceSets.slice(0, 3).map((set) => (
+                    <button
+                      key={set.id}
+                      type="button"
+                      className={`flex w-full items-start justify-between border px-3 py-3 text-left ${
+                        styleSelection.source === "reference_set" &&
+                        styleSelection.referenceSetId === set.id
+                          ? "border-neutral-900 bg-neutral-50"
+                          : "border-neutral-200 bg-white"
+                      }`}
+                      onClick={() =>
+                        setStyleSelection({
+                          source: "reference_set",
+                          referenceSetId: set.id,
+                          referenceSetName: set.name,
+                        })
+                      }
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{set.name}</p>
+                        <p className="mt-1 text-xs leading-5 text-neutral-500">
+                          {set.description ?? `${set.imageUrls.length} 张参考图`}
+                        </p>
+                      </div>
+                      {styleSelection.source === "reference_set" &&
+                      styleSelection.referenceSetId === set.id ? (
+                        <Check className="h-4 w-4 text-neutral-900" />
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {!packageMode && !packageRecommendation ? (
               <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
@@ -896,7 +1104,12 @@ export function ProjectEditorClient({
             </Button>
             <Button
               onClick={handleGenerateLayout}
-              disabled={generatingLayout || (!packageMode && !packageRecommendation)}
+              disabled={
+                generatingLayout ||
+                checkingPrecheck ||
+                generatePrecheck?.suggestedMode === "block" ||
+                (!packageMode && !packageRecommendation)
+              }
             >
               {generatingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               开始生成

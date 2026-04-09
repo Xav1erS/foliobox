@@ -11,10 +11,20 @@ export const runtime = "nodejs";
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_PDF_TYPES = ["application/pdf"];
+const ALLOWED_RESUME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+];
 
 type UploadPayload = {
-  folder?: "project-assets" | "score-inputs";
-  kind?: "project-image" | "score-image" | "score-pdf";
+  folder?: "project-assets" | "score-inputs" | "resumes" | "style-references";
+  kind?:
+    | "project-image"
+    | "score-image"
+    | "score-pdf"
+    | "resume-pdf"
+    | "style-reference-image";
   originalName?: string;
 };
 
@@ -106,6 +116,30 @@ export async function POST(request: NextRequest) {
           return {
             access: "private" as const,
             allowedContentTypes: ALLOWED_PDF_TYPES,
+            maximumSizeInBytes: MAX_FILE_SIZE,
+            addRandomSuffix: false,
+          };
+        }
+
+        if (payload.folder === "resumes" && payload.kind === "resume-pdf") {
+          if (!session?.user?.id) {
+            throw new Error("Unauthorized");
+          }
+          return {
+            access: "private" as const,
+            allowedContentTypes: ALLOWED_RESUME_TYPES,
+            maximumSizeInBytes: MAX_FILE_SIZE,
+            addRandomSuffix: false,
+          };
+        }
+
+        if (payload.folder === "style-references" && payload.kind === "style-reference-image") {
+          if (!session?.user?.id) {
+            throw new Error("Unauthorized");
+          }
+          return {
+            access: "private" as const,
+            allowedContentTypes: ALLOWED_IMAGE_TYPES,
             maximumSizeInBytes: MAX_FILE_SIZE,
             addRandomSuffix: false,
           };

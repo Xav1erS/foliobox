@@ -4,7 +4,20 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { llm } from "@/lib/llm";
-import { hasRemainingQuota } from "@/lib/entitlement";
+import {
+  getEntitlementSummary,
+  getProjectActionSummary,
+} from "@/lib/entitlement";
+import {
+  findReusableGeneratedDraft,
+  hashGenerationInput,
+  writePrecheckLog,
+} from "@/lib/generation-precheck";
+import {
+  resolveStyleProfile,
+  type StyleProfile,
+  type StyleReferenceSelection,
+} from "@/lib/style-reference-presets";
 
 // ─── Layout JSON schema ───────────────────────────────────────────────────────
 
@@ -37,7 +50,9 @@ const LayoutJsonSchema = z.object({
   qualityNotes: z.array(z.string()),
 });
 
-export type LayoutJson = z.infer<typeof LayoutJsonSchema>;
+export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
+  styleProfile?: StyleProfile;
+};
 export type LayoutPage = z.infer<typeof LayoutPageSchema>;
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -47,6 +62,7 @@ function buildPrompt(project: {
   packageMode: string;
   assetCount: number;
   facts: Record<string, unknown> | null;
+  styleSummary: string;
 }): string {
   const modeLabel =
     project.packageMode === "DEEP"
@@ -74,6 +90,9 @@ function buildPrompt(project: {
 
 ## 项目事实
 ${factsText}
+
+## 风格约束
+${project.styleSummary}
 
 ## 要求
 1. 严格按照包装模式的页数范围生成页面计划
@@ -105,7 +124,7 @@ ${factsText}
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -115,13 +134,10 @@ export async function POST(
   const userId = session.user.id;
   const { id: projectId } = await params;
 
-  const quotaResult = await hasRemainingQuota(userId, "projectLayouts");
-  if (!quotaResult.allowed) {
-    return NextResponse.json(
-      { error: "quota_exceeded", summary: quotaResult.summary },
-      { status: 403 }
-    );
-  }
+  const body = (await request.json().catch(() => ({}))) as {
+    styleSelection?: StyleReferenceSelection | null;
+  };
+  const styleSelection = body.styleSelection ?? { source: "none" as const };
 
   const project = await db.project.findFirst({
     where: { id: projectId, userId },
@@ -130,6 +146,7 @@ export async function POST(
       name: true,
       stage: true,
       packageMode: true,
+      layoutJson: true,
       facts: true,
       assets: {
         where: { selected: true },
@@ -155,20 +172,140 @@ export async function POST(
     );
   }
 
+  const [entitlementSummary, projectActionSummary] = await Promise.all([
+    getEntitlementSummary(userId),
+    getProjectActionSummary(userId, projectId),
+  ]);
+
+  const isRegeneration = Boolean(project.layoutJson);
+  const actionType = isRegeneration
+    ? "project_layout_regeneration"
+    : "project_layout_generation";
+  const actionQuota = isRegeneration
+    ? projectActionSummary.layoutRegenerations
+    : projectActionSummary.layoutGenerations;
+  const isProjectActivated =
+    projectActionSummary.diagnoses.used +
+      projectActionSummary.layoutGenerations.used +
+      projectActionSummary.layoutRegenerations.used >
+    0;
+
+  const styleProfile = resolveStyleProfile(styleSelection);
+  if (styleSelection.source === "reference_set" && styleSelection.referenceSetId) {
+    await db.styleReferenceSet.updateMany({
+      where: { id: styleSelection.referenceSetId, userId },
+      data: { lastUsedAt: new Date() },
+    });
+  }
+  const requestHash = hashGenerationInput({
+    actionType,
+    projectId,
+    packageMode: project.packageMode,
+    styleSelection,
+    assetIds: project.assets.map((asset) => asset.id),
+    facts: project.facts ?? {},
+  });
+
+  const reusable = await findReusableGeneratedDraft({
+    userId,
+    objectType: "project",
+    objectId: projectId,
+    requestHash,
+    draftType: "layout",
+  });
+
+  if (!reusable) {
+    if (!isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0) {
+      return NextResponse.json(
+        { error: "quota_exceeded", summary: entitlementSummary },
+        { status: 403 }
+      );
+    }
+
+    if (actionQuota.remaining <= 0) {
+      return NextResponse.json(
+        { error: "quota_exceeded", summary: entitlementSummary },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (reusable) {
+    await writePrecheckLog({
+      userId,
+      objectType: "project",
+      objectId: projectId,
+      actionType,
+      budgetStatus: "healthy",
+      suggestedMode: "reuse",
+      reusableDraftId: reusable.draft.id,
+    });
+
+    await db.generationTask.create({
+      data: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType,
+        usageClass: "high_cost",
+        status: "reused",
+        reusedFromTaskId: reusable.task.id,
+        requestHash,
+        provider: reusable.task.provider,
+        model: reusable.task.model,
+        wasSuccessful: true,
+        countedToBudget: false,
+      },
+    });
+
+    const layoutJson = reusable.draft.contentJson as LayoutJson;
+    await db.project.update({
+      where: { id: projectId },
+      data: { layoutJson: reusable.draft.contentJson as Prisma.InputJsonValue },
+    });
+
+    return NextResponse.json({
+      layoutJson,
+      reused: true,
+      precheck: {
+        suggestedMode: "reuse",
+        failureCounts: false,
+        consumesQuota: false,
+        reusableDraftId: reusable.draft.id,
+      },
+    });
+  }
+
   // Create generation task
   const task = await db.generationTask.create({
     data: {
       userId,
       objectType: "project",
       objectId: projectId,
-      actionType: "project_layout_generation",
+      actionType,
       usageClass: "high_cost",
       status: "running",
       provider: "openai",
+      requestHash,
+      styleReferenceSetHash:
+        styleSelection.source === "reference_set"
+          ? styleSelection.referenceSetId ?? undefined
+          : styleSelection.source === "preset"
+            ? styleSelection.presetKey ?? undefined
+            : undefined,
     },
   });
 
   try {
+    await writePrecheckLog({
+      userId,
+      objectType: "project",
+      objectId: projectId,
+      actionType,
+      budgetStatus: actionQuota.remaining <= 1 ? "near_limit" : "healthy",
+      suggestedMode: "continue",
+    });
+
     const factsRecord = project.facts
       ? (project.facts as Record<string, unknown>)
       : null;
@@ -178,13 +315,18 @@ export async function POST(
       packageMode: project.packageMode,
       assetCount: project.assets.length,
       facts: factsRecord,
+      styleSummary: `${styleProfile.label}。${styleProfile.summary}`,
     });
 
-    const layoutJson = await llm.generateStructured(prompt, LayoutJsonSchema, {
+    const generatedLayout = await llm.generateStructured(prompt, LayoutJsonSchema, {
       task: "project_layout_generation",
       temperature: 0.4,
       track: { userId, projectId },
     });
+    const layoutJson = {
+      ...generatedLayout,
+      styleProfile,
+    };
 
     // Persist layout JSON to project
     await db.project.update({

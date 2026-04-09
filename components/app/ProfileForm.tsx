@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X } from "lucide-react";
 import { InlineTip } from "@/components/app/InlineTip";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StickyActionBar } from "@/components/app/StickyActionBar";
+import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 interface ProfileData {
   currentTitle?: string | null;
@@ -103,6 +104,10 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [resumeApplying, setResumeApplying] = useState(false);
+  const [resumeMessage, setResumeMessage] = useState("");
+  const [parsedResumeId, setParsedResumeId] = useState<string | null>(null);
 
   function set<K extends keyof ProfileData>(key: K, value: ProfileData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -134,8 +139,131 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
     }
   }
 
+  async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setResumeUploading(true);
+    setResumeMessage("");
+
+    try {
+      const [uploaded] = await uploadFilesFromBrowser({
+        files: [file],
+        folder: "resumes",
+        kind: "resume-pdf",
+      });
+
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: [uploaded] }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error ?? "简历上传失败");
+      }
+
+      const profileDraft = (data as { profileDraft?: Partial<ProfileData> & { summary?: string } })
+        .profileDraft;
+      setParsedResumeId((data as { resume?: { id?: string } }).resume?.id ?? null);
+      setResumeMessage(
+        profileDraft?.summary ??
+          "已读取这份简历。你可以先应用到当前档案，再手动微调。"
+      );
+    } catch (uploadError) {
+      setResumeMessage(uploadError instanceof Error ? uploadError.message : "简历上传失败");
+      setParsedResumeId(null);
+    } finally {
+      setResumeUploading(false);
+      event.target.value = "";
+    }
+  }
+
+  async function handleApplyResume() {
+    if (!parsedResumeId) return;
+
+    setResumeApplying(true);
+    setResumeMessage("");
+
+    try {
+      const response = await fetch(`/api/profile/from-resume/${parsedResumeId}`, {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error ?? "应用简历失败");
+      }
+
+      const profile = (data as { profile?: ProfileData }).profile;
+      if (profile) {
+        setForm({
+          currentTitle: profile.currentTitle ?? "",
+          yearsOfExperience: profile.yearsOfExperience ?? "",
+          industry: profile.industry ?? "",
+          specialties: profile.specialties ?? [],
+          targetRole: profile.targetRole ?? "",
+          strengths: profile.strengths ?? [],
+          tonePreference: profile.tonePreference ?? "",
+        });
+      }
+
+      setSaved(false);
+      setResumeMessage("简历里的基础信息已经写入当前档案，你可以继续微调后再保存。");
+    } catch (applyError) {
+      setResumeMessage(applyError instanceof Error ? applyError.message : "应用简历失败");
+    } finally {
+      setResumeApplying(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
+      <SectionCard
+        title="从简历快速带入"
+        description="先上传一份 PDF 简历，我会帮你提取职位、经验年限和部分方向标签，再落到当前档案里。"
+      >
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div>
+            <p className="text-sm leading-6 text-neutral-500">
+              这一步更适合先把基础信息带进来，不会覆盖你后续手动写的项目事实。当前版本优先支持 PDF 简历。
+            </p>
+            {resumeMessage ? (
+              <div className="mt-4 border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                {resumeMessage}
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-3">
+            <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center border border-dashed border-neutral-300 bg-neutral-50 px-4 py-4 text-center transition-colors hover:border-neutral-500 hover:bg-white">
+              {resumeUploading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-neutral-500" />
+              ) : (
+                <UploadCloud className="h-5 w-5 text-neutral-500" />
+              )}
+              <p className="mt-3 text-sm font-medium text-neutral-900">上传 PDF 简历</p>
+              <p className="mt-1 text-xs leading-5 text-neutral-500">
+                上传后会先做一次文本提取
+              </p>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={handleResumeUpload}
+              />
+            </label>
+            <Button
+              variant="outline"
+              className="h-10 w-full rounded-none"
+              onClick={handleApplyResume}
+              disabled={!parsedResumeId || resumeApplying}
+            >
+              {resumeApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              应用到当前档案
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard
         title="基本信息"
         description="当前职位、年限和行业会影响作品集中的自我定位、语气和背景可信度。"

@@ -1,3 +1,5 @@
+import type { StyleProfile } from "@/lib/style-reference-presets";
+
 export type FixedPageId = "cover" | "about" | "closing";
 
 export type FixedPageConfig = {
@@ -36,6 +38,7 @@ export type PortfolioPackagingContent = {
   pages: PortfolioPackagingPage[];
   qualityNotes: string[];
   generatedAt: string;
+  styleProfile?: StyleProfile;
 };
 
 export type PortfolioEditorState = {
@@ -86,4 +89,3 @@ export function mergePortfolioEditorState(
       patch.diagnosis === undefined ? current.diagnosis : patch.diagnosis,
   };
 }
-

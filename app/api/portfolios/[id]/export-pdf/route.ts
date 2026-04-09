@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requirePlan } from "@/lib/entitlement";
+import type { PortfolioPackagingContent } from "@/lib/portfolio-editor";
+import {
+  PortfolioPdfRendererUnavailableError,
+  renderPortfolioPdf,
+} from "@/lib/portfolio-pdf";
+
+export const runtime = "nodejs";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -17,7 +24,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const portfolio = await db.portfolio.findFirst({
     where: { id, userId: session.user.id },
-    select: { id: true, contentJson: true },
+    select: { id: true, name: true, contentJson: true },
   });
 
   if (!portfolio) {
@@ -27,10 +34,38 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "请先生成作品集包装结果" }, { status: 400 });
   }
 
-  return NextResponse.json({
-    ok: true,
-    printUrl: `/portfolios/${portfolio.id}/print`,
-    message: "当前先通过打印页导出 PDF。",
-  });
-}
+  const content = portfolio.contentJson as PortfolioPackagingContent | null;
+  if (!content?.pages?.length) {
+    return NextResponse.json({ error: "请先生成作品集包装结果" }, { status: 400 });
+  }
 
+  try {
+    const pdfBuffer = await renderPortfolioPdf({
+      portfolioName: portfolio.name,
+      content,
+    });
+    const filename = `${portfolio.name.replace(/[\\/:*?"<>|]/g, "-") || "portfolio"}.pdf`;
+
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    if (error instanceof PortfolioPdfRendererUnavailableError) {
+      return NextResponse.json(
+        {
+          error: "pdf_renderer_unavailable",
+          message: "当前环境缺少 PDF 渲染器，暂时无法生成正式 PDF。",
+        },
+        { status: 503 }
+      );
+    }
+
+    console.error("portfolio pdf export failed:", error);
+    return NextResponse.json({ error: "正式 PDF 导出失败，请稍后重试" }, { status: 500 });
+  }
+}

@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 interface CaseCardProps {
+  slug: string;
   title: string;
   role: string;
   tags: string[];
@@ -125,6 +127,7 @@ function DocumentMock() {
 const MOCK_COMPONENTS = [DashboardMock, MobileMock, DocumentMock];
 
 export function CaseCard({
+  slug,
   title,
   role,
   tags,
@@ -136,7 +139,10 @@ export function CaseCard({
   const MockComponent = MOCK_COMPONENTS[index % 3];
 
   return (
-    <div className="group flex flex-col bg-white/[0.02] transition-all duration-300 hover:bg-white/[0.05] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]">
+    <Link
+      href={`/cases/${slug}`}
+      className="group flex flex-col bg-white/[0.02] transition-all duration-300 hover:bg-white/[0.05] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]"
+    >
       {/* Mock preview image */}
       <div className="relative overflow-hidden border-b border-white/[0.06] bg-white/[0.02]" style={{ height: 148 }}>
         <MockComponent />
@@ -180,12 +186,13 @@ export function CaseCard({
           ))}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
 export const EXAMPLE_CASES = [
   {
+    slug: "enterprise-data-dashboard",
     title: "企业数据中台改版",
     role: "UX 设计师 · B 端 / 企业系统",
     tags: ["B 端", "数据可视化", "信息架构"],
@@ -195,6 +202,7 @@ export const EXAMPLE_CASES = [
       "原始作品集只有截图，缺少背景与决策说明。整理后更清楚地展现了信息架构重组思路与数据看板的复杂度价值。",
   },
   {
+    slug: "consumer-finance-billing",
     title: "消费金融 App 账单体验优化",
     role: "产品设计师 · C 端 / 金融",
     tags: ["C 端", "用户体验", "增长设计"],
@@ -204,6 +212,7 @@ export const EXAMPLE_CASES = [
       "有完整设计稿但角色表达模糊。补充项目事实后，生成版本突出了个人在用户路径重构中的核心判断。",
   },
   {
+    slug: "gov-accessibility-upgrade",
     title: "政务服务平台无障碍升级",
     role: "高级 UI 设计师 · G 端 / 无障碍",
     tags: ["G 端", "无障碍", "系统设计"],

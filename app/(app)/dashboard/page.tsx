@@ -35,6 +35,10 @@ import {
   getProjectStageSummary,
 } from "@/lib/project-workflow";
 import { getEntitlementSummary } from "@/lib/entitlement";
+import {
+  getPortfolioContinuePath,
+  PORTFOLIO_STATUS_LABEL,
+} from "@/lib/portfolio-workflow";
 import { ProjectsCollection } from "@/components/app/ProjectsCollection";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 
@@ -44,12 +48,12 @@ const PLAN_COPY: Record<string, { title: string; description: string }> = {
     description: "可继续整理项目、生成草稿。完整排版、发布与 PDF 导出需解锁后可用。",
   },
   PRO: {
-    title: "起稿陪跑",
-    description: "已解锁完整生成流程、PDF 导出和在线链接发布。",
+    title: "标准版",
+    description: "已解锁完整生成流程、正式 PDF 导出和在线链接发布。",
   },
   SPRINT: {
-    title: "细化陪跑",
-    description: "已解锁更高配额与更强生成能力，适合求职冲刺期。",
+    title: "进阶版",
+    description: "已解锁更高配额与更高频生成能力，适合求职冲刺期。",
   },
 };
 
@@ -59,29 +63,6 @@ const LEVEL_COLOR: Record<PortfolioScoreLevel, { fg: string; bg: string }> = {
   DRAFT: { fg: "text-orange-700", bg: "bg-orange-50" },
   NOT_READY: { fg: "text-red-700", bg: "bg-red-50" },
 };
-
-const PORTFOLIO_STAGE_LABEL: Record<string, string> = {
-  DRAFT: "草稿",
-  SELECTION: "选择项目",
-  OUTLINE: "确认结构",
-  EDITOR: "修改中",
-  PUBLISHED: "已发布",
-};
-
-function getPortfolioNextStep(portfolio: { id: string; status: string }): {
-  href: string;
-  label: string;
-} {
-  switch (portfolio.status) {
-    case "EDITOR":
-    case "PUBLISHED":
-      return { href: `/portfolios/${portfolio.id}/editor`, label: "继续修改作品集" };
-    case "OUTLINE":
-      return { href: `/portfolios/${portfolio.id}/editor`, label: "回到作品集编辑器" };
-    default:
-      return { href: `/portfolios/${portfolio.id}/editor`, label: "开始编辑作品集" };
-  }
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -404,12 +385,12 @@ export default async function DashboardPage({
                         作品集
                       </span>
                       <span className="inline-flex items-center border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-mono uppercase tracking-wide text-neutral-400">
-                        {PORTFOLIO_STAGE_LABEL[activePortfolio.status] ?? activePortfolio.status}
+                        {PORTFOLIO_STATUS_LABEL[activePortfolio.status] ?? activePortfolio.status}
                       </span>
                     </div>
                     <p className="mt-3 text-sm text-neutral-600">
                       <span className="mr-1.5 text-neutral-400">—</span>
-                      {getPortfolioNextStep(activePortfolio).label}
+                      {getPortfolioContinuePath(activePortfolio).label}
                     </p>
                     <p className="mt-1.5 flex items-center gap-1.5 text-xs font-mono text-neutral-400">
                       <Clock3 className="h-3 w-3" />
@@ -417,7 +398,7 @@ export default async function DashboardPage({
                     </p>
                     <div className="mt-5">
                       <Button asChild className="h-11 rounded-none px-6">
-                        <Link href={getPortfolioNextStep(activePortfolio).href}>
+                        <Link href={getPortfolioContinuePath(activePortfolio).href}>
                           继续
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>

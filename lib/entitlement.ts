@@ -23,6 +23,12 @@ export type EntitlementQuotaUsage = {
   limit: number;
   remaining: number;
 };
+export type ObjectActionQuota = {
+  label: string;
+  used: number;
+  limit: number;
+  remaining: number;
+};
 export type EntitlementSummary = {
   planType: PlanType;
   title: string;
@@ -62,18 +68,18 @@ export const PLAN_DEFINITIONS = [
   },
   {
     planType: "pro" as const,
-    displayName: "Pro 版",
+    displayName: "标准版",
     price: 79,
     priceUnit: "month" as const,
-    description: "适合想自己完成整理、修改和导出的用户。",
+    description: "适合已经决定认真整理作品集，并希望完成第一版正式初稿的用户。",
     highlightTag: "最适合多数用户",
     featureList: [
       "完整评分结果",
-      "完整整理流程",
-      "多版本生成",
+      "10 个可激活项目",
+      "每个项目 1 次诊断 + 1 次生成排版",
+      "2 次作品集诊断 + 1 次作品集包装",
       "PDF 导出",
       "在线链接发布",
-      "更完整的编辑能力",
     ],
     targetUserText: "适合希望完整整理和导出作品集的用户",
     unlockScenarioText: "适合准备继续生成、编辑、导出时解锁",
@@ -83,16 +89,18 @@ export const PLAN_DEFINITIONS = [
   },
   {
     planType: "sprint" as const,
-    displayName: "求职冲刺版",
+    displayName: "进阶版",
     price: 299,
     priceUnit: "one_time" as const,
-    description: "适合正在密集投递、希望在短时间内集中优化作品集的用户。",
-    highlightTag: "适合投递前冲刺",
+    description: "适合有更多项目、需要更多重生成与更高频局部修改的用户。",
+    highlightTag: "更高次数与更高频打磨",
     featureList: [
-      "更高生成配额",
-      "更强优化能力",
-      "岗位定向优化",
-      "限时强化服务",
+      "30 个可激活项目",
+      "每个项目 3 次诊断 + 3 次生成排版",
+      "6 次作品集诊断 + 3 次作品集包装",
+      "更高频局部修改与验证",
+      "PDF 导出",
+      "在线链接发布",
     ],
     targetUserText: "适合正处于求职窗口期的用户",
     unlockScenarioText: "适合投递前集中优化时解锁",
@@ -110,14 +118,14 @@ export const PLAN_SUMMARY_COPY: Record<PlanType, PlanSummaryCopy> = {
     ctaLabel: "查看完整权益",
   },
   PRO: {
-    title: "起稿陪跑",
-    description: "已解锁完整生成流程、PDF 导出和在线链接发布。",
+    title: "标准版",
+    description: "已解锁正式整理闭环，可完成第一版作品集初稿。",
     href: "/profile",
     ctaLabel: "查看完整权益",
   },
   SPRINT: {
-    title: "细化陪跑",
-    description: "已解锁更高配额与更强生成能力，适合求职冲刺期。",
+    title: "进阶版",
+    description: "已解锁更多项目和更高频高成本动作，适合持续打磨与多轮重生成。",
     href: "/profile",
     ctaLabel: "查看完整权益",
   },
@@ -140,22 +148,72 @@ export const PLAN_QUOTAS: Record<
   Record<EntitlementQuotaKey, PlanQuotaDefinition>
 > = {
   FREE: {
-    activeProjects: { label: "可激活项目", limit: 3 },
+    activeProjects: { label: "可激活项目", limit: 0 },
     projectLayouts: { label: "项目排版", limit: 0 },
     portfolioPackagings: { label: "作品集包装", limit: 0 },
     publishLinks: { label: "发布链接", limit: 0 },
   },
   PRO: {
-    activeProjects: { label: "可激活项目", limit: 12 },
-    projectLayouts: { label: "项目排版", limit: 24 },
-    portfolioPackagings: { label: "作品集包装", limit: 8 },
-    publishLinks: { label: "发布链接", limit: 8 },
+    activeProjects: { label: "可激活项目", limit: 10 },
+    projectLayouts: { label: "项目排版", limit: 10 },
+    portfolioPackagings: { label: "作品集包装", limit: 1 },
+    publishLinks: { label: "发布链接", limit: 1 },
   },
   SPRINT: {
     activeProjects: { label: "可激活项目", limit: 30 },
-    projectLayouts: { label: "项目排版", limit: 80 },
-    portfolioPackagings: { label: "作品集包装", limit: 20 },
-    publishLinks: { label: "发布链接", limit: 20 },
+    projectLayouts: { label: "项目排版", limit: 30 },
+    portfolioPackagings: { label: "作品集包装", limit: 3 },
+    publishLinks: { label: "发布链接", limit: 1 },
+  },
+};
+
+const PROJECT_ACTION_LIMITS: Record<
+  PlanType,
+  {
+    diagnoses: number;
+    layoutGenerations: number;
+    layoutRegenerations: number;
+  }
+> = {
+  FREE: {
+    diagnoses: 0,
+    layoutGenerations: 0,
+    layoutRegenerations: 0,
+  },
+  PRO: {
+    diagnoses: 1,
+    layoutGenerations: 1,
+    layoutRegenerations: 1,
+  },
+  SPRINT: {
+    diagnoses: 3,
+    layoutGenerations: 3,
+    layoutRegenerations: 3,
+  },
+};
+
+const PORTFOLIO_ACTION_LIMITS: Record<
+  PlanType,
+  {
+    diagnoses: number;
+    packagingGenerations: number;
+    packagingRegenerations: number;
+  }
+> = {
+  FREE: {
+    diagnoses: 0,
+    packagingGenerations: 0,
+    packagingRegenerations: 0,
+  },
+  PRO: {
+    diagnoses: 2,
+    packagingGenerations: 1,
+    packagingRegenerations: 1,
+  },
+  SPRINT: {
+    diagnoses: 6,
+    packagingGenerations: 3,
+    packagingRegenerations: 3,
   },
 };
 
@@ -257,6 +315,15 @@ export function getPlanSummaryFromEntitlement(summary: EntitlementSummary): Plan
   };
 }
 
+function buildObjectActionQuota(label: string, limit: number, used: number): ObjectActionQuota {
+  return {
+    label,
+    used,
+    limit,
+    remaining: Math.max(limit - used, 0),
+  };
+}
+
 export async function getUserPlan(userId: string): Promise<PlanType> {
   const plan = await db.userPlan.findFirst({
     where: { userId, status: "ACTIVE" },
@@ -267,14 +334,23 @@ export async function getUserPlan(userId: string): Promise<PlanType> {
 }
 
 export async function getEntitlementSummary(userId: string): Promise<EntitlementSummary> {
-  const [plan, activeProjectsUsed, projectLayoutsUsed, portfolioPackagingsUsed, publishLinksUsed] =
+  const [plan, activeProjectTasks, projectLayoutsUsed, portfolioPackagingsUsed, publishLinksUsed] =
     await Promise.all([
       db.userPlan.findFirst({
         where: { userId, status: "ACTIVE" },
         orderBy: { createdAt: "desc" },
         select: { planType: true, expiresAt: true },
       }),
-      db.project.count({ where: { userId } }),
+      db.generationTask.findMany({
+        where: {
+          userId,
+          objectType: "project",
+          usageClass: "high_cost",
+          countedToBudget: true,
+        },
+        select: { objectId: true },
+        distinct: ["objectId"],
+      }),
       db.generationTask.count({
         where: {
           userId,
@@ -296,6 +372,7 @@ export async function getEntitlementSummary(userId: string): Promise<Entitlement
 
   const planType = (plan?.planType as PlanType | undefined) ?? "FREE";
   const summaryCopy = PLAN_SUMMARY_COPY[planType];
+  const activeProjectsUsed = activeProjectTasks.length;
 
   return {
     planType,
@@ -314,6 +391,103 @@ export async function getEntitlementSummary(userId: string): Promise<Entitlement
       ),
       publishLinks: buildQuotaUsage(planType, "publishLinks", publishLinksUsed),
     },
+  };
+}
+
+export async function getProjectActionSummary(userId: string, projectId: string) {
+  const planType = await getUserPlan(userId);
+  const [diagnosesUsed, layoutGenerationsUsed, layoutRegenerationsUsed] = await Promise.all([
+    db.generationTask.count({
+      where: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_diagnosis",
+        countedToBudget: true,
+      },
+    }),
+    db.generationTask.count({
+      where: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_layout_generation",
+        countedToBudget: true,
+      },
+    }),
+    db.generationTask.count({
+      where: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_layout_regeneration",
+        countedToBudget: true,
+      },
+    }),
+  ]);
+
+  const limits = PROJECT_ACTION_LIMITS[planType];
+  return {
+    diagnoses: buildObjectActionQuota("项目诊断", limits.diagnoses, diagnosesUsed),
+    layoutGenerations: buildObjectActionQuota(
+      "生成排版",
+      limits.layoutGenerations,
+      layoutGenerationsUsed
+    ),
+    layoutRegenerations: buildObjectActionQuota(
+      "重新生成",
+      limits.layoutRegenerations,
+      layoutRegenerationsUsed
+    ),
+  };
+}
+
+export async function getPortfolioActionSummary(userId: string, portfolioId: string) {
+  const planType = await getUserPlan(userId);
+  const [diagnosesUsed, packagingGenerationsUsed, packagingRegenerationsUsed] =
+    await Promise.all([
+      db.generationTask.count({
+        where: {
+          userId,
+          objectType: "portfolio",
+          objectId: portfolioId,
+          actionType: "portfolio_diagnosis",
+          countedToBudget: true,
+        },
+      }),
+      db.generationTask.count({
+        where: {
+          userId,
+          objectType: "portfolio",
+          objectId: portfolioId,
+          actionType: "portfolio_packaging_generation",
+          countedToBudget: true,
+        },
+      }),
+      db.generationTask.count({
+        where: {
+          userId,
+          objectType: "portfolio",
+          objectId: portfolioId,
+          actionType: "portfolio_packaging_regeneration",
+          countedToBudget: true,
+        },
+      }),
+    ]);
+
+  const limits = PORTFOLIO_ACTION_LIMITS[planType];
+  return {
+    diagnoses: buildObjectActionQuota("作品集诊断", limits.diagnoses, diagnosesUsed),
+    packagingGenerations: buildObjectActionQuota(
+      "生成作品集包装",
+      limits.packagingGenerations,
+      packagingGenerationsUsed
+    ),
+    packagingRegenerations: buildObjectActionQuota(
+      "重新包装",
+      limits.packagingRegenerations,
+      packagingRegenerationsUsed
+    ),
   };
 }
 

@@ -2,12 +2,24 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { hasRemainingQuota } from "@/lib/entitlement";
+import {
+  getEntitlementSummary,
+  getPortfolioActionSummary,
+} from "@/lib/entitlement";
+import {
+  findReusableGeneratedDraft,
+  hashGenerationInput,
+  writePrecheckLog,
+} from "@/lib/generation-precheck";
 import {
   resolvePortfolioEditorState,
   type PortfolioPackagingContent,
   type PortfolioPackagingPage,
 } from "@/lib/portfolio-editor";
+import {
+  resolveStyleProfile,
+  type StyleReferenceSelection,
+} from "@/lib/style-reference-presets";
 
 function packageModeLabel(mode: string | null | undefined) {
   if (mode === "DEEP") return "深讲";
@@ -16,18 +28,21 @@ function packageModeLabel(mode: string | null | undefined) {
   return "待判断";
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const quotaResult = await hasRemainingQuota(session.user.id, "portfolioPackagings");
-  if (!quotaResult.allowed) {
-    return NextResponse.json(
-      { error: "quota_exceeded", summary: quotaResult.summary },
-      { status: 403 }
-    );
+  const body = (await request.json().catch(() => ({}))) as {
+    styleSelection?: StyleReferenceSelection | null;
+  };
+  const styleSelection = body.styleSelection ?? { source: "none" as const };
+  const styleProfile = resolveStyleProfile(styleSelection);
+  if (styleSelection.source === "reference_set" && styleSelection.referenceSetId) {
+    await db.styleReferenceSet.updateMany({
+      where: { id: styleSelection.referenceSetId, userId: session.user.id },
+      data: { lastUsedAt: new Date() },
+    });
   }
 
   const { id } = await params;
@@ -47,6 +62,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (portfolio.projectIds.length === 0) {
     return NextResponse.json({ error: "请先选入至少一个项目" }, { status: 400 });
   }
+
+  const [entitlementSummary, portfolioActionSummary] = await Promise.all([
+    getEntitlementSummary(session.user.id),
+    getPortfolioActionSummary(session.user.id, portfolio.id),
+  ]);
+
+  const actionType = portfolioActionSummary.packagingGenerations.used > 0
+    ? "portfolio_packaging_regeneration"
+    : "portfolio_packaging_generation";
+  const actionQuota =
+    actionType === "portfolio_packaging_regeneration"
+      ? portfolioActionSummary.packagingRegenerations
+      : portfolioActionSummary.packagingGenerations;
 
   const selectedProjects = await db.project.findMany({
     where: { id: { in: portfolio.projectIds }, userId: session.user.id },
@@ -70,6 +98,81 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .filter(Boolean);
 
   const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
+  const requestHash = hashGenerationInput({
+    actionType,
+    portfolioId: portfolio.id,
+    projectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    selectedProjects: orderedProjects.map((project) => ({
+      id: project?.id,
+      layout: project?.layoutJson,
+      packageMode: project?.packageMode,
+    })),
+    styleSelection,
+  });
+  const reusable = await findReusableGeneratedDraft({
+    userId: session.user.id,
+    objectType: "portfolio",
+    objectId: portfolio.id,
+    requestHash,
+    draftType: "packaging",
+  });
+
+  if (!reusable && actionQuota.remaining <= 0) {
+    return NextResponse.json(
+      { error: "quota_exceeded", summary: entitlementSummary },
+      { status: 403 }
+    );
+  }
+
+  if (reusable) {
+    await writePrecheckLog({
+      userId: session.user.id,
+      objectType: "portfolio",
+      objectId: portfolio.id,
+      actionType,
+      budgetStatus: "healthy",
+      suggestedMode: "reuse",
+      reusableDraftId: reusable.draft.id,
+    });
+
+    await db.generationTask.create({
+      data: {
+        userId: session.user.id,
+        objectType: "portfolio",
+        objectId: portfolio.id,
+        actionType,
+        usageClass: "high_cost",
+        status: "reused",
+        reusedFromTaskId: reusable.task.id,
+        requestHash,
+        provider: reusable.task.provider,
+        model: reusable.task.model,
+        wasSuccessful: true,
+        countedToBudget: false,
+      },
+    });
+
+    const packaging = reusable.draft.contentJson as PortfolioPackagingContent;
+    await db.portfolio.update({
+      where: { id: portfolio.id },
+      data: {
+        contentJson: reusable.draft.contentJson as Prisma.InputJsonValue,
+        status: "EDITOR",
+      },
+    });
+
+    return NextResponse.json({
+      packaging,
+      reused: true,
+      precheck: {
+        suggestedMode: "reuse",
+        failureCounts: false,
+        consumesQuota: false,
+      },
+    });
+  }
+
   const pages: PortfolioPackagingPage[] = [];
 
   editorState.fixedPages
@@ -131,6 +234,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         .join("、")}`,
     ],
     generatedAt: new Date().toISOString(),
+    styleProfile,
   };
 
   const task = await db.generationTask.create({
@@ -138,14 +242,30 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       userId: session.user.id,
       objectType: "portfolio",
       objectId: portfolio.id,
-      actionType: "portfolio_packaging_generation",
+      actionType,
       usageClass: "high_cost",
       status: "running",
       provider: "system",
+      requestHash,
+      styleReferenceSetHash:
+        styleSelection.source === "reference_set"
+          ? styleSelection.referenceSetId ?? undefined
+          : styleSelection.source === "preset"
+            ? styleSelection.presetKey ?? undefined
+            : undefined,
     },
   });
 
   try {
+    await writePrecheckLog({
+      userId: session.user.id,
+      objectType: "portfolio",
+      objectId: portfolio.id,
+      actionType,
+      budgetStatus: actionQuota.remaining <= 1 ? "near_limit" : "healthy",
+      suggestedMode: "continue",
+    });
+
     await db.portfolio.update({
       where: { id: portfolio.id },
       data: {
@@ -184,4 +304,3 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     );
   }
 }
-
