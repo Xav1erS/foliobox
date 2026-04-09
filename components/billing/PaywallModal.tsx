@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLAN_DEFINITIONS } from "@/lib/entitlement";
+import {
+  formatQuotaLimitLabel,
+  PLAN_DEFINITIONS,
+  PLAN_QUOTAS,
+  type EntitlementQuotaKey,
+  type EntitlementQuotaUsage,
+  type PlanType,
+} from "@/lib/entitlement";
 
 type SceneType =
   | "score_detail"
@@ -63,6 +70,15 @@ const SCENE_CONFIG: Record<
 
 const PAID_PLANS = PLAN_DEFINITIONS.filter((p) => p.planType !== "free");
 
+const SCENE_QUOTA_KEYS: Record<SceneType, EntitlementQuotaKey[]> = {
+  score_detail: [],
+  full_rewrite: ["projectLayouts", "portfolioPackagings"],
+  multi_variant: ["projectLayouts"],
+  pdf_export: [],
+  publish_link: ["publishLinks"],
+  sprint_upgrade: ["projectLayouts", "portfolioPackagings", "publishLinks"],
+};
+
 export function PaywallModal({
   open,
   onClose,
@@ -80,6 +96,38 @@ export function PaywallModal({
   const [provider, setProvider] = useState<"wechat_pay" | "alipay">("wechat_pay");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [currentPlanType, setCurrentPlanType] = useState<PlanType | null>(null);
+  const [currentQuotas, setCurrentQuotas] = useState<
+    Record<EntitlementQuotaKey, EntitlementQuotaUsage> | null
+  >(null);
+
+  const sceneQuotaKeys = SCENE_QUOTA_KEYS[scene];
+  const selectedPlanQuotas = useMemo(
+    () => PLAN_QUOTAS[selectedPlan.toUpperCase() as PlanType],
+    [selectedPlan]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    fetch("/api/billing/me")
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !data || data.error) return;
+        setCurrentPlanType((data.planType as PlanType | undefined) ?? null);
+        setCurrentQuotas(
+          (data.quotas as Record<EntitlementQuotaKey, EntitlementQuotaUsage> | undefined) ?? null
+        );
+      })
+      .catch(() => {
+        // Ignore non-blocking summary fetch failures in the modal.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   async function handleUnlock() {
     setLoading(true);
@@ -168,6 +216,36 @@ export function PaywallModal({
           <h2 className="text-lg font-semibold text-neutral-900">{config.title}</h2>
           <p className="mt-1.5 text-sm text-neutral-500">{config.description}</p>
 
+          {currentPlanType && currentQuotas ? (
+            <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+              <p className="text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                当前方案
+              </p>
+              <p className="mt-1 text-sm font-medium text-neutral-900">{currentPlanType}</p>
+              {sceneQuotaKeys.length > 0 ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {sceneQuotaKeys.map((key) => {
+                    const quota = currentQuotas[key];
+                    return (
+                      <div key={key} className="border border-neutral-200 bg-white px-3 py-2">
+                        <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                          {quota.label}
+                        </p>
+                        <p className="mt-1 text-sm text-neutral-700">
+                          剩余 {quota.remaining} / {quota.limit}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs leading-5 text-neutral-500">
+                  当前弹窗对应的是能力解锁场景，购买后会同时获得更完整的生成与导出能力。
+                </p>
+              )}
+            </div>
+          ) : null}
+
           {/* Plan selection */}
           <div className="mt-5 space-y-3">
             {PAID_PLANS.map((plan) => {
@@ -214,6 +292,51 @@ export function PaywallModal({
                           </li>
                         ))}
                       </ul>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {sceneQuotaKeys.length > 0
+                          ? sceneQuotaKeys.map((key) => {
+                              const quota = selectedPlanQuotas[key];
+                              return (
+                                <div
+                                  key={`${plan.planType}-${key}`}
+                                  className="rounded-lg border border-neutral-200 bg-white px-3 py-2"
+                                >
+                                  <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                    {quota.label}
+                                  </p>
+                                  <p className="mt-1 text-xs font-medium text-neutral-700">
+                                    {formatQuotaLimitLabel(key, quota.limit)}
+                                  </p>
+                                </div>
+                              );
+                            })
+                          : (
+                            <>
+                              <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
+                                <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                  项目排版
+                                </p>
+                                <p className="mt-1 text-xs font-medium text-neutral-700">
+                                  {formatQuotaLimitLabel(
+                                    "projectLayouts",
+                                    selectedPlanQuotas.projectLayouts.limit
+                                  )}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
+                                <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                  作品集包装
+                                </p>
+                                <p className="mt-1 text-xs font-medium text-neutral-700">
+                                  {formatQuotaLimitLabel(
+                                    "portfolioPackagings",
+                                    selectedPlanQuotas.portfolioPackagings.limit
+                                  )}
+                                </p>
+                              </div>
+                            </>
+                          )}
+                      </div>
                     </div>
                     <div
                       className={`mt-1 h-4 w-4 shrink-0 rounded-full border-2 ${

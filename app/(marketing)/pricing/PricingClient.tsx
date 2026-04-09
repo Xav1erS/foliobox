@@ -3,7 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { PLAN_DEFINITIONS } from "@/lib/entitlement";
+import {
+  formatQuotaLimitLabel,
+  PLAN_DEFINITIONS,
+  PLAN_QUOTAS,
+  QUOTA_DISPLAY_ORDER,
+} from "@/lib/entitlement";
 import { PaywallModal } from "@/components/billing/PaywallModal";
 import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 import {
@@ -11,7 +16,7 @@ import {
   getPricingSecondaryAction,
 } from "@/lib/marketing-cta";
 
-const COMPARISON_ROWS = [
+const FEATURE_COMPARISON_ROWS = [
   { label: "免费评分入口", free: true, pro: true, sprint: true },
   { label: "简版评分结果", free: true, pro: true, sprint: true },
   { label: "完整评分结果", free: false, pro: true, sprint: true },
@@ -22,6 +27,19 @@ const COMPARISON_ROWS = [
   { label: "更高配额", free: false, pro: false, sprint: true },
   { label: "岗位定向优化", free: false, pro: false, sprint: true },
 ];
+
+const PLAN_TYPE_MAP = {
+  free: "FREE",
+  pro: "PRO",
+  sprint: "SPRINT",
+} as const;
+
+const QUOTA_COMPARISON_ROWS = QUOTA_DISPLAY_ORDER.map((key) => ({
+  label: PLAN_QUOTAS.FREE[key].label,
+  free: formatQuotaLimitLabel(key, PLAN_QUOTAS.FREE[key].limit),
+  pro: formatQuotaLimitLabel(key, PLAN_QUOTAS.PRO[key].limit),
+  sprint: formatQuotaLimitLabel(key, PLAN_QUOTAS.SPRINT[key].limit),
+}));
 
 const STAGE_GUIDES = [
   {
@@ -115,7 +133,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
           <span className="hidden md:block">再看具体适合哪一档</span>
         </h2>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/55">
-          免费版适合先看清问题；Pro 版适合把第一版真正做出来；求职冲刺版适合在投递窗口里做更密集的优化。
+          免费版适合先看清问题；Pro 版适合把第一版真正做出来；求职冲刺版适合在投递窗口里做更密集的优化。差异不只在“能不能用”，也在每种高成本动作能做多少次。
         </p>
       </div>
 
@@ -151,6 +169,25 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             {plan.targetUserText && (
               <p className="mt-1 text-xs text-white/35">{plan.targetUserText}</p>
             )}
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {QUOTA_DISPLAY_ORDER.map((key) => {
+                const quota = PLAN_QUOTAS[PLAN_TYPE_MAP[plan.planType]][key];
+                return (
+                  <div
+                    key={`${plan.planType}-${key}`}
+                    className="border border-white/10 bg-black/10 px-3 py-2"
+                  >
+                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/35">
+                      {quota.label}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-white/82">
+                      {formatQuotaLimitLabel(key, quota.limit)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
 
             <ul className="mt-5 flex-1 space-y-2">
               {plan.featureList.map((f) => (
@@ -213,7 +250,9 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10 bg-white/[0.03]">
-              <th className="px-5 py-4 text-left text-sm font-medium text-white/50">能力对比</th>
+              <th className="px-5 py-4 text-left text-sm font-medium text-white/50">
+                能力与额度
+              </th>
               {PLAN_DEFINITIONS.map((p) => (
                 <th key={p.planType} className="px-5 py-4 text-center text-sm font-medium text-white/70">
                   {p.displayName}
@@ -222,10 +261,24 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             </tr>
           </thead>
           <tbody>
-            {COMPARISON_ROWS.map((row, i) => (
+            {QUOTA_COMPARISON_ROWS.map((row, i) => (
               <tr
                 key={row.label}
                 className={`border-b border-white/[0.06] ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}
+              >
+                <td className="px-5 py-3.5 text-sm text-white/60">{row.label}</td>
+                {(["free", "pro", "sprint"] as const).map((p) => (
+                  <td key={p} className="px-5 py-3.5 text-center text-sm font-medium text-white/78">
+                    {row[p]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+
+            {FEATURE_COMPARISON_ROWS.map((row, i) => (
+              <tr
+                key={row.label}
+                className={`border-b border-white/[0.06] ${i % 2 === 0 ? "bg-white/[0.02]" : ""}`}
               >
                 <td className="px-5 py-3.5 text-sm text-white/60">{row.label}</td>
                 {(["free", "pro", "sprint"] as const).map((p) => (

@@ -3,7 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 // canDo is a pure function — mock DB so Prisma doesn't need a real connection
 vi.mock("@/lib/db", () => ({ db: {} }));
 
-import { canDo, type PlanType, type EntitlementAction } from "./entitlement";
+import {
+  canDo,
+  formatQuotaLimitLabel,
+  type PlanType,
+  type EntitlementAction,
+} from "./entitlement";
 
 const PAID_ACTIONS: EntitlementAction[] = [
   "full_score",
@@ -62,5 +67,19 @@ describe("canDo", () => {
     it("SPRINT can trigger full rewrite", () => {
       expect(canDo("SPRINT", "full_rewrite")).toBe(true);
     });
+  });
+});
+
+describe("formatQuotaLimitLabel", () => {
+  it("formats active projects as count", () => {
+    expect(formatQuotaLimitLabel("activeProjects", 12)).toBe("12 个");
+  });
+
+  it("formats generation quotas as times", () => {
+    expect(formatQuotaLimitLabel("portfolioPackagings", 8)).toBe("8 次");
+  });
+
+  it("returns locked label for zero quota", () => {
+    expect(formatQuotaLimitLabel("publishLinks", 0)).toBe("未解锁");
   });
 });

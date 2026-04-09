@@ -4,49 +4,15 @@ import { db } from "@/lib/db";
 import { ProfileForm } from "@/components/app/ProfileForm";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ResumeContextBanner } from "@/components/app/ResumeContextBanner";
+import {
+  getEntitlementSummary,
+  getQuotaStatus,
+  PLAN_DEFINITIONS,
+  QUOTA_DISPLAY_ORDER,
+  formatQuotaUsageValue,
+} from "@/lib/entitlement";
 import { getRequiredSession } from "@/lib/required-session";
 import { formatProjectDate } from "@/lib/project-workflow";
-
-const PLAN_COPY: Record<string, {
-  title: string;
-  stage: string;
-  description: string;
-  abilities: string[];
-  completionLine: string;
-}> = {
-  FREE: {
-    title: "免费体验",
-    stage: "基础体验阶段",
-    description: "可继续整理项目、生成草稿。完整排版、发布与 PDF 导出需解锁后可用。",
-    abilities: ["免费评分入口", "基础整理流程体验", "简版评分结果"],
-    completionLine: "适合先体验产品、了解当前作品集问题的阶段。",
-  },
-  PRO: {
-    title: "起稿陪跑",
-    stage: "第一版起稿阶段",
-    description: "已解锁完整生成流程、PDF 导出和在线链接发布。",
-    abilities: [
-      "完整整理与生成流程",
-      "项目级排版生成",
-      "Portfolio 初稿生成",
-      "PDF 导出",
-      "在线链接发布",
-    ],
-    completionLine: "适合从素材整理到完成第一版可编辑作品集初稿。",
-  },
-  SPRINT: {
-    title: "细化陪跑",
-    stage: "深度优化阶段",
-    description: "已解锁更高配额与更强生成能力，适合求职冲刺期。",
-    abilities: [
-      "起稿陪跑全部能力",
-      "更多轮局部 AI 改写",
-      "更多次重新验证与对比",
-      "更充足的整份包装调整空间",
-    ],
-    completionLine: "适合从已有初稿进行高密度修改、验证和优化。",
-  },
-};
 
 export default async function ProfilePage({
   searchParams,
@@ -57,7 +23,7 @@ export default async function ProfilePage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const fromScore = resolvedSearchParams?.from === "score";
 
-  const [profile, userPlan] = await Promise.all([
+  const [profile, userPlan, entitlementSummary] = await Promise.all([
     db.designerProfile.findUnique({
       where: { userId: session.user.id },
     }),
@@ -66,10 +32,16 @@ export default async function ProfilePage({
       orderBy: { createdAt: "desc" },
       select: { planType: true, expiresAt: true },
     }),
+    getEntitlementSummary(session.user.id),
   ]);
 
   const currentPlan = userPlan?.planType ?? "FREE";
-  const planCopy = PLAN_COPY[currentPlan] ?? PLAN_COPY.FREE;
+  const planDefinition =
+    PLAN_DEFINITIONS.find((plan) => plan.planType === currentPlan.toLowerCase()) ??
+    PLAN_DEFINITIONS[0];
+  const quotaStatus = getQuotaStatus(entitlementSummary);
+  const quotaStatusClass =
+    quotaStatus.tone === "emerald" ? "bg-emerald-400" : "bg-amber-400";
 
   return (
     <div className="px-6 py-10">
@@ -111,13 +83,13 @@ export default async function ProfilePage({
             <div className="flex items-start justify-between gap-6">
               <div>
                 <p className="text-xl font-bold tracking-tight text-neutral-900">
-                  {planCopy.title}
+                  {entitlementSummary.title}
                 </p>
                 <p className="mt-1 text-xs font-mono uppercase tracking-[0.12em] text-neutral-400">
-                  {planCopy.stage}
+                  {planDefinition.displayName}
                 </p>
                 <p className="mt-2 text-sm leading-5 text-neutral-500">
-                  {planCopy.description}
+                  {entitlementSummary.description}
                 </p>
                 {userPlan?.expiresAt && (
                   <p className="mt-2 text-xs font-mono text-neutral-400">
@@ -144,7 +116,7 @@ export default async function ProfilePage({
               已解锁能力
             </p>
             <ul className="space-y-2">
-              {planCopy.abilities.map((ability) => (
+              {planDefinition.featureList.map((ability) => (
                 <li
                   key={ability}
                   className="flex items-center gap-2.5 text-sm text-neutral-700"
@@ -154,9 +126,30 @@ export default async function ProfilePage({
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-xs leading-5 text-neutral-400">
-              {planCopy.completionLine}
-            </p>
+
+            <div className="mt-5 border-t border-neutral-200 pt-5">
+              <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+                当前额度
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {QUOTA_DISPLAY_ORDER.map((key) => {
+                  const quota = entitlementSummary.quotas[key];
+                  return (
+                    <div key={key} className="border border-neutral-200 bg-neutral-50 px-3 py-3">
+                      <p className="text-xs font-mono uppercase tracking-[0.12em] text-neutral-400">
+                        {quota.label}
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-neutral-900">
+                        {formatQuotaUsageValue(key, quota)}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        已用 {quota.used} · 剩余 {quota.remaining}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -174,21 +167,41 @@ export default async function ProfilePage({
           {/* Budget status */}
           <div className="border-b border-neutral-300 px-6 py-5">
             <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-              <span className="text-sm font-medium text-neutral-900">预算充足</span>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${quotaStatusClass}`} />
+              <span className="text-sm font-medium text-neutral-900">{quotaStatus.label}</span>
             </div>
             <p className="mt-2 text-sm leading-5 text-neutral-500">
-              按当前套餐，仍可继续整理项目与生成作品集初稿。
+              {quotaStatus.description}
             </p>
           </div>
 
           {/* Recent records */}
           <div className="px-6 py-5">
             <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
-              最近处理记录
+              当前使用情况
             </p>
-            <p className="text-sm leading-6 text-neutral-400">
-              处理记录功能即将上线，届时可在此查看所有高成本动作的使用明细。
+            <div className="grid gap-3 sm:grid-cols-2">
+              {QUOTA_DISPLAY_ORDER.map((key) => {
+                const quota = entitlementSummary.quotas[key];
+                return (
+                  <div key={key} className="border border-neutral-200 px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{quota.label}</p>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          总额度 {quota.limit} · 已用 {quota.used}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-900">
+                        剩余 {quota.remaining}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 text-xs leading-5 text-neutral-400">
+              更细的动作明细和账期记录还没接入；当前这里展示的是基于对象与任务记录实时推导的剩余额度。
             </p>
           </div>
         </div>

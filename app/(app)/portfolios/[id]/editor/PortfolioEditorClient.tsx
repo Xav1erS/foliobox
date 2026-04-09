@@ -176,7 +176,7 @@ export function PortfolioEditorClient({
     if (!packaging) {
       return diagnosis.suggestions[0] ?? "当前可以继续生成作品集包装，拿到整份作品集的页面节奏建议。";
     }
-    return "当前已经拿到作品集包装结果，可以继续细调项目顺序、固定页和兼容发布链路。";
+    return "当前已经拿到作品集包装结果，可以继续细调项目顺序、固定页，并进入发布与导出。";
   }, [diagnosis, packaging, selectedProjects.length]);
 
   async function parseJsonResponse(response: Response) {
@@ -608,7 +608,7 @@ export function PortfolioEditorClient({
                   </div>
 
                   <div className="border border-neutral-200 bg-white p-4">
-                    <p className="text-sm font-medium text-neutral-900">兼容层入口</p>
+                    <p className="text-sm font-medium text-neutral-900">发布与兼容入口</p>
                     <div className="mt-3 space-y-3">
                       <Link
                         href={`/portfolios/${initialData.id}/outline`}
@@ -621,7 +621,7 @@ export function PortfolioEditorClient({
                         href={`/portfolios/${initialData.id}/publish`}
                         className="flex items-center justify-between border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-white"
                       >
-                        打开发布兼容页
+                        打开发布与导出页
                         <ArrowRight className="h-3.5 w-3.5 text-neutral-400" />
                       </Link>
                     </div>

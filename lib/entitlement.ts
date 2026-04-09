@@ -123,9 +123,21 @@ export const PLAN_SUMMARY_COPY: Record<PlanType, PlanSummaryCopy> = {
   },
 };
 
-const PLAN_QUOTAS: Record<
+export type PlanQuotaDefinition = {
+  label: string;
+  limit: number;
+};
+
+export const QUOTA_DISPLAY_ORDER: EntitlementQuotaKey[] = [
+  "activeProjects",
+  "projectLayouts",
+  "portfolioPackagings",
+  "publishLinks",
+];
+
+export const PLAN_QUOTAS: Record<
   PlanType,
-  Record<EntitlementQuotaKey, { label: string; limit: number }>
+  Record<EntitlementQuotaKey, PlanQuotaDefinition>
 > = {
   FREE: {
     activeProjects: { label: "可激活项目", limit: 3 },
@@ -146,6 +158,59 @@ const PLAN_QUOTAS: Record<
     publishLinks: { label: "发布链接", limit: 20 },
   },
 };
+
+export function formatQuotaLimitLabel(
+  key: EntitlementQuotaKey,
+  limit: number
+): string {
+  if (limit <= 0) return "未解锁";
+  if (key === "activeProjects") return `${limit} 个`;
+  return `${limit} 次`;
+}
+
+export function formatQuotaUsageValue(
+  key: EntitlementQuotaKey,
+  quota: EntitlementQuotaUsage
+): string {
+  if (quota.limit <= 0) return "未解锁";
+  if (key === "activeProjects") return `${quota.used}/${quota.limit}`;
+  return `${quota.remaining}/${quota.limit}`;
+}
+
+export function getQuotaStatus(summary: EntitlementSummary): {
+  label: string;
+  description: string;
+  tone: "emerald" | "amber";
+} {
+  if (summary.planType === "FREE") {
+    return {
+      label: "当前为体验模式",
+      description:
+        "你仍可继续整理项目；项目排版、作品集包装、发布链接与 PDF 导出需要升级后使用。",
+      tone: "amber",
+    };
+  }
+
+  const remainingHighCostActions =
+    summary.quotas.projectLayouts.remaining +
+    summary.quotas.portfolioPackagings.remaining +
+    summary.quotas.publishLinks.remaining;
+
+  if (remainingHighCostActions <= 6) {
+    return {
+      label: "剩余额度偏少",
+      description:
+        "高成本动作还可继续使用，但已经接近当前套餐上限，建议在生成前先确认本轮目标。",
+      tone: "amber",
+    };
+  }
+
+  return {
+    label: "剩余额度充足",
+    description: "当前套餐仍可继续进行项目排版、作品集包装与公开发布。",
+    tone: "emerald",
+  };
+}
 
 export function getPlanSummaryCopy(plan: PlanType): PlanSummaryCopy {
   return PLAN_SUMMARY_COPY[plan];
