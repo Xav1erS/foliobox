@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -12,8 +12,13 @@ import {
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
+
+export const editorFieldClass =
+  "border-white/10 bg-white/[0.03] text-white placeholder:text-white/28";
 
 type EditorScaffoldProps = {
   objectLabel: string;
@@ -59,13 +64,10 @@ export function EditorScaffold({
     <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#101114] text-white">
       <header className="border-b border-white/10 bg-[#16171b]/96 backdrop-blur">
         <div className="flex min-h-14 items-center gap-3 px-4 py-2">
-          <Link
-            href={backHref}
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white"
-          >
+          <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3 text-sm">
             <ArrowLeft className="h-4 w-4" />
             {backLabel}
-          </Link>
+          </EditorChromeLink>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-white/32">
@@ -98,7 +100,7 @@ export function EditorScaffold({
             </Link>
           ) : null}
 
-          <div className="flex shrink-0 items-center gap-2 [&_button]:border-white/10 [&_button]:bg-white [&_button]:text-neutral-900 [&_button]:hover:bg-white/90">
+          <div className="flex shrink-0 items-center gap-2">
             {secondaryAction}
             {primaryAction}
           </div>
@@ -178,18 +180,13 @@ function RailHeader({
       <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
         {label}
       </p>
-      <button
-        type="button"
-        onClick={onCollapse}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/54 transition-colors hover:bg-white/[0.06] hover:text-white"
-        aria-label={`折叠${label}`}
-      >
+      <EditorChromeIconButton onClick={onCollapse} aria-label={`折叠${label}`}>
         {side === "left" ? (
           <PanelLeftClose className="h-4 w-4" />
         ) : (
           <PanelRightClose className="h-4 w-4" />
         )}
-      </button>
+      </EditorChromeIconButton>
     </div>
   );
 }
@@ -308,6 +305,56 @@ export function EditorSurfaceButton({
   children,
   className,
   onClick,
+  disabled,
+}: {
+  active?: boolean;
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "w-full rounded-xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+        active
+          ? "border-sky-400/70 bg-sky-400/10 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.16)]"
+          : "border-white/10 bg-white/[0.03] text-white/72 hover:bg-white/[0.05]",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function EditorEmptyState({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function EditorStripButton({
+  active,
+  children,
+  className,
+  onClick,
 }: {
   active?: boolean;
   children: ReactNode;
@@ -319,10 +366,10 @@ export function EditorSurfaceButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border px-3 py-3 text-left transition-colors",
+        "shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
         active
-          ? "border-sky-400/70 bg-sky-400/10 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.16)]"
-          : "border-white/10 bg-white/[0.03] text-white/72 hover:bg-white/[0.05]",
+          ? "border-sky-400/70 bg-sky-400/10 text-white"
+          : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]",
         className
       )}
     >
@@ -339,13 +386,90 @@ export function EditorEdgeToggle({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <EditorChromeIconButton
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/54 transition-colors hover:bg-white/[0.06] hover:text-white"
       aria-label={side === "left" ? "展开左侧栏" : "展开右侧栏"}
     >
       {side === "left" ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-    </button>
+    </EditorChromeIconButton>
+  );
+}
+
+export function EditorChromeButton({
+  className,
+  variant = "outline",
+  ...props
+}: ComponentProps<typeof Button>) {
+  return (
+    <Button
+      variant={variant}
+      className={cn(
+        "border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+export function EditorChromeIconButton({
+  className,
+  ...props
+}: ComponentProps<typeof Button>) {
+  return (
+    <EditorChromeButton
+      size="icon"
+      className={cn("h-8 w-8 rounded-md text-white/54", className)}
+      {...props}
+    />
+  );
+}
+
+export function EditorChromeLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex h-9 items-center rounded-md border border-white/10 bg-white/[0.03] text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white",
+        className
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export function EditorTabsList({
+  className,
+  ...props
+}: ComponentProps<typeof TabsList>) {
+  return (
+    <TabsList
+      className={cn("rounded-lg bg-white/[0.04] p-1", className)}
+      {...props}
+    />
+  );
+}
+
+export function EditorTabsTrigger({
+  className,
+  ...props
+}: ComponentProps<typeof TabsTrigger>) {
+  return (
+    <TabsTrigger
+      className={cn(
+        "rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900",
+        className
+      )}
+      {...props}
+    />
   );
 }

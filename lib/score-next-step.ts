@@ -38,7 +38,7 @@ export function getScoreNextStep(params: {
   profileReady: boolean;
 }): ScoreNextStep {
   const workspaceHref = `/dashboard?from=score&sid=${params.scoreId}`;
-  const projectHref = `/projects/new?from=score&sid=${params.scoreId}`;
+  const projectHref = `/projects?create=1&from=score&sid=${params.scoreId}`;
   const profileHref = `/profile?from=score&sid=${params.scoreId}`;
   const loginWorkspaceHref = `/login?next=${encodeURIComponent(workspaceHref)}`;
 
@@ -66,7 +66,7 @@ export function getScoreNextStep(params: {
 
   if (params.level === "NOT_READY") {
     return {
-      title: "先导入一个真实项目，把基础表达补起来",
+      title: "先新建一个真实项目，把基础表达补起来",
       description:
         "这次评分说明当前还不适合直接投递。下一步更适合先整理一个真实项目，把背景、角色、过程和结果补齐。",
       primaryHref: projectHref,

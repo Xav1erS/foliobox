@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  ArrowRight,
   Loader2,
   Save,
   Sparkles,
@@ -13,8 +12,11 @@ import {
 } from "lucide-react";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -24,14 +26,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import {
   EditorCanvasChip,
+  EditorChromeButton,
+  EditorEmptyState,
+  editorFieldClass,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
+  EditorStripButton,
   EditorSurfaceButton,
+  EditorTabsList,
+  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import {
   PROJECT_STAGE_LABEL,
@@ -118,43 +126,6 @@ export type ProjectEditorInitialData = {
   styleReferenceSets: StyleReferenceSetOption[];
 };
 
-function getLegacyProjectPath(project: { id: string; stage: string }) {
-  if (project.stage === "BOUNDARY") {
-    return {
-      href: `/projects/${project.id}/boundary`,
-      label: "边界确认兼容页",
-      description: "继续使用当前边界分析能力。",
-    };
-  }
-  if (project.stage === "COMPLETENESS") {
-    return {
-      href: `/projects/${project.id}/completeness`,
-      label: "完整度兼容页",
-      description: "继续补充 facts 并运行完整度分析。",
-    };
-  }
-  if (project.stage === "PACKAGE") {
-    return {
-      href: `/projects/${project.id}/package`,
-      label: "包装模式兼容页",
-      description: "继续选择深讲、浅讲或补充展示。",
-    };
-  }
-  if (project.stage === "LAYOUT" || project.stage === "READY") {
-    return {
-      href: `/projects/${project.id}/layout`,
-      label: "排版兼容页",
-      description: "继续查看当前 layout 生成结果。",
-    };
-  }
-
-  return {
-    href: `/projects/${project.id}/boundary`,
-    label: "开始整理兼容页",
-    description: "当前过渡阶段仍复用旧流程能力。",
-  };
-}
-
 function packageModeLabel(mode: string | null) {
   if (mode === "DEEP") return "深讲";
   if (mode === "LIGHT") return "浅讲";
@@ -174,6 +145,20 @@ function verdictLabel(verdict: string | undefined) {
   if (verdict === "needs_work") return "仍需补充";
   if (verdict === "insufficient") return "信息不足";
   return "待判断";
+}
+
+function EditorPanelCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={cn("border-white/10 bg-white/[0.03] text-white shadow-none", className)}>
+      <CardContent className="p-4">{children}</CardContent>
+    </Card>
+  );
 }
 
 export function ProjectEditorClient({
@@ -227,7 +212,6 @@ export function ProjectEditorClient({
     stage && stage !== "DRAFT"
       ? PROJECT_STAGE_LABEL[stage]
       : PROJECT_STATUS_LABEL[initialData.importStatus] ?? PROJECT_STATUS_LABEL.DRAFT;
-  const legacyEntry = getLegacyProjectPath({ id: initialData.id, stage });
   const displayAssets = useMemo(() => {
     const selectedAssets = assets.filter((asset) => asset.selected);
     return selectedAssets.length > 0 ? selectedAssets : assets;
@@ -400,7 +384,7 @@ export function ProjectEditorClient({
   }, [canvasItems, selectedCanvasItemId]);
   const nextStepConclusion = useMemo(() => {
     if (layout) {
-      return "当前项目已经拿到排版结果，可以继续细看页面结构，或回到兼容页补查旧链路结果。";
+      return "当前项目已经拿到排版结果，可以继续细看页面结构，并准备把它加入作品集。";
     }
     if (displayAssets.length === 0) {
       return "先补充能代表项目过程与结果的素材，再运行项目诊断。";
@@ -629,7 +613,7 @@ export function ProjectEditorClient({
     const resolvedMode = packageMode ?? packageRecommendation?.recommendedMode ?? null;
 
     if (!resolvedMode) {
-      setActionError("请先运行项目诊断，或先在兼容页确认包装模式。");
+      setActionError("请先运行项目诊断，拿到包装模式建议后再生成排版。");
       return;
     }
 
@@ -693,15 +677,14 @@ export function ProjectEditorClient({
           </Button>
         }
         secondaryAction={
-          <Button
-            variant="outline"
-            className="h-9 border-white/10 bg-white/[0.03] px-4 text-white hover:bg-white/[0.08] hover:text-white"
+          <EditorChromeButton
+            className="h-9 px-4"
             onClick={handleRunDiagnosis}
             disabled={diagnosing}
           >
             {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             项目诊断
-          </Button>
+          </EditorChromeButton>
         }
         planSummary={planSummary}
         leftRailLabel="Layers / Assets"
@@ -709,17 +692,17 @@ export function ProjectEditorClient({
         leftRail={
           <Tabs defaultValue="layers" className="flex h-full flex-col">
             <div className="border-b border-white/10 p-3">
-              <TabsList className="grid w-full grid-cols-3 rounded-lg bg-white/[0.04] p-1">
-                <TabsTrigger value="layers" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+              <EditorTabsList className="grid w-full grid-cols-3">
+                <EditorTabsTrigger value="layers">
                   图层
-                </TabsTrigger>
-                <TabsTrigger value="assets" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="assets">
                   素材
-                </TabsTrigger>
-                <TabsTrigger value="facts" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="facts">
                   项目
-                </TabsTrigger>
-              </TabsList>
+                </EditorTabsTrigger>
+              </EditorTabsList>
             </div>
 
             <TabsContent value="layers" className="mt-0 flex-1 overflow-y-auto">
@@ -813,9 +796,9 @@ export function ProjectEditorClient({
                       </EditorSurfaceButton>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                    <EditorEmptyState>
                       还没有素材。先上传过程图、关键界面或结果画面。
-                    </div>
+                    </EditorEmptyState>
                   )}
                 </div>
               </EditorRailSection>
@@ -825,12 +808,12 @@ export function ProjectEditorClient({
               <EditorRailSection title="Facts Snapshot">
                 <div className="grid gap-2">
                   {factSnapshot.map((item) => (
-                    <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                    <EditorPanelCard key={item.label} className="bg-white/[0.02]">
                       <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/34">
                         {item.label}
                       </p>
                       <p className="mt-2 text-sm text-white/78">{item.value}</p>
-                    </div>
+                    </EditorPanelCard>
                   ))}
                 </div>
               </EditorRailSection>
@@ -843,7 +826,7 @@ export function ProjectEditorClient({
                       setFacts((current) => ({ ...current, projectType: event.target.value }))
                     }
                     placeholder="项目类型"
-                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("h-10", editorFieldClass)}
                   />
                   <Input
                     value={facts.industry}
@@ -851,7 +834,7 @@ export function ProjectEditorClient({
                       setFacts((current) => ({ ...current, industry: event.target.value }))
                     }
                     placeholder="所属行业"
-                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("h-10", editorFieldClass)}
                   />
                   <Input
                     value={facts.roleTitle}
@@ -859,7 +842,7 @@ export function ProjectEditorClient({
                       setFacts((current) => ({ ...current, roleTitle: event.target.value }))
                     }
                     placeholder="我的角色"
-                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("h-10", editorFieldClass)}
                   />
                   <Textarea
                     value={facts.background}
@@ -867,7 +850,7 @@ export function ProjectEditorClient({
                       setFacts((current) => ({ ...current, background: event.target.value }))
                     }
                     placeholder="项目背景"
-                    className="min-h-24 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("min-h-24", editorFieldClass)}
                   />
                   <Textarea
                     value={facts.resultSummary}
@@ -875,7 +858,7 @@ export function ProjectEditorClient({
                       setFacts((current) => ({ ...current, resultSummary: event.target.value }))
                     }
                     placeholder="结果摘要"
-                    className="min-h-20 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("min-h-20", editorFieldClass)}
                   />
                   <Button
                     variant="outline"
@@ -895,7 +878,7 @@ export function ProjectEditorClient({
                   value={notesDraft}
                   onChange={(event) => setNotesDraft(event.target.value)}
                   placeholder="把还没整理进 facts 的线索临时记在这里"
-                  className="min-h-24 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                  className={cn("min-h-24", editorFieldClass)}
                 />
                 <p className="mt-2 text-xs leading-5 text-white/34">
                   当前备注仍是本地草稿位，后续会拆成独立备注对象和可引用上下文。
@@ -1011,14 +994,14 @@ export function ProjectEditorClient({
         rightRail={
           <Tabs defaultValue="inspector" className="flex h-full flex-col">
             <div className="border-b border-white/10 p-3">
-              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-white/[0.04] p-1">
-                <TabsTrigger value="inspector" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+              <EditorTabsList className="grid w-full grid-cols-2">
+                <EditorTabsTrigger value="inspector">
                   Inspector
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="ai">
                   AI
-                </TabsTrigger>
-              </TabsList>
+                </EditorTabsTrigger>
+              </EditorTabsList>
             </div>
 
             <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
@@ -1026,10 +1009,10 @@ export function ProjectEditorClient({
                 {selectedCanvasItem ? (
                   <>
                     <EditorInfoList items={selectedCanvasItem.meta} />
-                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <EditorPanelCard className="mt-4">
                       <p className="text-sm font-medium text-white">{selectedCanvasItem.title}</p>
                       <p className="mt-2 text-sm leading-6 text-white/56">{selectedCanvasItem.summary}</p>
-                    </div>
+                    </EditorPanelCard>
                   </>
                 ) : (
                   <p className="text-sm leading-6 text-white/46">
@@ -1042,9 +1025,9 @@ export function ProjectEditorClient({
                 {selectedCanvasItem?.keyPoints?.length ? (
                   <div className="space-y-2">
                     {selectedCanvasItem.keyPoints.map((point) => (
-                      <div key={point} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm leading-6 text-white/64">
+                      <EditorPanelCard key={point} className="bg-white/[0.02]">
                         {point}
-                      </div>
+                      </EditorPanelCard>
                     ))}
                   </div>
                 ) : (
@@ -1068,14 +1051,14 @@ export function ProjectEditorClient({
 
             <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
               <EditorRailSection title="Current Conclusion">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                <EditorPanelCard>
                   <p className="text-sm leading-7 text-white/74">
                     {layout?.narrativeSummary ??
                       packageRecommendation?.reasoning ??
                       completenessAnalysis?.overallComment ??
                       "先运行项目诊断，系统会在这里返回边界、完整度和包装模式建议。"}
                   </p>
-                </div>
+                </EditorPanelCard>
               </EditorRailSection>
 
               <EditorRailSection title="AI 结果">
@@ -1086,26 +1069,26 @@ export function ProjectEditorClient({
                 ) : (
                   <div className="space-y-3">
                     {boundaryAnalysis ? (
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <EditorPanelCard>
                         <p className="text-sm font-medium text-white">边界分析</p>
                         <p className="mt-2 text-sm leading-6 text-white/56">{boundaryAnalysis.projectSummary}</p>
-                      </div>
+                      </EditorPanelCard>
                     ) : null}
                     {completenessAnalysis ? (
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <EditorPanelCard>
                         <p className="text-sm font-medium text-white">
                           完整度检查 · {verdictLabel(completenessAnalysis.overallVerdict)}
                         </p>
                         <p className="mt-2 text-sm leading-6 text-white/56">{completenessAnalysis.overallComment}</p>
-                      </div>
+                      </EditorPanelCard>
                     ) : null}
                     {packageRecommendation ? (
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <EditorPanelCard>
                         <p className="text-sm font-medium text-white">
                           包装模式推荐 · {packageModeLabel(packageRecommendation.recommendedMode)}
                         </p>
                         <p className="mt-2 text-sm leading-6 text-white/56">{packageRecommendation.reasoning}</p>
-                      </div>
+                      </EditorPanelCard>
                     ) : null}
                   </div>
                 )}
@@ -1113,13 +1096,6 @@ export function ProjectEditorClient({
 
               <EditorRailSection title="下一步">
                 <p className="text-sm leading-6 text-white/56">{nextStepConclusion}</p>
-                <Link
-                  href={legacyEntry.href}
-                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-white"
-                >
-                  {legacyEntry.label}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
               </EditorRailSection>
             </TabsContent>
           </Tabs>
@@ -1127,22 +1103,17 @@ export function ProjectEditorClient({
         bottomStrip={
           <div className="flex gap-2 overflow-x-auto">
             {canvasItems.map((item) => (
-              <button
+              <EditorStripButton
                 key={item.id}
-                type="button"
                 onClick={() => setSelectedCanvasItemId(item.id)}
-                className={cn(
-                  "w-40 shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
-                  selectedCanvasItem?.id === item.id
-                    ? "border-sky-400/70 bg-sky-400/10 text-white"
-                    : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
-                )}
+                active={selectedCanvasItem?.id === item.id}
+                className="w-40"
               >
                 <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
                   {item.frameLabel}
                 </p>
                 <p className="mt-2 truncate text-sm font-medium">{item.title}</p>
-              </button>
+              </EditorStripButton>
             ))}
           </div>
         }
@@ -1155,7 +1126,7 @@ export function ProjectEditorClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="rounded-none">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription>
@@ -1164,7 +1135,18 @@ export function ProjectEditorClient({
           </DialogHeader>
 
           <div className="space-y-3 text-sm text-neutral-600">
-            <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <Card className="shadow-none">
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                    预检
+                  </Badge>
+                  {generatePrecheck?.suggestedMode === "reuse" ? (
+                    <Badge variant="outline" className="rounded-full">
+                      可复用
+                    </Badge>
+                  ) : null}
+                </div>
               {checkingPrecheck ? (
                 <div className="flex items-center gap-2 text-neutral-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1186,15 +1168,24 @@ export function ProjectEditorClient({
               ) : (
                 <p>点击生成前会先做一次预检，判断当前是否可复用以及会不会计次。</p>
               )}
-            </div>
-            <div className="border border-neutral-200 bg-white px-4 py-3">
-              <p>当前阶段：{stageInfo?.label ?? "草稿"}</p>
-              <p className="mt-1">
-                当前包装模式：
-                {packageModeLabel(packageMode ?? packageRecommendation?.recommendedMode ?? null)}
-              </p>
-            </div>
-            <div className="border border-neutral-200 bg-white px-4 py-4">
+              </CardContent>
+            </Card>
+            <Card className="shadow-none">
+              <CardContent className="space-y-3 p-4">
+                <Badge variant="secondary" className="w-fit rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  当前上下文
+                </Badge>
+                <div className="space-y-1">
+                  <p>当前阶段：{stageInfo?.label ?? "草稿"}</p>
+                  <p>
+                    当前包装模式：
+                    {packageModeLabel(packageMode ?? packageRecommendation?.recommendedMode ?? null)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-none">
+              <CardContent className="p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-neutral-900">风格参考</p>
@@ -1207,13 +1198,15 @@ export function ProjectEditorClient({
                 </Button>
               </div>
 
+              <Separator className="my-4" />
+
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <button
                   type="button"
-                  className={`border px-3 py-3 text-left ${
+                  className={`rounded-xl border px-3 py-3 text-left transition-colors ${
                     styleSelection.source === "none"
-                      ? "border-neutral-900 bg-neutral-50"
-                      : "border-neutral-200 bg-white"
+                      ? "border-neutral-900 bg-neutral-100"
+                      : "border-neutral-200 bg-white hover:border-neutral-300"
                   }`}
                   onClick={() => setStyleSelection({ source: "none" })}
                 >
@@ -1226,11 +1219,11 @@ export function ProjectEditorClient({
                   <button
                     key={preset.key}
                     type="button"
-                    className={`border px-3 py-3 text-left ${
+                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
                       styleSelection.source === "preset" &&
                       styleSelection.presetKey === preset.key
-                        ? "border-neutral-900 bg-neutral-50"
-                        : "border-neutral-200 bg-white"
+                        ? "border-neutral-900 bg-neutral-100"
+                        : "border-neutral-200 bg-white hover:border-neutral-300"
                     }`}
                     onClick={() =>
                       setStyleSelection({ source: "preset", presetKey: preset.key })
@@ -1253,11 +1246,11 @@ export function ProjectEditorClient({
                     <button
                       key={set.id}
                       type="button"
-                      className={`flex w-full items-start justify-between border px-3 py-3 text-left ${
+                      className={`flex w-full items-start justify-between rounded-xl border px-3 py-3 text-left transition-colors ${
                         styleSelection.source === "reference_set" &&
                         styleSelection.referenceSetId === set.id
-                          ? "border-neutral-900 bg-neutral-50"
-                          : "border-neutral-200 bg-white"
+                          ? "border-neutral-900 bg-neutral-100"
+                          : "border-neutral-200 bg-white hover:border-neutral-300"
                       }`}
                       onClick={() =>
                         setStyleSelection({
@@ -1281,11 +1274,14 @@ export function ProjectEditorClient({
                   ))}
                 </div>
               ) : null}
-            </div>
+              </CardContent>
+            </Card>
             {!packageMode && !packageRecommendation ? (
-              <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
-                还没有包装模式结论。先运行“项目诊断”，或前往兼容页确认包装模式。
-              </div>
+              <Card className="border-amber-200 bg-amber-50 text-amber-900 shadow-none">
+                <CardContent className="p-4">
+                  还没有包装模式结论。先运行“项目诊断”，拿到包装模式建议后再继续。
+                </CardContent>
+              </Card>
             ) : null}
           </div>
 

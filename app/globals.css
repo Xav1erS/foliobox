@@ -29,6 +29,29 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.75rem;
+    --app-shell-bg: #f3f1ec;
+    --app-shell-bg-strong: #edeae2;
+    --app-shell-grid-line: rgba(17, 17, 17, 0.055);
+    --app-shell-mobile-bg: rgba(243, 241, 236, 0.95);
+    --app-sidebar-bg: rgba(248, 246, 241, 0.92);
+    --app-sidebar-border-strong: rgba(17, 17, 17, 0.95);
+    --app-sidebar-border-soft: rgba(17, 24, 39, 0.14);
+    --app-panel-bg: rgba(255, 255, 255, 0.9);
+    --app-panel-muted: rgba(247, 244, 239, 0.9);
+    --app-panel-elevated: rgba(255, 255, 255, 0.98);
+    --app-panel-header:
+      linear-gradient(180deg, rgba(252, 251, 248, 0.98), rgba(244, 240, 233, 0.84));
+    --app-border-soft: rgba(17, 24, 39, 0.16);
+    --app-border-subtle: rgba(17, 24, 39, 0.1);
+    --app-text-primary: #101114;
+    --app-text-secondary: rgba(16, 17, 20, 0.72);
+    --app-text-muted: rgba(16, 17, 20, 0.5);
+    --app-accent-bg: rgba(255, 255, 255, 0.76);
+    --app-accent-border: rgba(17, 24, 39, 0.14);
+    --app-shadow-card: 0 26px 70px -58px rgba(15, 23, 42, 0.42);
+    --app-shadow-elevated: 0 30px 90px -64px rgba(15, 23, 42, 0.48);
+    --app-radius-panel: 1.25rem;
+    --app-radius-control: 0.95rem;
   }
 
   .dark {
@@ -65,5 +88,188 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .app-shell {
+    position: relative;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--app-shell-bg);
+    color: var(--app-text-primary);
+  }
+
+  .app-shell-grid {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    opacity: 0.22;
+    background-image:
+      linear-gradient(var(--app-shell-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--app-shell-grid-line) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .app-shell-mobile-bar {
+    border-bottom: 1px solid var(--app-border-soft);
+    background: var(--app-shell-mobile-bg);
+    color: var(--app-text-primary);
+    backdrop-filter: blur(14px);
+  }
+
+  .app-sidebar {
+    position: relative;
+    display: flex;
+    height: 100%;
+    width: 15rem;
+    flex-shrink: 0;
+    flex-direction: column;
+    border-right: 2px solid var(--app-sidebar-border-strong);
+    background: var(--app-sidebar-bg);
+    backdrop-filter: blur(18px);
+  }
+
+  .app-sidebar-noise {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    opacity: 0.2;
+    background-image: radial-gradient(rgba(17, 17, 17, 0.08) 0.8px, transparent 0.8px);
+    background-size: 14px 14px;
+    mask-image: linear-gradient(180deg, black 0%, transparent 85%);
+    -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 85%);
+  }
+
+  .app-divider-strong {
+    border-color: var(--app-sidebar-border-strong);
+  }
+
+  .app-divider-soft {
+    border-color: var(--app-sidebar-border-soft);
+  }
+
+  .app-section-divider {
+    border-top: 1px solid color-mix(in srgb, var(--app-sidebar-border-strong) 62%, transparent);
+  }
+
+  .app-nav-item {
+    border: 1px solid transparent;
+    border-radius: var(--app-radius-control);
+    color: var(--app-text-secondary);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .app-nav-item:hover {
+    border-color: var(--app-border-subtle);
+    background: rgba(255, 255, 255, 0.58);
+    color: var(--app-text-primary);
+  }
+
+  .app-nav-item-active {
+    border-color: var(--app-accent-border);
+    background: var(--app-accent-bg);
+    color: var(--app-text-primary);
+  }
+
+  .app-action-primary {
+    border-radius: var(--app-radius-control);
+    box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.55);
+  }
+
+  .app-action-secondary {
+    border-radius: var(--app-radius-control);
+    border: 1px solid var(--app-border-soft);
+    background: rgba(255, 255, 255, 0.52);
+    color: var(--app-text-secondary);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .app-action-secondary:hover {
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--app-text-primary);
+  }
+
+  .app-panel {
+    border: 1px solid var(--app-border-soft);
+    border-radius: var(--app-radius-panel);
+    background: var(--app-panel-bg);
+    box-shadow: var(--app-shadow-card);
+    backdrop-filter: blur(18px);
+  }
+
+  .app-panel-muted {
+    border: 1px solid var(--app-border-soft);
+    border-radius: var(--app-radius-panel);
+    background: var(--app-panel-muted);
+  }
+
+  .app-panel-elevated {
+    border: 1px solid var(--app-border-soft);
+    border-radius: var(--app-radius-panel);
+    background: var(--app-panel-elevated);
+    box-shadow: var(--app-shadow-elevated);
+    backdrop-filter: blur(18px);
+  }
+
+  .app-panel-header {
+    background: var(--app-panel-header);
+  }
+
+  .app-text-primary {
+    color: var(--app-text-primary);
+  }
+
+  .app-text-secondary {
+    color: var(--app-text-secondary);
+  }
+
+  .app-text-muted {
+    color: var(--app-text-muted);
+  }
+
+  .app-page-eyebrow {
+    color: var(--app-text-muted);
+  }
+
+  .app-page-title {
+    color: var(--app-text-primary);
+  }
+
+  .app-page-description {
+    color: var(--app-text-secondary);
+  }
+
+  .app-empty-state {
+    border: 1px dashed var(--app-border-soft);
+    border-radius: var(--app-radius-panel);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px);
+  }
+
+  .app-empty-state-icon {
+    border: 1px solid var(--app-border-soft);
+    border-radius: var(--app-radius-control);
+    background: var(--app-shell-bg-strong);
+  }
+
+  .app-inline-tip {
+    border: 1px solid var(--app-border-soft);
+    border-radius: var(--app-radius-control);
+    background: rgba(245, 242, 236, 0.92);
+  }
+
+  .app-sticky-bar {
+    border-top: 1px solid var(--app-border-soft);
+    background: rgba(243, 241, 236, 0.95);
+    backdrop-filter: blur(14px);
   }
 }

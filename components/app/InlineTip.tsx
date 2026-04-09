@@ -9,9 +9,9 @@ export function InlineTip({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start gap-2.5 border border-neutral-300 bg-neutral-100/85 p-3.5", className)}>
-      <Info className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
-      <div className="text-xs leading-5 text-neutral-500">{children}</div>
+    <div className={cn("app-inline-tip flex items-start gap-2.5 p-3.5", className)}>
+      <Info className="app-text-muted mt-0.5 h-4 w-4 shrink-0" />
+      <div className="app-text-muted text-xs leading-5">{children}</div>
     </div>
   );
 }

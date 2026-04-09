@@ -76,7 +76,7 @@ export default function NewPortfolioPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && name.trim()) handleCreate();
                 }}
-                className="h-11 rounded-none border-neutral-300"
+                className="h-11 border-neutral-300"
                 autoFocus
               />
               <p className="text-xs text-neutral-400">
@@ -94,14 +94,14 @@ export default function NewPortfolioPage() {
       <StickyActionBar>
         <Button
           variant="outline"
-          className="h-11 rounded-none px-5"
+          className="h-11 px-5"
           onClick={() => router.back()}
           disabled={loading}
         >
           取消
         </Button>
         <Button
-          className="h-11 rounded-none px-6"
+          className="h-11 px-6"
           onClick={handleCreate}
           disabled={!name.trim() || loading}
         >

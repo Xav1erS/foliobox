@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 import { ArrowRight, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { PROJECT_STATUS_LABEL, PROJECT_STAGE_LABEL } from "@/lib/project-workflow";
 
 type ProjectCard = {
@@ -57,11 +60,10 @@ export function ProjectsCollection({
         const deleting = deletingId === project.id;
 
         return (
-          <div
+          <Card
             key={project.id}
-            className="group border border-neutral-300 bg-white/88 backdrop-blur-sm transition-colors hover:bg-white"
+            className="group overflow-hidden border-border/70 bg-card/95 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
-            {/* Cover image */}
             <div className="relative h-40 overflow-hidden border-b border-neutral-200 bg-neutral-100">
               {project.coverImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -79,50 +81,53 @@ export function ProjectsCollection({
               )}
             </div>
 
-            {/* Info */}
-            <div className="px-4 pt-4 pb-3">
-              {/* Name row */}
+            <CardContent className="space-y-4 p-5">
               <div className="flex items-start justify-between gap-2">
-                <p className="truncate text-[15px] font-semibold text-neutral-900 leading-snug">
-                  {project.name}
-                </p>
-                <span className="shrink-0 border border-neutral-200 px-2 py-0.5 text-xs font-mono text-neutral-500">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold leading-snug text-card-foreground">
+                    {project.name}
+                  </p>
+                  <p className="mt-1 text-xs font-mono text-muted-foreground">{project.updatedAt}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0 rounded-md px-2 py-0.5 font-mono text-[11px]">
                   {status.label}
-                </span>
+                </Badge>
               </div>
-              <p className="mt-1 text-xs font-mono text-neutral-400">{project.updatedAt}</p>
 
-              {/* Next step */}
-              <div className="mt-3 border-t border-neutral-100 pt-3">
-                <p className="text-xs text-neutral-400">
-                  <span className="mr-1 text-neutral-300">—</span>
-                  {project.nextStep.label}
-                </p>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                    下一步
+                  </p>
+                  <p className="mt-1 text-sm text-foreground/88">
+                    {project.nextStep.label}
+                  </p>
+                </div>
                 {project.stageSummary ? (
-                  <p className="mt-0.5 text-xs leading-5 text-neutral-400">{project.stageSummary}</p>
+                  <p className="text-sm leading-6 text-muted-foreground">{project.stageSummary}</p>
                 ) : null}
               </div>
-            </div>
+            </CardContent>
 
-            {/* Actions */}
-            <div className="flex items-center border-t border-neutral-200 px-4 py-3">
-              <Link
-                href={project.nextStep.href}
-                className="flex flex-1 items-center gap-1.5 text-sm font-medium text-neutral-900 hover:text-neutral-600"
-              >
-                继续
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
+            <Separator />
+
+            <CardFooter className="flex items-center justify-between p-4">
+              <Button asChild variant="ghost" className="h-9 px-0 text-sm font-medium text-foreground hover:bg-transparent hover:text-foreground">
+                <Link href={project.nextStep.href}>
+                  继续编辑
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </Button>
               <button
                 type="button"
                 disabled={deleting}
                 onClick={() => handleDelete(project.id, project.name)}
-                className="flex h-8 w-8 items-center justify-center text-neutral-300 transition-colors hover:text-neutral-600 disabled:opacity-40"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
               >
-                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </button>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
         );
       })}
     </div>

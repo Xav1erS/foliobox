@@ -9,6 +9,9 @@ import {
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 export default async function PortfoliosPage() {
   const session = await getRequiredSession("/portfolios");
@@ -23,9 +26,9 @@ export default async function PortfoliosPage() {
       <PageHeader
         eyebrow="Portfolios"
         title="我的作品集"
-        description="每份作品集是一个独立的组装对象。选入 Project、确认结构、生成前后页、修改并发布。"
+        description="每份作品集都是一个独立组装对象。你会在里面选入项目、确认结构、生成包装、发布与导出。"
         actions={
-          <Button asChild className="h-11 rounded-none px-5">
+          <Button asChild className="h-11 px-5">
             <Link href="/portfolios/new">
               <PlusCircle className="mr-2 h-4 w-4" />
               新建作品集
@@ -35,45 +38,55 @@ export default async function PortfoliosPage() {
       />
 
       {/* 2px structural divider */}
-      <div className="mt-6 -mx-6 border-t-2 border-black" />
+      <div className="app-section-divider mt-6 -mx-6" />
 
       <div className="mt-6">
         {portfolios.length === 0 ? (
           <EmptyState
             icon={<BookOpen className="h-6 w-6 text-neutral-400" />}
             title="还没有作品集"
-            description="作品集是把多个项目组装成一份完整作品集的地方。先把项目做到可进入作品集阶段，再来这里创建。"
+            description="作品集负责把多个项目收成一个完整输出对象。先准备好项目池，或者直接新建一份空白作品集开始组装。"
             action={
               <div className="flex flex-col items-center gap-3 sm:flex-row">
-                <Button asChild className="h-11 rounded-none px-5">
+                <Button asChild className="h-11 px-5">
                   <Link href="/portfolios/new">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     新建作品集
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="h-11 rounded-none px-5">
+                <Button asChild variant="outline" className="h-11 px-5">
                   <Link href="/projects">先去整理项目</Link>
                 </Button>
               </div>
             }
           />
         ) : (
-          <div>
-            {/* Meta row */}
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
-                全部作品集 · {portfolios.length} 份
-              </p>
-              {portfolios[0] && portfolios[0].status !== "DRAFT" ? (
-                <Link
-                  href={getPortfolioContinuePath(portfolios[0]).href}
-                  className="group inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900"
-                >
-                  继续：{portfolios[0].name}
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              ) : null}
-            </div>
+          <div className="space-y-6">
+            <Card className="border-border/70 bg-card/95 shadow-sm">
+              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                      全部作品集
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">{portfolios.length} 份</span>
+                  </div>
+                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                    作品集阶段只保留 editor、publish 和 print 主链路。旧的结构兼容页已经退出实际工作流程。
+                  </p>
+                </div>
+                {portfolios[0] ? (
+                  <Button asChild variant="outline" className="h-10 px-4">
+                    <Link href={getPortfolioContinuePath(portfolios[0]).href}>
+                      继续最近：{portfolios[0].name}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Separator />
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {portfolios.map((portfolio) => {
@@ -82,38 +95,52 @@ export default async function PortfoliosPage() {
                 const projectCount = portfolio.projectIds.length;
 
                 return (
-                  <Link
+                  <Card
                     key={portfolio.id}
-                    href={continuePath.href}
-                    className="group relative flex flex-col border border-neutral-300 bg-white/88 p-5 backdrop-blur-sm transition-colors hover:bg-white"
+                    className="group border-border/70 bg-card/95 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
-                    <span className="absolute left-0 top-0 h-full w-[2px] bg-transparent transition-colors group-hover:bg-brand-red" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[15px] font-medium text-neutral-900">
-                          {portfolio.name}
-                        </p>
-                        <p className="mt-1 text-xs font-mono text-neutral-400">
-                          {portfolio.updatedAt.toLocaleDateString("zh-CN", {
-                            month: "short",
-                            day: "numeric",
-                          })} 更新
-                        </p>
+                    <CardContent className="space-y-4 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-semibold text-card-foreground">
+                            {portfolio.name}
+                          </p>
+                          <p className="mt-1 text-xs font-mono text-muted-foreground">
+                            {portfolio.updatedAt.toLocaleDateString("zh-CN", {
+                              month: "short",
+                              day: "numeric",
+                            })} 更新
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                          {statusLabel}
+                        </Badge>
                       </div>
-                      <span className="shrink-0 border border-neutral-200 px-2 py-0.5 text-xs font-mono uppercase tracking-wide text-neutral-500">
-                        {statusLabel}
-                      </span>
-                    </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-4">
-                      <p className="text-xs text-neutral-500">
-                        {projectCount > 0
-                          ? `已选入 ${projectCount} 个项目`
-                          : "尚未选入项目"}
-                      </p>
-                      <ArrowRight className="h-3.5 w-3.5 text-neutral-400 transition-transform group-hover:translate-x-0.5" />
-                    </div>
-                  </Link>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                            项目池
+                          </p>
+                          <p className="mt-1 text-sm text-foreground/88">
+                            {projectCount > 0 ? `已选入 ${projectCount} 个项目` : "尚未选入项目"}
+                          </p>
+                        </div>
+                        <p className="text-sm leading-6 text-muted-foreground">{continuePath.label}</p>
+                      </div>
+                    </CardContent>
+
+                    <Separator />
+
+                    <CardFooter className="p-4">
+                      <Button asChild variant="ghost" className="h-9 px-0 text-sm font-medium hover:bg-transparent">
+                        <Link href={continuePath.href}>
+                          继续编辑
+                          <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 );
               })}
             </div>

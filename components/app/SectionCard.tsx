@@ -16,14 +16,14 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "border border-neutral-300 bg-white shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]",
+        "app-panel",
         className
       )}
     >
       {(title || description) && (
-        <div className="border-b border-neutral-300 bg-[linear-gradient(180deg,_rgba(250,250,249,0.96),_rgba(245,245,244,0.82))] px-6 py-5">
-          {title ? <h2 className="text-[15px] font-semibold text-neutral-900">{title}</h2> : null}
-          {description ? <p className="mt-1 text-sm leading-5 text-neutral-500">{description}</p> : null}
+        <div className="app-divider-soft app-panel-header border-b px-6 py-5">
+          {title ? <h2 className="app-text-primary text-[15px] font-semibold">{title}</h2> : null}
+          {description ? <p className="app-text-muted mt-1 text-sm leading-5">{description}</p> : null}
         </div>
       )}
       <div className={cn("p-6", contentClassName)}>{children}</div>

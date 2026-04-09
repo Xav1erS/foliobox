@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { ProfileForm } from "@/components/app/ProfileForm";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ResumeContextBanner } from "@/components/app/ResumeContextBanner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
   getEntitlementSummary,
   getQuotaStatus,
@@ -53,188 +57,172 @@ export default async function ProfilePage({
   ].filter(Boolean).length;
 
   return (
-    <div className="px-6 py-10">
+    <div className="space-y-6 px-6 py-10">
       <PageHeader
         eyebrow="PROFILE"
         title="设计师档案"
         description="这些信息会作为 AI 输入，影响作品集中的自我定位、强调重点和整体叙述语气。"
       />
 
-      {/* 2px structural divider */}
-      <div className="mt-6 -mx-6 border-t-2 border-black" />
+      <Separator className="-mx-6 w-auto" />
 
-      {/* From-score banner */}
       {fromScore && (
-        <div className="border-b border-neutral-200 py-5">
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="p-5">
           <ResumeContextBanner>
             你是从评分结果回到这里的。先补充当前职位、经验年限、擅长方向与目标岗位，再去整理项目，会让后续生成结果更贴近你的求职方向。
           </ResumeContextBanner>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="grid gap-3 pt-6 md:grid-cols-3">
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Profile Readiness
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             {profileReadiness}
           </p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             当前已写入的定位、方向和表达偏好数量。
           </p>
-        </div>
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Plan
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             {planDefinition.displayName}
           </p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             当前套餐会直接影响高成本动作的剩余额度。
           </p>
-        </div>
-        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-foreground text-background shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
             Why It Matters
           </p>
           <p className="mt-2 text-base font-medium leading-7">
             档案越清楚，后续项目和作品集生成就越贴近你真实的投递方向。
           </p>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* 01 基础资料 & 02 求职方向 — editable form */}
-      <div className="pt-6">
-        <ProfileForm initialData={profile} />
-      </div>
+      <ProfileForm initialData={profile} />
 
-      {/* 2px divider before billing sections */}
-      <div className="-mx-6 border-t-2 border-black" />
+      <Separator className="-mx-6 w-auto" />
 
-      {/* 03 当前方案与权益 */}
-      <div className="py-6">
-        <p className="mb-5 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
-          当前方案与权益
-        </p>
-
-        <div className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
-          {/* Plan header */}
-          <div className="border-b border-neutral-300 px-6 py-5">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <p className="text-xl font-bold tracking-tight text-neutral-900">
-                  {entitlementSummary.title}
-                </p>
-                <p className="mt-1 text-xs font-mono uppercase tracking-[0.12em] text-neutral-400">
-                  {planDefinition.displayName}
-                </p>
-                <p className="mt-2 text-sm leading-5 text-neutral-500">
-                  {entitlementSummary.description}
-                </p>
-                {userPlan?.expiresAt && (
-                  <p className="mt-2 text-xs font-mono text-neutral-400">
-                    有效期至 {formatProjectDate(userPlan.expiresAt)}
-                  </p>
-                )}
-              </div>
-              {currentPlan === "FREE" && (
-                <Link
-                  href="/pricing"
-                  className="group shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-neutral-900 underline-offset-2 hover:underline"
-                >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  查看升级方案
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              )}
+      <Card className="border-border/70 bg-card/95 shadow-sm">
+        <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                当前方案与权益
+              </Badge>
             </div>
+            <CardTitle className="text-xl">{entitlementSummary.title}</CardTitle>
+            <CardDescription className="text-sm leading-6">
+              {entitlementSummary.description}
+            </CardDescription>
+            {userPlan?.expiresAt ? (
+              <p className="text-xs font-mono text-muted-foreground">
+                有效期至 {formatProjectDate(userPlan.expiresAt)}
+              </p>
+            ) : null}
           </div>
-
-          {/* Abilities */}
-          <div className="px-6 py-5">
-            <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+          {currentPlan === "FREE" ? (
+            <Button asChild variant="outline" className="h-10 px-4">
+              <Link href="/pricing">
+                <CreditCard className="mr-2 h-4 w-4" />
+                查看升级方案
+              </Link>
+            </Button>
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
               已解锁能力
             </p>
             <ul className="space-y-2">
               {planDefinition.featureList.map((ability) => (
                 <li
                   key={ability}
-                  className="flex items-center gap-2.5 text-sm text-neutral-700"
+                  className="flex items-center gap-2.5 text-sm text-foreground/88"
                 >
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" />
                   {ability}
                 </li>
               ))}
             </ul>
-
-            <div className="mt-5 border-t border-neutral-200 pt-5">
-              <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
-                当前额度
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {QUOTA_DISPLAY_ORDER.map((key) => {
-                  const quota = entitlementSummary.quotas[key];
-                  return (
-                    <div key={key} className="border border-neutral-200 bg-neutral-50 px-3 py-3">
-                      <p className="text-xs font-mono uppercase tracking-[0.12em] text-neutral-400">
-                        {quota.label}
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-neutral-900">
-                        {formatQuotaUsageValue(key, quota)}
-                      </p>
-                      <p className="mt-1 text-xs text-neutral-500">
-                        已用 {quota.used} · 剩余 {quota.remaining}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
-        </div>
-      </div>
 
-      {/* 1px divider */}
-      <div className="-mx-6 border-t border-neutral-300" />
+          <Separator />
 
-      {/* 04 处理预算 */}
-      <div className="py-6">
-        <p className="mb-5 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
-          处理预算
-        </p>
-
-        <div className="border border-neutral-300 bg-white/88 backdrop-blur-sm">
-          {/* Budget status */}
-          <div className="border-b border-neutral-300 px-6 py-5">
-            <div className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${quotaStatusClass}`} />
-              <span className="text-sm font-medium text-neutral-900">{quotaStatus.label}</span>
-            </div>
-            <p className="mt-2 text-sm leading-5 text-neutral-500">
-              {quotaStatus.description}
+          <div>
+            <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
+              当前额度
             </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {QUOTA_DISPLAY_ORDER.map((key) => {
+                const quota = entitlementSummary.quotas[key];
+                return (
+                  <div key={key} className="rounded-xl border border-border/70 bg-background px-4 py-3">
+                    <p className="text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                      {quota.label}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {formatQuotaUsageValue(key, quota)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      已用 {quota.used} · 剩余 {quota.remaining}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Recent records */}
-          <div className="px-6 py-5">
-            <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+      <Card className="border-border/70 bg-card/95 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${quotaStatusClass}`} />
+            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+              处理预算
+            </Badge>
+          </div>
+          <CardTitle className="text-xl">{quotaStatus.label}</CardTitle>
+          <CardDescription className="text-sm leading-6">
+            {quotaStatus.description}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="mb-3 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
               当前使用情况
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {QUOTA_DISPLAY_ORDER.map((key) => {
                 const quota = entitlementSummary.quotas[key];
                 return (
-                  <div key={key} className="border border-neutral-200 px-4 py-4">
+                  <div key={key} className="rounded-xl border border-border/70 bg-background px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-neutral-900">{quota.label}</p>
-                        <p className="mt-1 text-xs text-neutral-500">
+                        <p className="text-sm font-medium text-foreground">{quota.label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           总额度 {quota.limit} · 已用 {quota.used}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-neutral-900">
+                      <p className="text-sm font-semibold text-foreground">
                         剩余 {quota.remaining}
                       </p>
                     </div>
@@ -242,12 +230,12 @@ export default async function ProfilePage({
                 );
               })}
             </div>
-            <p className="mt-4 text-xs leading-5 text-neutral-400">
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">
               更细的动作明细和账期记录还没接入；当前这里展示的是基于对象与任务记录实时推导的剩余额度。
             </p>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 function Skel({ className }: { className: string }) {
-  return <Skeleton className={`rounded-none ${className}`} />;
+  return <Skeleton className={`rounded-xl ${className}`} />;
 }
 
 export default function AppLoading() {

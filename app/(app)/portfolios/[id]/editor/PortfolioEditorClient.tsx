@@ -15,8 +15,11 @@ import {
   Wand2,
   X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -25,13 +28,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   EditorCanvasChip,
+  EditorChromeButton,
+  EditorEmptyState,
+  editorFieldClass,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
+  EditorStripButton,
   EditorSurfaceButton,
+  EditorTabsList,
+  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import type {
   ObjectActionQuota,
@@ -130,6 +139,20 @@ function pageRoleLabel(role: string) {
   if (role === "closing") return "结尾页";
   if (role === "project_case") return "项目案例";
   return role;
+}
+
+function EditorPanelCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={cn("border-white/10 bg-white/[0.03] text-white shadow-none", className)}>
+      <CardContent className="p-4">{children}</CardContent>
+    </Card>
+  );
 }
 
 export function PortfolioEditorClient({
@@ -531,15 +554,14 @@ export function PortfolioEditorClient({
           </Button>
         }
         secondaryAction={
-          <Button
-            variant="outline"
-            className="h-9 border-white/10 bg-white/[0.03] px-4 text-white hover:bg-white/[0.08] hover:text-white"
+          <EditorChromeButton
+            className="h-9 px-4"
             onClick={handleRunDiagnosis}
             disabled={diagnosing}
           >
             {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             作品集诊断
-          </Button>
+          </EditorChromeButton>
         }
         planSummary={planSummary}
         leftRailLabel="Structure / Pages"
@@ -547,17 +569,17 @@ export function PortfolioEditorClient({
         leftRail={
           <Tabs defaultValue="structure" className="flex h-full flex-col">
             <div className="border-b border-white/10 p-3">
-              <TabsList className="grid w-full grid-cols-3 rounded-lg bg-white/[0.04] p-1">
-                <TabsTrigger value="structure" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+              <EditorTabsList className="grid w-full grid-cols-3">
+                <EditorTabsTrigger value="structure">
                   结构
-                </TabsTrigger>
-                <TabsTrigger value="projects" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="projects">
                   项目
-                </TabsTrigger>
-                <TabsTrigger value="pages" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="pages">
                   页面
-                </TabsTrigger>
-              </TabsList>
+                </EditorTabsTrigger>
+              </EditorTabsList>
             </div>
 
             <TabsContent value="structure" className="mt-0 flex-1 overflow-y-auto">
@@ -567,7 +589,7 @@ export function PortfolioEditorClient({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="作品集名称"
-                    className="h-10 border-white/10 bg-white/[0.03] text-white placeholder:text-white/28"
+                    className={cn("h-10", editorFieldClass)}
                   />
                   <Button
                     variant="outline"
@@ -592,10 +614,10 @@ export function PortfolioEditorClient({
               <EditorRailSection title="结构检查">
                 <div className="space-y-2">
                   {structureChecklist.map((item) => (
-                    <div
+                    <EditorPanelCard
                       key={item.label}
                       className={cn(
-                        "rounded-xl border px-3 py-3",
+                        "",
                         item.done
                           ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
                           : "border-white/10 bg-white/[0.03] text-white/72"
@@ -608,7 +630,7 @@ export function PortfolioEditorClient({
                         </p>
                       </div>
                       <p className="mt-2 text-sm leading-6 opacity-80">{item.detail}</p>
-                    </div>
+                    </EditorPanelCard>
                   ))}
                 </div>
               </EditorRailSection>
@@ -616,26 +638,23 @@ export function PortfolioEditorClient({
               <EditorRailSection title="固定页">
                 <div className="space-y-2">
                   {fixedPages.map((page) => (
-                    <button
+                    <EditorSurfaceButton
                       key={page.id}
-                      type="button"
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition-colors",
-                        page.enabled
-                          ? "border-sky-400/35 bg-sky-400/10 text-white"
-                          : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
-                      )}
+                      active={page.enabled}
+                      className={page.enabled ? "border-sky-400/35" : undefined}
                       onClick={() => handleToggleFixedPage(page.id)}
                       disabled={updatingStructure}
                     >
-                      <div>
-                        <p className="text-sm font-medium">{page.label}</p>
-                        <p className="mt-1 text-xs opacity-70">
-                          {page.enabled ? "已启用" : "当前关闭"}
-                        </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{page.label}</p>
+                          <p className="mt-1 text-xs opacity-70">
+                            {page.enabled ? "已启用" : "当前关闭"}
+                          </p>
+                        </div>
+                        {page.enabled ? <Check className="h-4 w-4" /> : null}
                       </div>
-                      {page.enabled ? <Check className="h-4 w-4" /> : null}
-                    </button>
+                    </EditorSurfaceButton>
                   ))}
                 </div>
               </EditorRailSection>
@@ -646,54 +665,45 @@ export function PortfolioEditorClient({
                 <div className="space-y-2">
                   {selectedProjects.length > 0 ? (
                     selectedProjects.map((project) => (
-                      <div
-                        key={project.id}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
-                      >
+                      <EditorPanelCard key={project.id} className="bg-white/[0.02]">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-white">{project.name}</p>
                             <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
+                            <EditorChromeButton
                               size="icon"
-                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              className="h-8 w-8"
                               onClick={() => handleMoveProject(project.id, "up")}
                               disabled={updatingStructure}
                             >
                               <ArrowUp className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
+                            </EditorChromeButton>
+                            <EditorChromeButton
                               size="icon"
-                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              className="h-8 w-8"
                               onClick={() => handleMoveProject(project.id, "down")}
                               disabled={updatingStructure}
                             >
                               <ArrowDown className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
+                            </EditorChromeButton>
+                            <EditorChromeButton
                               size="icon"
-                              className="h-8 w-8 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white"
+                              className="h-8 w-8"
                               onClick={() => handleToggleProject(project.id)}
                               disabled={updatingStructure}
                             >
                               <X className="h-3.5 w-3.5" />
-                            </Button>
+                            </EditorChromeButton>
                           </div>
                         </div>
-                      </div>
+                      </EditorPanelCard>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                    <EditorEmptyState>
                       还没有选入项目。先从下面加入 2-4 个最能代表能力面的项目。
-                    </div>
+                    </EditorEmptyState>
                   )}
                 </div>
               </EditorRailSection>
@@ -702,10 +712,9 @@ export function PortfolioEditorClient({
                 <div className="space-y-2">
                   {availableProjects.length > 0 ? (
                     availableProjects.map((project) => (
-                      <button
+                      <EditorSurfaceButton
                         key={project.id}
-                        type="button"
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left text-white/72 transition-colors hover:bg-white/[0.05]"
+                        className="flex items-center justify-between"
                         onClick={() => handleToggleProject(project.id)}
                         disabled={updatingStructure}
                       >
@@ -714,12 +723,12 @@ export function PortfolioEditorClient({
                           <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
                         </div>
                         <Plus className="h-4 w-4 shrink-0 text-white/46" />
-                      </button>
+                      </EditorSurfaceButton>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                    <EditorEmptyState>
                       所有可用项目都已经在当前作品集里了。
-                    </div>
+                    </EditorEmptyState>
                   )}
                 </div>
               </EditorRailSection>
@@ -745,9 +754,9 @@ export function PortfolioEditorClient({
                       </EditorSurfaceButton>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46">
+                    <EditorEmptyState>
                       还没有页面结构。先选项目并运行作品集诊断。
-                    </div>
+                    </EditorEmptyState>
                   )}
                 </div>
               </EditorRailSection>
@@ -756,13 +765,10 @@ export function PortfolioEditorClient({
                 {aiHistory.length > 0 ? (
                   <div className="space-y-2">
                     {aiHistory.map((item) => (
-                      <div
-                        key={item.key}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
-                      >
+                      <EditorPanelCard key={item.key} className="bg-white/[0.02]">
                         <p className="text-sm font-medium text-white">{item.label}</p>
                         <p className="mt-1 text-xs leading-5 text-white/46">{item.summary}</p>
-                      </div>
+                      </EditorPanelCard>
                     ))}
                   </div>
                 ) : (
@@ -912,14 +918,14 @@ export function PortfolioEditorClient({
         rightRail={
           <Tabs defaultValue="inspector" className="flex h-full flex-col">
             <div className="border-b border-white/10 p-3">
-              <TabsList className="grid w-full grid-cols-2 rounded-lg bg-white/[0.04] p-1">
-                <TabsTrigger value="inspector" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+              <EditorTabsList className="grid w-full grid-cols-2">
+                <EditorTabsTrigger value="inspector">
                   Inspector
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900">
+                </EditorTabsTrigger>
+                <EditorTabsTrigger value="ai">
                   AI
-                </TabsTrigger>
-              </TabsList>
+                </EditorTabsTrigger>
+              </EditorTabsList>
             </div>
 
             <TabsContent value="inspector" className="mt-0 flex-1 overflow-y-auto">
@@ -934,10 +940,10 @@ export function PortfolioEditorClient({
                         { label: "建议页数", value: selectedCanvasItem.pageCountSuggestion },
                       ]}
                     />
-                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <EditorPanelCard className="mt-4">
                       <p className="text-sm font-medium text-white">{selectedCanvasItem.title}</p>
                       <p className="mt-2 text-sm leading-6 text-white/56">{selectedCanvasItem.summary}</p>
-                    </div>
+                    </EditorPanelCard>
                   </>
                 ) : (
                   <p className="text-sm leading-6 text-white/46">
@@ -959,7 +965,7 @@ export function PortfolioEditorClient({
 
               <EditorRailSection title="关联项目">
                 {selectedCanvasProject ? (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <EditorPanelCard>
                     <p className="text-sm font-medium text-white">{selectedCanvasProject.name}</p>
                     <p className="mt-2 text-sm leading-6 text-white/56">
                       {selectedCanvasProject.layout?.narrativeSummary ??
@@ -967,7 +973,7 @@ export function PortfolioEditorClient({
                         selectedCanvasProject.background ??
                         "当前项目还没有稳定摘要，建议先回项目编辑器补齐项目结论。"}
                     </p>
-                  </div>
+                  </EditorPanelCard>
                 ) : (
                   <p className="text-sm leading-6 text-white/46">
                     当前选中的是固定页，它不对应具体项目。
@@ -978,28 +984,28 @@ export function PortfolioEditorClient({
 
             <TabsContent value="ai" className="mt-0 flex-1 overflow-y-auto">
               <EditorRailSection title="Current Conclusion">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                <EditorPanelCard>
                   <p className="text-sm leading-7 text-white/74">
                     {packaging?.narrativeSummary ??
                       diagnosis?.summary ??
                       "先运行作品集诊断，系统会判断当前项目组合、固定页和整体节奏是否足以进入整份包装。"}
                   </p>
-                </div>
+                </EditorPanelCard>
               </EditorRailSection>
 
               <EditorRailSection title="AI 结果">
                 {diagnosis ? (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <EditorPanelCard>
                       <p className="text-sm font-medium text-white">
                         作品集诊断 · {portfolioVerdictLabel(diagnosis.overallVerdict)}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-white/56">{diagnosis.summary}</p>
-                    </div>
+                    </EditorPanelCard>
                     {diagnosis.suggestions.map((suggestion) => (
-                      <div key={suggestion} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                      <EditorPanelCard key={suggestion} className="bg-white/[0.02]">
                         <p className="text-sm leading-6 text-white/56">{suggestion}</p>
-                      </div>
+                      </EditorPanelCard>
                     ))}
                   </div>
                 ) : (
@@ -1013,10 +1019,10 @@ export function PortfolioEditorClient({
                 {aiHistory.length > 0 ? (
                   <div className="space-y-2">
                     {aiHistory.map((item) => (
-                      <div key={item.key} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                      <EditorPanelCard key={item.key} className="bg-white/[0.02]">
                         <p className="text-sm font-medium text-white">{item.label}</p>
                         <p className="mt-1 text-sm leading-6 text-white/56">{item.summary}</p>
-                      </div>
+                      </EditorPanelCard>
                     ))}
                   </div>
                 ) : (
@@ -1036,13 +1042,6 @@ export function PortfolioEditorClient({
                     打开发布与导出页
                     <ArrowRight className="h-3.5 w-3.5 text-white/34" />
                   </Link>
-                  <Link
-                    href={`/portfolios/${initialData.id}/outline`}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white"
-                  >
-                    打开结构兼容页
-                    <ArrowRight className="h-3.5 w-3.5 text-white/34" />
-                  </Link>
                 </div>
               </EditorRailSection>
             </TabsContent>
@@ -1052,28 +1051,23 @@ export function PortfolioEditorClient({
           <div className="flex gap-2 overflow-x-auto">
             {pages.length > 0 ? (
               pages.map((page, index) => (
-                <button
+                <EditorStripButton
                   key={page.id}
-                  type="button"
                   onClick={() => setSelectedCanvasItemId(page.id)}
-                  className={cn(
-                    "w-44 shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
-                    selectedCanvasItem?.id === page.id
-                      ? "border-sky-400/70 bg-sky-400/10 text-white"
-                      : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]"
-                  )}
+                  active={selectedCanvasItem?.id === page.id}
+                  className="w-44"
                 >
                   <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
                     Page {index + 1}
                   </p>
                   <p className="mt-2 truncate text-sm font-medium">{page.title}</p>
                   <p className="mt-1 text-xs opacity-70">{page.pageCountSuggestion}</p>
-                </button>
+                </EditorStripButton>
               ))
             ) : (
-              <div className="flex h-20 min-w-full items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] text-sm text-white/40">
+              <EditorEmptyState className="flex h-20 min-w-full items-center justify-center py-0 text-white/40">
                 这里会承接整份作品集的页面条。
-              </div>
+              </EditorEmptyState>
             )}
           </div>
         }
@@ -1086,7 +1080,7 @@ export function PortfolioEditorClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="rounded-none">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>生成作品集包装</DialogTitle>
             <DialogDescription>
@@ -1095,7 +1089,18 @@ export function PortfolioEditorClient({
           </DialogHeader>
 
           <div className="space-y-3 text-sm text-neutral-600">
-            <div className="border border-neutral-200 bg-neutral-50 px-4 py-3">
+            <Card className="shadow-none">
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                    预检
+                  </Badge>
+                  {generatePrecheck?.suggestedMode === "reuse" ? (
+                    <Badge variant="outline" className="rounded-full">
+                      可复用
+                    </Badge>
+                  ) : null}
+                </div>
               {checkingPrecheck ? (
                 <div className="flex items-center gap-2 text-neutral-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1117,12 +1122,21 @@ export function PortfolioEditorClient({
               ) : (
                 <p>点击生成前会先检查当前输入是否命中复用，以及会不会计次。</p>
               )}
-            </div>
-            <div className="border border-neutral-200 bg-white px-4 py-3">
-              <p>已选项目：{selectedProjects.length} 个</p>
-              <p className="mt-1">已启用固定页：{fixedPages.filter((page) => page.enabled).length} 个</p>
-            </div>
-            <div className="border border-neutral-200 bg-white px-4 py-4">
+              </CardContent>
+            </Card>
+            <Card className="shadow-none">
+              <CardContent className="space-y-3 p-4">
+                <Badge variant="secondary" className="w-fit rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  当前上下文
+                </Badge>
+                <div className="space-y-1">
+                  <p>已选项目：{selectedProjects.length} 个</p>
+                  <p>已启用固定页：{fixedPages.filter((page) => page.enabled).length} 个</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-none">
+              <CardContent className="p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-neutral-900">风格参考</p>
@@ -1135,13 +1149,15 @@ export function PortfolioEditorClient({
                 </Button>
               </div>
 
+              <Separator className="my-4" />
+
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <button
                   type="button"
-                  className={`border px-3 py-3 text-left ${
+                  className={`rounded-xl border px-3 py-3 text-left transition-colors ${
                     styleSelection.source === "none"
-                      ? "border-neutral-900 bg-neutral-50"
-                      : "border-neutral-200 bg-white"
+                      ? "border-neutral-900 bg-neutral-100"
+                      : "border-neutral-200 bg-white hover:border-neutral-300"
                   }`}
                   onClick={() => setStyleSelection({ source: "none" })}
                 >
@@ -1154,11 +1170,11 @@ export function PortfolioEditorClient({
                   <button
                     key={preset.key}
                     type="button"
-                    className={`border px-3 py-3 text-left ${
+                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
                       styleSelection.source === "preset" &&
                       styleSelection.presetKey === preset.key
-                        ? "border-neutral-900 bg-neutral-50"
-                        : "border-neutral-200 bg-white"
+                        ? "border-neutral-900 bg-neutral-100"
+                        : "border-neutral-200 bg-white hover:border-neutral-300"
                     }`}
                     onClick={() =>
                       setStyleSelection({ source: "preset", presetKey: preset.key })
@@ -1181,11 +1197,11 @@ export function PortfolioEditorClient({
                     <button
                       key={set.id}
                       type="button"
-                      className={`flex w-full items-start justify-between border px-3 py-3 text-left ${
+                      className={`flex w-full items-start justify-between rounded-xl border px-3 py-3 text-left transition-colors ${
                         styleSelection.source === "reference_set" &&
                         styleSelection.referenceSetId === set.id
-                          ? "border-neutral-900 bg-neutral-50"
-                          : "border-neutral-200 bg-white"
+                          ? "border-neutral-900 bg-neutral-100"
+                          : "border-neutral-200 bg-white hover:border-neutral-300"
                       }`}
                       onClick={() =>
                         setStyleSelection({
@@ -1209,11 +1225,14 @@ export function PortfolioEditorClient({
                   ))}
                 </div>
               ) : null}
-            </div>
+              </CardContent>
+            </Card>
             {selectedProjects.length === 0 ? (
-              <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
-                当前还没有选入项目，无法生成作品集包装。
-              </div>
+              <Card className="border-amber-200 bg-amber-50 text-amber-900 shadow-none">
+                <CardContent className="p-4">
+                  当前还没有选入项目，无法生成作品集包装。
+                </CardContent>
+              </Card>
             ) : null}
           </div>
 

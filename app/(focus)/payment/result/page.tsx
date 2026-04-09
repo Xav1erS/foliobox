@@ -31,7 +31,7 @@ export default async function PaymentResultPage({
   function buildReturnPath(): string {
     const { projectId } = orderData;
     if (projectId) {
-      return `/projects/${projectId}/layout`;
+      return `/projects/${projectId}/editor`;
     }
     return "/dashboard";
   }

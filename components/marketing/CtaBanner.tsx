@@ -7,7 +7,7 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
     : { href: "/score", label: "先看看现在能不能投" };
   const secondaryAction = isLoggedIn
     ? getHeroSecondaryAction(isLoggedIn)
-    : { href: "/login?next=/projects/new", label: "开始整理第一版" };
+    : { href: "/login?next=/projects?create=1", label: "开始整理第一版" };
 
   return (
     <section className="relative overflow-hidden border-y border-white/8 px-6 py-20">

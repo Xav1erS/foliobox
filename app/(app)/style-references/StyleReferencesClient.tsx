@@ -6,8 +6,11 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { STYLE_PRESETS } from "@/lib/style-reference-presets";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
 type StyleReferenceSetRecord = {
@@ -84,43 +87,53 @@ export function StyleReferencesClient({
   return (
     <div className="space-y-8">
       <section className="grid gap-3 md:grid-cols-3">
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             My Sets
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">{sets.length}</p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{sets.length}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             你自己的图组会在项目排版和作品集包装前作为样式约束被选择。
           </p>
-        </div>
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Presets
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             {STYLE_PRESETS.length}
           </p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             系统预制风格更适合快速定调，先判断整份节奏是否合适。
           </p>
-        </div>
-        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-foreground text-background shadow-sm">
+          <CardContent className="p-5">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
             Usage
           </p>
           <p className="mt-2 text-base font-medium leading-7">
             风格参考只影响视觉语言、标题层级和版面密度，不会改动项目边界和讲述顺序。
           </p>
-        </div>
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="grid gap-4 border border-neutral-300 bg-white p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)] lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="border border-neutral-300 bg-[linear-gradient(135deg,_rgba(250,250,249,0.98),_rgba(244,244,245,0.92))] px-5 py-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+      <section>
+        <Card className="border-border/70 bg-card/95 shadow-sm">
+          <CardContent className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-xl border border-border/70 bg-muted/35 px-5 py-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
             Upload Set
-          </p>
-          <p className="mt-2 text-lg font-semibold text-neutral-900">上传参考图组</p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+            </Badge>
+          </div>
+          <p className="mt-2 text-lg font-semibold text-foreground">上传参考图组</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             一次上传一组风格图。推荐把排版气质接近、颜色和版面密度一致的图片放在同一组里，这样生成时更稳定。
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -136,31 +149,31 @@ export function StyleReferencesClient({
             />
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="border border-neutral-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-neutral-900">建议数量</p>
-              <p className="mt-1 text-sm leading-6 text-neutral-500">3-8 张，风格尽量统一。</p>
+            <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <p className="text-sm font-medium text-foreground">建议数量</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">3-8 张，风格尽量统一。</p>
             </div>
-            <div className="border border-neutral-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-neutral-900">适合内容</p>
-              <p className="mt-1 text-sm leading-6 text-neutral-500">封面、目录、内容页和结尾页参考。</p>
+            <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <p className="text-sm font-medium text-foreground">适合内容</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">封面、目录、内容页和结尾页参考。</p>
             </div>
-            <div className="border border-neutral-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-neutral-900">不会影响</p>
-              <p className="mt-1 text-sm leading-6 text-neutral-500">项目顺序、页面结构与事实判断。</p>
+            <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <p className="text-sm font-medium text-foreground">不会影响</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">项目顺序、页面结构与事实判断。</p>
             </div>
           </div>
         </div>
 
-        <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center border border-dashed border-neutral-300 bg-neutral-50 px-5 py-5 text-center transition-colors hover:border-neutral-500 hover:bg-white">
+        <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/25 px-5 py-5 text-center transition-colors hover:border-foreground/30 hover:bg-background">
           {uploading || saving ? (
-            <Loader2 className="h-5 w-5 animate-spin text-neutral-500" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           ) : (
-            <ImagePlus className="h-5 w-5 text-neutral-500" />
+            <ImagePlus className="h-5 w-5 text-muted-foreground" />
           )}
-          <p className="mt-3 text-sm font-medium text-neutral-900">
+          <p className="mt-3 text-sm font-medium text-foreground">
             上传参考图组
           </p>
-          <p className="mt-1 text-xs leading-5 text-neutral-500">
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             支持 JPG / PNG / WebP，建议一次上传 3–8 张
           </p>
           <input
@@ -171,23 +184,25 @@ export function StyleReferencesClient({
             onChange={handleCreate}
           />
         </label>
+          </CardContent>
+        </Card>
       </section>
 
       {message ? (
-        <div className="border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <div className="rounded-xl border border-border/70 bg-muted/35 px-4 py-3 text-sm text-muted-foreground">
           {message}
         </div>
       ) : null}
 
       <section>
-        <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+        <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
           系统预制风格
         </p>
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           {STYLE_PRESETS.map((preset) => (
-            <div
+            <Card
               key={preset.key}
-              className="overflow-hidden border border-neutral-300 bg-white shadow-[0_24px_60px_-54px_rgba(15,23,42,0.32)]"
+              className="overflow-hidden border-border/70 bg-card/95 shadow-sm"
             >
               <div
                 className="h-28 border-b"
@@ -196,50 +211,53 @@ export function StyleReferencesClient({
                   borderColor: preset.border,
                 }}
               />
-              <div className="px-4 py-4">
+              <CardContent className="px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-neutral-900">{preset.label}</p>
-                  <span className="border border-neutral-200 bg-neutral-50 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-500">
+                  <p className="text-sm font-medium text-foreground">{preset.label}</p>
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]">
                     preset
-                  </span>
+                  </Badge>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-neutral-500">{preset.description}</p>
-                <p className="mt-3 text-xs text-neutral-400">更偏向：{preset.emphasis}</p>
-              </div>
-            </div>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{preset.description}</p>
+                <p className="mt-3 text-xs text-muted-foreground">更偏向：{preset.emphasis}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </section>
 
       <section>
-        <p className="text-xs font-mono uppercase tracking-[0.2em] text-neutral-400">
+        <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
           我的参考图组
         </p>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {sets.length > 0 ? (
             sets.map((set) => (
-              <div
+              <Card
                 key={set.id}
-                className="border border-neutral-300 bg-white p-4 shadow-[0_24px_60px_-54px_rgba(15,23,42,0.32)]"
+                className="border-border/70 bg-card/95 shadow-sm"
               >
+                <CardHeader className="gap-3 pb-0">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-neutral-900">{set.name}</p>
+                    <CardTitle className="text-base">{set.name}</CardTitle>
                     {set.description ? (
-                      <p className="mt-1 text-sm leading-6 text-neutral-500">{set.description}</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{set.description}</p>
                     ) : null}
-                    <p className="mt-2 text-xs font-mono uppercase tracking-[0.16em] text-neutral-400">
+                    <Badge variant="outline" className="mt-2 rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]">
                       {set.imageUrls.length} images
-                    </p>
+                    </Badge>
                   </div>
                   <Button variant="outline" className="h-9 px-3" onClick={() => handleDelete(set.id)}>
                     <Trash2 className="h-4 w-4" />
                     删除
                   </Button>
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-3">
+                </CardHeader>
+                <CardContent className="pt-4">
+                <div className="grid grid-cols-3 gap-3">
                   {set.imageUrls.slice(0, 6).map((url) => (
-                    <div key={url} className="relative aspect-[4/3] overflow-hidden border border-neutral-200 bg-neutral-100">
+                    <div key={url} className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-muted">
                       <Image
                         src={buildPrivateBlobProxyUrl(url)}
                         alt={set.name}
@@ -250,10 +268,11 @@ export function StyleReferencesClient({
                     </div>
                   ))}
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             ))
           ) : (
-            <div className="border border-dashed border-neutral-300 bg-white px-5 py-10 text-sm text-neutral-500 lg:col-span-2">
+            <div className="rounded-xl border border-dashed border-border bg-card/95 px-5 py-10 text-sm text-muted-foreground lg:col-span-2">
               你还没有自己的参考图组。先上传一组，这些图会在生成排版或作品集包装前作为样式约束被选择；如果只是想快速试风格，也可以先用上面的系统预制风格。
             </div>
           )}

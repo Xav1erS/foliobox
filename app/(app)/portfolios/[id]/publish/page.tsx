@@ -40,7 +40,7 @@ export default async function PortfolioPublishPage({
         title="发布与导出"
         description="直接基于当前 Portfolio 包装结果生成公开链接，或导出正式 PDF。"
         actions={
-          <Button asChild className="h-10 rounded-none px-4">
+          <Button asChild className="h-10 px-4">
             <Link href={`/portfolios/${portfolio.id}/editor`}>返回作品集编辑器</Link>
           </Button>
         }

@@ -10,7 +10,7 @@ export function StickyActionBar({
   return (
     <div
       className={cn(
-        "sticky bottom-0 border-t border-neutral-300 bg-neutral-100/95 px-6 py-4 backdrop-blur",
+        "app-sticky-bar sticky bottom-0 px-6 py-4",
         className
       )}
     >

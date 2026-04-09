@@ -123,12 +123,12 @@ export function Navbar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 rounded-none border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
+                className="h-12 w-12 rounded-xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-none">
+            <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 rounded-l-3xl border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
               <DialogHeader className="border-b border-white/10 px-5 py-4 text-left">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-white">
                   集盒FolioBox
