@@ -5,6 +5,7 @@ import type {
   ComponentType,
   PointerEvent as ReactPointerEvent,
   ReactNode,
+  WheelEvent as ReactWheelEvent,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -31,15 +32,20 @@ import {
   AlignRight,
   ArrowLeft,
   Copy,
+  FolderOpen,
   GripVertical,
   History,
   ImageIcon,
+  LayoutTemplate,
   Loader2,
   Plus,
   Save,
+  Search,
   Sparkles,
+  StickyNote,
   Trash2,
   Type,
+  Upload,
   Wand2,
   ZoomIn,
   ZoomOut,
@@ -68,7 +74,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import {
   EditorChromeButton,
   EditorChromeIconButton,
@@ -207,14 +212,13 @@ export type ProjectEditorInitialData = {
 const LEFT_PANEL_ITEMS: Array<{
   key: LeftRailPanel;
   label: string;
-  shortLabel: string;
-  icon?: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }> = [
-  { key: "project", label: "项目", shortLabel: "P" },
-  { key: "assets", label: "素材", shortLabel: "A", icon: ImageIcon },
-  { key: "notes", label: "备注", shortLabel: "N" },
-  { key: "boards", label: "画板", shortLabel: "B" },
-  { key: "history", label: "历史", shortLabel: "H", icon: History },
+  { key: "project", label: "项目", icon: FolderOpen },
+  { key: "assets", label: "素材", icon: ImageIcon },
+  { key: "notes", label: "备注", icon: StickyNote },
+  { key: "boards", label: "画板", icon: LayoutTemplate },
+  { key: "history", label: "历史", icon: History },
 ];
 
 function clamp(value: number, min: number, max: number) {
@@ -390,7 +394,7 @@ function EditorPanelCard({
   return (
     <Card
       className={cn(
-        "rounded-[24px] border-white/[0.08] bg-[#1a1c21] text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.68)]",
+        "rounded-[24px] border-white/[0.08] bg-[#1b1a18] text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.68)]",
         className
       )}
     >
@@ -402,14 +406,12 @@ function EditorPanelCard({
 function LeftRailIconButton({
   active,
   label,
-  shortLabel,
   icon: Icon,
   onClick,
 }: {
   active: boolean;
   label: string;
-  shortLabel: string;
-  icon?: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   onClick: () => void;
 }) {
   return (
@@ -419,14 +421,14 @@ function LeftRailIconButton({
       className={cn(
         "group flex w-full flex-col items-center gap-2 rounded-[18px] border px-2 py-3 text-[11px] transition-colors",
         active
-          ? "border-white/[0.14] bg-white/[0.07] text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
-          : "border-white/[0.08] bg-white/[0.02] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
+          ? "border-white/[0.14] bg-white/[0.08] text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
+          : "border-white/[0.08] bg-white/[0.018] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
       )}
       aria-label={label}
       title={label}
     >
       <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-current/20 bg-black/10">
-        {Icon ? <Icon className="h-4 w-4" /> : <span>{shortLabel}</span>}
+        <Icon className="h-4 w-4" />
       </span>
       <span className="leading-none">{label}</span>
     </button>
@@ -464,12 +466,11 @@ function DraggableAssetCard({
         "overflow-hidden rounded-[22px] border transition-all",
         active
           ? "border-white/[0.18] bg-white/[0.08] shadow-[0_18px_36px_-26px_rgba(0,0,0,0.75)]"
-          : "border-white/[0.08] bg-[#1a1c21]",
+          : "border-white/[0.08] bg-[#1b1a18]",
         isDragging && "opacity-70"
       )}
     >
-      <button
-        type="button"
+      <div
         className="block w-full cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
@@ -501,23 +502,29 @@ function DraggableAssetCard({
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/42">
             {meta.note ?? "拖到中央画板即可加入当前页。"}
           </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSelected(asset.id);
+              }}
+              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/[0.08] hover:text-white"
+            >
+              {asset.selected ? "移出生成" : "纳入生成"}
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSetCover(asset.id);
+              }}
+              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/[0.08] hover:text-white"
+            >
+              设为封面
+            </button>
+          </div>
         </div>
-      </button>
-      <div className="grid grid-cols-2 gap-px border-t border-white/[0.08] bg-white/[0.08]">
-        <button
-          type="button"
-          onClick={() => onToggleSelected(asset.id)}
-          className="bg-[#1a1c21] px-3 py-2 text-xs text-white/58 transition-colors hover:text-white"
-        >
-          {asset.selected ? "移出生成" : "纳入生成"}
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetCover(asset.id)}
-          className="bg-[#1a1c21] px-3 py-2 text-xs text-white/58 transition-colors hover:text-white"
-        >
-          设为封面
-        </button>
       </div>
     </div>
   );
@@ -552,8 +559,12 @@ function SortableBoardStripItem({
       }}
       className={cn("shrink-0", isDragging && "opacity-60")}
     >
-      <EditorStripButton active={active} className="relative w-40 overflow-hidden rounded-[24px] p-0" onClick={onClick}>
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+      <EditorStripButton
+        active={active}
+        className="relative w-[104px] overflow-hidden rounded-[22px] p-1.5"
+        onClick={onClick}
+      >
+        <div className="absolute left-3 top-3 z-10">
           <button
             type="button"
             onClick={(event) => {
@@ -561,14 +572,17 @@ function SortableBoardStripItem({
               onToggleScope();
             }}
             className={cn(
-              "rounded-full border px-2 py-0.5 text-[10px]",
+              "flex h-5 w-5 items-center justify-center rounded-full border",
               selectedForScope
-                ? "border-white/[0.16] bg-white/[0.08] text-white"
+                ? "border-white/[0.16] bg-white text-neutral-950"
                 : "border-white/[0.08] bg-black/30 text-white/50"
             )}
+            aria-label="加入批量范围"
           >
-            批量
+            <span className="h-2 w-2 rounded-full bg-current" />
           </button>
+        </div>
+        <div className="absolute right-3 top-3 z-10">
           <button
             type="button"
             onClick={(event) => event.stopPropagation()}
@@ -576,12 +590,12 @@ function SortableBoardStripItem({
             aria-label="拖拽排序"
             {...attributes}
             {...listeners}
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </button>
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
         </div>
-        <div className="p-2.5">
-          <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0c0f]">
+        <div>
+          <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0b0a]">
             {thumbnailUrl ? (
               <div className="aspect-video">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -592,16 +606,10 @@ function SortableBoardStripItem({
                 />
               </div>
             ) : (
-              <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.08]">
-                <span className="text-[10px] text-white/32">
-                  1920 x 1080
-                </span>
+              <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-3">
+                <div className="h-full w-full rounded-[12px] border border-black/6 bg-white shadow-[inset_0_0_0_1px_rgba(17,17,17,0.02)]" />
               </div>
             )}
-          </div>
-          <div className="mt-2.5 px-1 pb-1">
-            <p className="truncate text-[11px] text-white/40">{boardStatusLabel(board.status)}</p>
-            <p className="mt-1 truncate text-sm font-medium text-white">{board.name}</p>
           </div>
         </div>
       </EditorStripButton>
@@ -644,7 +652,6 @@ export function ProjectEditorClient({
   const [actionError, setActionError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [updatingAssetFlags, setUpdatingAssetFlags] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -676,6 +683,7 @@ export function ProjectEditorClient({
 
   const [boardViewportRef, boardViewportSize] = useElementSize<HTMLDivElement>();
   const boardDropRef = useRef<HTMLDivElement | null>(null);
+  const assetPickerRef = useRef<HTMLInputElement | null>(null);
   const lastSavedSceneRef = useRef(JSON.stringify(scene));
   const didHydrateSceneRef = useRef(false);
 
@@ -1176,24 +1184,59 @@ export function ProjectEditorClient({
     });
   }
 
-  function setZoom(delta: number) {
+  function applyZoom(nextZoom: number, origin?: { clientX: number; clientY: number }) {
+    const container = boardViewportRef.current;
+    if (!container) {
+      updateScene((current) => ({
+        ...current,
+        viewport: {
+          ...current.viewport,
+          zoom: nextZoom,
+        },
+      }));
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const fallbackX = rect.left + rect.width / 2;
+    const fallbackY = rect.top + rect.height / 2;
+    const originX = origin?.clientX ?? fallbackX;
+    const originY = origin?.clientY ?? fallbackY;
+    const contentRatioX =
+      container.scrollWidth > 0
+        ? (container.scrollLeft + (originX - rect.left)) / container.scrollWidth
+        : 0.5;
+    const contentRatioY =
+      container.scrollHeight > 0
+        ? (container.scrollTop + (originY - rect.top)) / container.scrollHeight
+        : 0.5;
+
     updateScene((current) => ({
       ...current,
       viewport: {
         ...current.viewport,
-        zoom: clamp(current.viewport.zoom + delta, 0.55, 1.8),
+        zoom: nextZoom,
       },
     }));
+
+    window.requestAnimationFrame(() => {
+      container.scrollLeft = container.scrollWidth * contentRatioX - (originX - rect.left);
+      container.scrollTop = container.scrollHeight * contentRatioY - (originY - rect.top);
+    });
+  }
+
+  function setZoom(delta: number, origin?: { clientX: number; clientY: number }) {
+    applyZoom(clamp(scene.viewport.zoom + delta, 0.55, 1.8), origin);
   }
 
   function resetZoom() {
-    updateScene((current) => ({
-      ...current,
-      viewport: {
-        ...current.viewport,
-        zoom: 1,
-      },
-    }));
+    applyZoom(1);
+  }
+
+  function handleBoardViewportWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const nextDelta = event.deltaY < 0 ? 0.08 : -0.08;
+    setZoom(nextDelta, { clientX: event.clientX, clientY: event.clientY });
   }
 
   function startNodeMove(event: ReactPointerEvent<HTMLButtonElement>, node: ProjectBoardNode) {
@@ -1308,15 +1351,14 @@ export function ProjectEditorClient({
     }
   }
 
-  async function handleUploadAssets() {
-    if (pendingFiles.length === 0) return;
-
+  async function handleUploadAssets(files: File[]) {
+    if (files.length === 0) return;
     setUploadingAssets(true);
     setActionError("");
 
     try {
       const uploadedFiles = await uploadFilesFromBrowser({
-        files: pendingFiles,
+        files,
         folder: "project-assets",
         kind: "project-image",
       });
@@ -1330,12 +1372,24 @@ export function ProjectEditorClient({
       );
 
       await refreshAssets();
-      setPendingFiles([]);
       setLeftPanel("assets");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "素材上传失败，请稍后重试");
     } finally {
       setUploadingAssets(false);
+    }
+  }
+
+  function handleOpenAssetPicker() {
+    assetPickerRef.current?.click();
+  }
+
+  async function handleAssetFilesPicked(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+    await handleUploadAssets(selectedFiles);
+    if (assetPickerRef.current) {
+      assetPickerRef.current.value = "";
     }
   }
 
@@ -1709,13 +1763,12 @@ export function ProjectEditorClient({
           rightRailLabel="属性与 AI"
           leftRail={
             <div className="flex h-full min-h-0">
-              <div className="flex w-[82px] shrink-0 flex-col gap-2 border-r border-white/[0.06] bg-[#101114] p-3">
+              <div className="flex w-[82px] shrink-0 flex-col gap-2 border-r border-white/[0.06] bg-[#121110] p-3">
                 {LEFT_PANEL_ITEMS.map((item) => (
                   <LeftRailIconButton
                     key={item.key}
                     active={leftPanel === item.key}
                     label={item.label}
-                    shortLabel={item.shortLabel}
                     icon={item.icon}
                     onClick={() => setLeftPanel(item.key)}
                   />
@@ -1798,7 +1851,7 @@ export function ProjectEditorClient({
                           {savingFacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                           保存项目信息
                         </Button>
-                        {factsMessage ? <p className="text-xs text-emerald-300">{factsMessage}</p> : null}
+                        {factsMessage ? <p className="text-xs text-white/56">{factsMessage}</p> : null}
                       </div>
                     </EditorRailSection>
                   </>
@@ -1807,35 +1860,45 @@ export function ProjectEditorClient({
                 {leftPanel === "assets" ? (
                   <>
                     <EditorRailSection title="上传素材">
-                      <ImageUploadZone
-                        files={pendingFiles}
-                        onFilesChange={setPendingFiles}
-                        disabled={uploadingAssets}
-                        theme="dark"
-                        onError={(message) => setActionError(message)}
+                      <input
+                        ref={assetPickerRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => {
+                          void handleAssetFilesPicked(event.target.files);
+                        }}
                       />
                       <Button
-                        className="mt-3 h-11 w-full rounded-full border border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
-                        onClick={handleUploadAssets}
-                        disabled={uploadingAssets || pendingFiles.length === 0}
+                        className="h-11 w-full rounded-full border border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
+                        onClick={handleOpenAssetPicker}
+                        disabled={uploadingAssets}
                       >
                         {uploadingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                        上传到素材库
+                        {!uploadingAssets ? <Upload className="h-4 w-4" /> : null}
+                        上传素材
                       </Button>
+                      <p className="mt-3 text-xs leading-5 text-white/36">
+                        支持 JPG / PNG / WebP。点击按钮选择文件后会直接上传到素材库。
+                      </p>
                     </EditorRailSection>
 
                     <EditorRailSection title="素材墙" className="flex-1">
-                      <Input
-                        placeholder="搜索素材标题或备注"
-                        value={assetSearch}
-                        onChange={(event) => setAssetSearch(event.target.value)}
-                        className={cn("col-span-2 mb-3 h-10", editorFieldClass)}
-                      />
+                      <div className="relative mb-3">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/28" />
+                        <Input
+                          placeholder="搜索素材标题或备注"
+                          value={assetSearch}
+                          onChange={(event) => setAssetSearch(event.target.value)}
+                          className={cn("col-span-2 h-10 pl-9", editorFieldClass)}
+                        />
+                      </div>
                       <div className="col-span-2 mb-1 flex items-center justify-between text-xs text-white/38">
                         <span>已显示 {visibleAssets.length} / {assets.length} 张素材</span>
                         <span>{usedAssetIds.size} 张已在画板中使用</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2.5">
                         {visibleAssets.length > 0 ? (
                           visibleAssets.map((asset) => (
                             <DraggableAssetCard
@@ -1990,7 +2053,7 @@ export function ProjectEditorClient({
           center={
             <div className="relative flex h-full min-h-0 flex-col">
               <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
-                <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-white/[0.08] bg-[#f5f5f5]/95 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.45)] backdrop-blur">
+                <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-black/6 bg-[#f1eee8]/94 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.42)] backdrop-blur">
                   <div className="min-w-0 pr-1">
                     <p className="max-w-[180px] truncate text-sm font-semibold">
                       {activeBoard?.name ?? "Untitled board"}
@@ -1999,28 +2062,28 @@ export function ProjectEditorClient({
                       {activeBoard?.intent || "把左侧素材拖进画板，先搭出这一页的主结构。"}
                     </p>
                   </div>
-                  <div className="h-8 w-px bg-neutral-300" />
-                  <span className="inline-flex items-center rounded-full border border-neutral-300 bg-neutral-100 px-3 py-1 text-[11px] text-neutral-700">
+                  <div className="h-8 w-px bg-black/8" />
+                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-[11px] text-neutral-700">
                     {boardStatusLabel(activeBoard?.status ?? "empty")}
                   </span>
-                  <span className="inline-flex items-center rounded-full border border-neutral-300 bg-neutral-100 px-3 py-1 text-[11px] text-neutral-700">
+                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-[11px] text-neutral-700">
                     {scene.generationScope.mode === "current"
                       ? "当前页"
                       : scene.generationScope.mode === "selected"
                         ? `已选 ${generationBoardIds.length}`
                         : `全部 ${scene.boardOrder.length}`}
                   </span>
-                  <div className="h-8 w-px bg-neutral-300" />
+                  <div className="h-8 w-px bg-black/8" />
                   <EditorChromeButton
-                    className="h-10 gap-2 border-neutral-300 bg-white px-4 text-neutral-950 hover:bg-neutral-100 hover:text-neutral-950"
+                    className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-950 hover:bg-neutral-100 hover:text-neutral-950"
                     onClick={addTextNode}
                   >
                     <Type className="h-4 w-4" />
                     添加文本
                   </EditorChromeButton>
-                  <div className="h-8 w-px bg-neutral-300" />
+                  <div className="h-8 w-px bg-black/8" />
                   <EditorChromeIconButton
-                    className="text-neutral-600 hover:text-neutral-950"
+                    className="border-black/8 bg-white text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
                     onClick={() => setZoom(-0.1)}
                     aria-label="缩小画板"
                   >
@@ -2029,12 +2092,12 @@ export function ProjectEditorClient({
                   <button
                     type="button"
                     onClick={resetZoom}
-                    className="inline-flex h-10 items-center rounded-full border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-neutral-950"
+                    className="inline-flex h-10 items-center rounded-full border border-black/8 bg-white px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-neutral-950"
                   >
                     {Math.round(scene.viewport.zoom * 100)}%
                   </button>
                   <EditorChromeIconButton
-                    className="text-neutral-600 hover:text-neutral-950"
+                    className="border-black/8 bg-white text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950"
                     onClick={() => setZoom(0.1)}
                     aria-label="放大画板"
                   >
@@ -2043,7 +2106,11 @@ export function ProjectEditorClient({
                 </div>
               </div>
 
-              <div ref={boardViewportRef} className="relative flex-1 overflow-auto px-12 pb-10 pt-24">
+              <div
+                ref={boardViewportRef}
+                onWheel={handleBoardViewportWheel}
+                className="relative flex-1 overflow-auto px-10 pb-8 pt-24"
+              >
                 <div className="flex min-h-full min-w-full items-center justify-center">
                   <div className="relative" style={{ width: boardRender.width, height: boardRender.height }}>
                     <BoardDropSurface
@@ -2672,7 +2739,7 @@ export function ProjectEditorClient({
             </Tabs>
           }
           bottomStrip={
-            <div className="mx-auto flex max-w-[1280px] items-start gap-3 overflow-x-auto rounded-[28px] border border-white/[0.06] bg-[#17191d] p-3 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+            <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/[0.06] bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
               <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
                 {scene.boardOrder.map((boardId) => {
                   const board = scene.boards.find((item) => item.id === boardId);
@@ -2695,9 +2762,11 @@ export function ProjectEditorClient({
                   );
                 })}
               </SortableContext>
-              <EditorStripButton className="w-32 border-dashed" onClick={addBoard}>
-                <p className="text-[10px] opacity-60">新页面</p>
-                <p className="mt-2 text-sm font-medium">新建画板</p>
+              <EditorStripButton
+                className="flex aspect-video w-[104px] items-center justify-center border-dashed p-0"
+                onClick={addBoard}
+              >
+                <Plus className="h-5 w-5" />
               </EditorStripButton>
             </div>
           }
@@ -2934,42 +3003,32 @@ const BoardDropSurface = forwardRef<
         ref={assignRefs}
         onClick={onSelectBoard}
         className={cn(
-          "relative block overflow-hidden rounded-[34px] border bg-[#0d0e11] text-left shadow-[0_70px_140px_-72px_rgba(0,0,0,0.88)] transition-all",
-          isOver ? "border-white/[0.22] ring-2 ring-white/[0.16]" : "border-white/[0.08]"
+          "relative block overflow-hidden rounded-[32px] border bg-white text-left shadow-[0_70px_140px_-72px_rgba(0,0,0,0.45)] transition-all",
+          isOver ? "border-black/18 ring-2 ring-black/12" : "border-black/8"
         )}
         style={{
           width: render.width,
           height: render.height,
           backgroundColor: board.frame.background,
-          backgroundImage:
-            "radial-gradient(circle at top left, rgba(255,255,255,0.06), transparent 24%), radial-gradient(circle at bottom right, rgba(255,255,255,0.03), transparent 22%)",
         }}
       >
-        <div
-          className="absolute inset-0 opacity-60"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1.5px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
         <div className="pointer-events-none absolute left-6 top-6 z-[1] flex items-start justify-between gap-4">
-          <div className="rounded-full border border-white/[0.08] bg-[#111317]/76 px-3 py-1.5 text-[11px] text-white/56 backdrop-blur">
+          <div className="rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/56 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur">
             {board.name}
           </div>
         </div>
-        <div className="pointer-events-none absolute right-6 top-6 z-[1] rounded-full border border-white/[0.08] bg-[#111317]/76 px-3 py-1.5 text-[11px] text-white/46 backdrop-blur">
+        <div className="pointer-events-none absolute right-6 top-6 z-[1] rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/46 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur">
           {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
         </div>
 
         {board.nodes.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center px-10">
-            <div className="max-w-lg rounded-[30px] border border-white/[0.08] bg-[#111317]/84 px-8 py-10 text-center shadow-[0_40px_90px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
-              <p className="text-[11px] text-white/36">Empty board</p>
-              <p className="mt-4 text-[30px] font-semibold tracking-[-0.04em] text-white">
+            <div className="max-w-lg rounded-[30px] border border-black/8 bg-[#faf8f4]/96 px-8 py-10 text-center shadow-[0_36px_80px_-54px_rgba(0,0,0,0.28)] backdrop-blur">
+              <p className="text-[11px] text-black/34">Empty board</p>
+              <p className="mt-4 text-[30px] font-semibold tracking-[-0.04em] text-neutral-950">
                 把第一张素材拖进来
               </p>
-              <p className="mt-3 text-sm leading-7 text-white/48">
+              <p className="mt-3 text-sm leading-7 text-black/50">
                 先搭出这一页的主视觉和标题层级，底部缩略图负责切换，其余页面不会挤进主画布。
               </p>
             </div>
@@ -2995,7 +3054,7 @@ const BoardDropSurface = forwardRef<
                   key={node.id}
                   className={cn(
                     "absolute rounded-2xl transition-all",
-                    selected && "ring-2 ring-white/65"
+                    selected && "ring-2 ring-black/35"
                   )}
                   style={nodeStyle}
                 >
@@ -3015,7 +3074,7 @@ const BoardDropSurface = forwardRef<
                           onCancelInlineText();
                         }
                       }}
-                      className="h-full w-full resize-none rounded-[22px] border border-white/[0.22] bg-[#0d0f13]/82 px-4 py-3 text-white outline-none backdrop-blur"
+                      className="h-full w-full resize-none rounded-[22px] border border-black/12 bg-white/96 px-4 py-3 text-neutral-950 outline-none backdrop-blur"
                       style={{
                         fontSize: `${(node.fontSize / PROJECT_BOARD_WIDTH) * render.width}px`,
                         fontWeight: node.fontWeight,
@@ -3037,7 +3096,7 @@ const BoardDropSurface = forwardRef<
                       }}
                       className={cn(
                         "flex h-full w-full items-start rounded-[22px] px-4 py-3 text-left transition-colors",
-                        selected ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
+                        selected ? "bg-black/[0.035]" : "hover:bg-black/[0.02]"
                       )}
                       style={{
                         justifyContent:
@@ -3060,7 +3119,7 @@ const BoardDropSurface = forwardRef<
                     <button
                       type="button"
                       onPointerDown={(event) => onStartMove(event, node)}
-                      className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-white text-black/62 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.28)]"
                       aria-label="拖拽文本"
                     >
                       <GripVertical className="h-4 w-4" />
@@ -3079,7 +3138,7 @@ const BoardDropSurface = forwardRef<
                 key={node.id}
                 className={cn(
                   "absolute overflow-hidden rounded-[26px] border bg-black/20 transition-all shadow-[0_20px_40px_-32px_rgba(0,0,0,0.6)]",
-                  selected ? "border-white/[0.22] ring-2 ring-white/[0.16]" : "border-white/[0.08]"
+                  selected ? "border-black/16 ring-2 ring-black/10" : "border-black/8"
                 )}
                 style={nodeStyle}
               >
@@ -3114,13 +3173,13 @@ const BoardDropSurface = forwardRef<
                 </button>
                 {selected ? (
                   <>
-                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/[0.08] bg-black/45 px-2 py-1 text-[10px] text-white/70">
+                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-black/8 bg-white/92 px-2 py-1 text-[10px] text-black/65 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.3)]">
                       {node.roleTag ?? "image"}
                     </div>
                     <button
                       type="button"
                       onPointerDown={(event) => onStartResize(event, node)}
-                      className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-white text-black/62 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.28)]"
                       aria-label="缩放图片"
                     >
                       <GripVertical className="h-4 w-4 rotate-90" />

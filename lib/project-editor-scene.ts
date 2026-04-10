@@ -2,8 +2,9 @@ import { z } from "zod";
 
 export const PROJECT_BOARD_WIDTH = 1920;
 export const PROJECT_BOARD_HEIGHT = 1080;
-export const DEFAULT_BOARD_BACKGROUND = "#17191d";
-export const DEFAULT_TEXT_COLOR = "#f5f7fb";
+export const DEFAULT_BOARD_BACKGROUND = "#ffffff";
+export const DEFAULT_TEXT_COLOR = "#111111";
+const LEGACY_EMPTY_BOARD_BACKGROUND = "#17191d";
 
 export const PROJECT_IMAGE_ROLE_TAGS = [
   "main",
@@ -404,7 +405,10 @@ export function normalizeProjectEditorScene(scene: ProjectEditorScene): ProjectE
       frame: {
         width: PROJECT_BOARD_WIDTH,
         height: PROJECT_BOARD_HEIGHT,
-        background: board.frame.background ?? DEFAULT_BOARD_BACKGROUND,
+        background:
+          board.frame.background === LEGACY_EMPTY_BOARD_BACKGROUND && board.nodes.length === 0
+            ? DEFAULT_BOARD_BACKGROUND
+            : board.frame.background ?? DEFAULT_BOARD_BACKGROUND,
       },
       nodes: [...board.nodes].sort((a, b) => a.zIndex - b.zIndex),
     })

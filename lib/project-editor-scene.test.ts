@@ -17,9 +17,42 @@ describe("project editor scene", () => {
     expect(scene.boards[0].frame).toEqual({
       width: PROJECT_BOARD_WIDTH,
       height: PROJECT_BOARD_HEIGHT,
-      background: "#17191d",
+      background: "#ffffff",
     });
     expect(scene.boards[0].name).toBe("Start");
+  });
+
+  it("migrates legacy empty dark boards to white", () => {
+    const scene = resolveProjectEditorScene(
+      {
+        editorScene: {
+          version: 1,
+          activeBoardId: "board-1",
+          boardOrder: ["board-1"],
+          boards: [
+            {
+              id: "board-1",
+              name: "Start",
+              intent: "",
+              status: "empty",
+              frame: {
+                width: PROJECT_BOARD_WIDTH,
+                height: PROJECT_BOARD_HEIGHT,
+                background: "#17191d",
+              },
+              thumbnailAssetId: null,
+              nodes: [],
+              aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
+            },
+          ],
+          generationScope: { mode: "current", boardIds: ["board-1"] },
+          viewport: { zoom: 1, panX: 0, panY: 0 },
+        },
+      },
+      { assets: [], projectName: "案例 A" }
+    );
+
+    expect(scene.boards[0].frame.background).toBe("#ffffff");
   });
 
   it("does not treat scene-only layout as generated output", () => {
