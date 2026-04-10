@@ -1126,12 +1126,12 @@ export function ProjectEditorFabricClient({
 
   return (
     <EditorScaffold
-      objectLabel="项目 · 编辑器"
+      objectLabel=""
       objectName={initialData.name}
       backHref="/projects"
       backLabel="全部项目"
-      statusLabel="编辑中"
-      statusMeta={`${scene.boards.length} 张画板 · ${initialData.assets.length} 张素材`}
+      statusLabel=""
+      statusMeta=""
       primaryAction={
         <div className="relative flex items-center gap-2">
           <Button
@@ -1671,6 +1671,9 @@ export function ProjectEditorFabricClient({
       }
       bottomStrip={
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/[0.06] bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+          <div className="shrink-0 px-3 text-sm font-medium text-white/56">
+            {scene.boards.length} 张画板
+          </div>
           {scene.boardOrder.map((boardId) => {
             const board = scene.boards.find((item) => item.id === boardId);
             if (!board) return null;

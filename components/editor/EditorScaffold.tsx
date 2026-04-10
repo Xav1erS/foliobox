@@ -59,6 +59,7 @@ export function EditorScaffold({
 }: EditorScaffoldProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta);
 
   return (
     <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0f0f0e] text-white">
@@ -70,16 +71,18 @@ export function EditorScaffold({
           </EditorChromeLink>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/36">
-              <span>{objectLabel}</span>
-              {statusLabel ? (
-                <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-white/62">
-                  {statusLabel}
-                </span>
-              ) : null}
-              {statusMeta ? <span>{statusMeta}</span> : null}
-            </div>
-            <div className="mt-1 flex min-w-0 items-center gap-3">
+            {hasHeaderMeta ? (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/36">
+                {objectLabel ? <span>{objectLabel}</span> : null}
+                {statusLabel ? (
+                  <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-white/62">
+                    {statusLabel}
+                  </span>
+                ) : null}
+                {statusMeta ? <span>{statusMeta}</span> : null}
+              </div>
+            ) : null}
+            <div className={cn("flex min-w-0 items-center gap-3", hasHeaderMeta ? "mt-1" : "")}>
               <h1 className="truncate text-[22px] font-semibold tracking-[-0.035em] text-white">
                 {objectName}
               </h1>
