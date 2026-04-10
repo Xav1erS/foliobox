@@ -31,12 +31,14 @@ type EditorScaffoldProps = {
   secondaryAction?: ReactNode;
   leftRail: ReactNode;
   center: ReactNode;
-  rightRail: ReactNode;
+  rightRail?: ReactNode | null;
   bottomStrip?: ReactNode;
   topNote?: ReactNode;
   planSummary?: PlanSummaryCopy;
   leftRailLabel?: string;
   rightRailLabel?: string;
+  leftRailWidthClass?: string;
+  rightRailWidthClass?: string;
 };
 
 export function EditorScaffold({
@@ -56,6 +58,8 @@ export function EditorScaffold({
   planSummary,
   leftRailLabel = "左侧栏",
   rightRailLabel = "右侧栏",
+  leftRailWidthClass = "w-[332px]",
+  rightRailWidthClass = "w-[332px]",
 }: EditorScaffoldProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -118,7 +122,12 @@ export function EditorScaffold({
             onClick={() => setLeftCollapsed(false)}
           />
         ) : (
-          <aside className="flex w-[332px] shrink-0 flex-col border-r border-white/[0.05] bg-[#121110]">
+          <aside
+            className={cn(
+              "flex shrink-0 flex-col border-r border-white/[0.05] bg-[#121110] transition-[width] duration-300 ease-out",
+              leftRailWidthClass
+            )}
+          >
             <RailHeader
               label={leftRailLabel}
               side="left"
@@ -144,22 +153,29 @@ export function EditorScaffold({
           <div className="relative h-full overflow-hidden">{center}</div>
         </main>
 
-        {rightCollapsed ? (
-          <CollapsedRailButton
-            side="right"
-            label={rightRailLabel}
-            onClick={() => setRightCollapsed(false)}
-          />
-        ) : (
-          <aside className="flex w-[332px] shrink-0 flex-col border-l border-white/[0.05] bg-[#121110]">
-            <RailHeader
-              label={rightRailLabel}
+        {rightRail ? (
+          rightCollapsed ? (
+            <CollapsedRailButton
               side="right"
-              onCollapse={() => setRightCollapsed(true)}
+              label={rightRailLabel}
+              onClick={() => setRightCollapsed(false)}
             />
-            <div className="min-h-0 flex-1 overflow-y-auto">{rightRail}</div>
-          </aside>
-        )}
+          ) : (
+            <aside
+              className={cn(
+                "flex shrink-0 flex-col border-l border-white/[0.05] bg-[#121110] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
+                rightRailWidthClass
+              )}
+            >
+              <RailHeader
+                label={rightRailLabel}
+                side="right"
+                onCollapse={() => setRightCollapsed(true)}
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">{rightRail}</div>
+            </aside>
+          )
+        ) : null}
       </div>
 
       {bottomStrip ? (
@@ -179,8 +195,8 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] px-4">
-      <p className="text-[11px] text-white/38">
+    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.015] px-4">
+      <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
       <EditorChromeIconButton onClick={onCollapse} aria-label={`折叠${label}`}>
@@ -207,7 +223,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#11100f] text-white/44 transition-colors hover:bg-[#1a1817] hover:text-white"
+      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#11100f] text-white/44 transition-colors hover:bg-[#1a1817] hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (

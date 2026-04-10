@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Point, Textbox } from "fabric";
+import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
 import {
   DndContext,
   PointerSensor,
@@ -21,9 +21,13 @@ import {
   ChevronDown,
   Circle,
   Copy,
+  FolderOpen,
+  ImageIcon,
+  LayoutTemplate,
   Loader2,
   Minus,
-  Save,
+  PencilLine,
+  Sparkles,
   Square,
   Trash2,
   Triangle,
@@ -37,19 +41,19 @@ import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   EditorChromeButton,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
-  EditorTabsList,
-  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import {
+  createProjectBoard,
   createProjectImageNode,
+  markBoardsAfterGeneration,
+  markBoardsAsAnalyzed,
   createProjectShapeNode,
   createProjectTextNode,
   getSceneBoardById,
@@ -58,6 +62,7 @@ import {
   PROJECT_BOARD_WIDTH,
   PROJECT_SHAPE_TYPES,
   resolveProjectEditorScene,
+  resolveProjectAssetMeta,
   type ProjectBoard,
   type ProjectBoardImageNode,
   type ProjectBoardNode,
@@ -85,6 +90,7 @@ type ActiveObjectMeta =
   | {
       kind: "image";
       id: string;
+      assetId: string | null;
       opacity: number;
     }
   | {
@@ -112,6 +118,8 @@ type ContextMenuState = {
   y: number;
 };
 
+type LeftPanelKey = "project" | "layers" | "boards";
+
 const SHAPE_LABELS: Record<ProjectShapeType, string> = {
   rect: "矩形",
   square: "正方形",
@@ -119,6 +127,17 @@ const SHAPE_LABELS: Record<ProjectShapeType, string> = {
   triangle: "三角形",
   line: "线段",
 };
+
+const LEFT_PANEL_ITEMS: Array<{
+  key: LeftPanelKey;
+  label: string;
+  icon: typeof FolderOpen;
+  hint: string;
+}> = [
+  { key: "project", label: "项目", icon: FolderOpen, hint: "项目背景与上下文" },
+  { key: "layers", label: "图层", icon: Layers, hint: "对象层级与管理" },
+  { key: "boards", label: "画板", icon: LayoutTemplate, hint: "新增与切换画板" },
+];
 
 type FabricSceneObject = FabricObject & {
   data?: {
@@ -136,6 +155,14 @@ function newNodeId(prefix: "text" | "image" | "shape") {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) {
+    throw new Error(data.error ?? "请求失败");
+  }
+  return data;
 }
 
 function getBoardThumbnailAssetId(board: ProjectBoard) {
@@ -160,12 +187,20 @@ export function ProjectEditorFabricClient({
     })
   );
   const [canvasReady, setCanvasReady] = useState(false);
+  const [assets, setAssets] = useState(initialData.assets);
   const [activeMeta, setActiveMeta] = useState<ActiveObjectMeta>({ kind: "none" });
   const [assetSearch, setAssetSearch] = useState("");
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
-  const [leftTab, setLeftTab] = useState<"assets" | "layers">("assets");
-  const [layerTab, setLayerTab] = useState<"arrange" | "layers">("layers");
+  const [, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [assetDetailsSaving, setAssetDetailsSaving] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{
+    tone: "info" | "error";
+    text: string;
+  } | null>(null);
+  const [leftPanel, setLeftPanel] = useState<LeftPanelKey | null>("project");
   const [layerItems, setLayerItems] = useState<LayerItem[]>([]);
   const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([]);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
@@ -186,9 +221,10 @@ export function ProjectEditorFabricClient({
   const lastSavedSceneRef = useRef(JSON.stringify(scene));
   const didHydrateSceneRef = useRef(false);
 
+  const [imageDetailsDraft, setImageDetailsDraft] = useState({ title: "", note: "" });
   const assetMap = useMemo(
-    () => new Map(initialData.assets.map((asset) => [asset.id, asset])),
-    [initialData.assets]
+    () => new Map(assets.map((asset) => [asset.id, asset])),
+    [assets]
   );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -199,11 +235,25 @@ export function ProjectEditorFabricClient({
   );
   const visibleAssets = useMemo(() => {
     const keyword = assetSearch.trim().toLowerCase();
-    if (!keyword) return initialData.assets;
-    return initialData.assets.filter((asset) =>
+    if (!keyword) return assets;
+    return assets.filter((asset) =>
       [asset.title ?? "", asset.id].join(" ").toLowerCase().includes(keyword)
     );
-  }, [assetSearch, initialData.assets]);
+  }, [assetSearch, assets]);
+  const activeBoardAssetIds = useMemo(() => {
+    if (!activeBoard) return new Set<string>();
+    return new Set(
+      activeBoard.nodes.flatMap((node) => (node.type === "image" ? [node.assetId] : []))
+    );
+  }, [activeBoard]);
+  const featuredAssets = useMemo(
+    () => visibleAssets.filter((asset) => activeBoardAssetIds.has(asset.id)),
+    [activeBoardAssetIds, visibleAssets]
+  );
+  const libraryAssets = useMemo(
+    () => visibleAssets.filter((asset) => !activeBoardAssetIds.has(asset.id)),
+    [activeBoardAssetIds, visibleAssets]
+  );
   const boardThumbnailMap = useMemo(() => {
     return new Map(
       scene.boards.map((board) => {
@@ -212,6 +262,69 @@ export function ProjectEditorFabricClient({
       })
     );
   }, [assetMap, scene.boards]);
+  const hasActiveInspector = activeMeta.kind !== "none";
+  const factsSnapshot = [
+    { label: "项目类型", value: initialData.facts.projectType.trim() || "待补充" },
+    { label: "所属行业", value: initialData.facts.industry.trim() || "待补充" },
+    { label: "我的角色", value: initialData.facts.roleTitle.trim() || "待补充" },
+    { label: "背景摘要", value: initialData.facts.background.trim() || "待补充" },
+    { label: "结果摘要", value: initialData.facts.resultSummary.trim() || "待补充" },
+  ];
+  const currentLeftPanelLabel =
+    LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
+  const sourceLabel =
+    initialData.sourceType === "FIGMA"
+      ? "Figma"
+      : initialData.sourceType === "IMAGES"
+        ? "图片导入"
+        : "手动创建";
+  const packageModeLabel =
+    initialData.packageMode === "DEEP"
+      ? "深讲"
+      : initialData.packageMode === "LIGHT"
+        ? "浅讲"
+        : initialData.packageMode === "SUPPORTIVE"
+          ? "补充展示"
+          : "待判断";
+  const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
+  const selectedImageAsset =
+    activeMeta.kind === "image" && activeMeta.assetId
+      ? assetMap.get(activeMeta.assetId) ?? null
+      : null;
+
+  function toggleLeftPanel(panel: LeftPanelKey) {
+    setLeftPanel((current) => (current === panel ? null : panel));
+  }
+
+  function createBoard() {
+    const board = createProjectBoard({
+      name: `画板 ${scene.boards.length + 1}`,
+      intent: `${initialData.name} 的新画板`,
+    });
+    setScene((current) =>
+      normalizeProjectEditorScene({
+        ...current,
+        activeBoardId: board.id,
+        boardOrder: [...current.boardOrder, board.id],
+        boards: [...current.boards, board],
+      })
+    );
+    setLeftPanel("boards");
+  }
+
+  function selectBoard(boardId: string) {
+    setScene((current) =>
+      normalizeProjectEditorScene({ ...current, activeBoardId: boardId })
+    );
+  }
+
+  function getCurrentGenerationScope() {
+    const boardId = activeBoard?.id ?? scene.activeBoardId;
+    return {
+      mode: "current" as const,
+      boardIds: boardId ? [boardId] : [],
+    };
+  }
 
   function getLayerItemsFromCanvas(canvas: FabricCanvas) {
     const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
@@ -409,6 +522,105 @@ export function ProjectEditorFabricClient({
     return () => window.clearTimeout(timeout);
   }, [scene]);
 
+  async function persistCurrentSceneForAction() {
+    try {
+      await persistScene(scene, true);
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "画板保存失败，请稍后重试",
+      });
+      throw error;
+    }
+  }
+
+  async function handleRunDiagnosis() {
+    if (!activeBoard || diagnosing) return;
+    setDiagnosing(true);
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const generationScope = getCurrentGenerationScope();
+      const payload = JSON.stringify({ generationScope });
+      const [boundaryResult, completenessResult, packageResult] =
+        await Promise.allSettled([
+          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/boundary/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })),
+          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/completeness/analyze`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })),
+          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/package/recommend`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          })),
+        ]);
+
+      const failures = [boundaryResult, completenessResult, packageResult].filter(
+        (item) => item.status === "rejected"
+      ) as PromiseRejectedResult[];
+
+      const nextStatus = failures.length > 0 ? "needs_attention" : "analyzed";
+      setScene((current) =>
+        markBoardsAsAnalyzed(current, generationScope.boardIds, nextStatus)
+      );
+      setActionMessage({
+        tone: failures.length > 0 ? "error" : "info",
+        text:
+          failures.length > 0
+            ? `项目诊断部分完成：${failures
+                .map((item) =>
+                  item.reason instanceof Error ? item.reason.message : "请求失败"
+                )
+                .join("；")}`
+            : "项目诊断已完成",
+      });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "项目诊断失败，请稍后重试",
+      });
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
+  async function handleGenerateLayout() {
+    if (!activeBoard || generating) return;
+    setGenerating(true);
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const generationScope = getCurrentGenerationScope();
+      await parseJsonResponse(
+        await fetch(`/api/projects/${initialData.id}/layout/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generationScope }),
+        })
+      );
+      setScene((current) => markBoardsAfterGeneration(current, generationScope.boardIds));
+      setActionMessage({
+        tone: "info",
+        text: "生成排版已提交，当前画板保持不变，可继续手动微调。",
+      });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "生成排版失败，请稍后重试",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   useEffect(() => {
     if (!contextMenu.open) return;
     const handler = () => closeContextMenu();
@@ -422,6 +634,28 @@ export function ProjectEditorFabricClient({
     window.addEventListener("mousedown", handler);
     return () => window.removeEventListener("mousedown", handler);
   }, [shapeMenuOpen]);
+
+  useEffect(() => {
+    if (!assetPickerOpen) return;
+    const handler = () => setAssetPickerOpen(false);
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [assetPickerOpen]);
+
+  useEffect(() => {
+    if (!actionMessage || actionMessage.tone === "error") return;
+    const timeout = window.setTimeout(() => setActionMessage(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [actionMessage]);
+
+  useEffect(() => {
+    if (!selectedImageAsset) return;
+    const meta = resolveProjectAssetMeta(selectedImageAsset.metaJson);
+    setImageDetailsDraft({
+      title: selectedImageAsset.title ?? "",
+      note: meta.note ?? "",
+    });
+  }, [selectedImageAsset]);
 
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
@@ -447,6 +681,7 @@ export function ProjectEditorFabricClient({
       setActiveMeta({
         kind: "image",
         id: data.nodeId ?? "image",
+        assetId: data.assetId ?? null,
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
       });
       return;
@@ -482,6 +717,16 @@ export function ProjectEditorFabricClient({
     setActiveMeta({ kind: "none" });
   }
 
+  function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
+    const width = canvas.getWidth();
+    const height = canvas.getHeight();
+    const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
+    const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
+    canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
+    setZoom(nextZoom);
+    canvas.requestRenderAll();
+  }
+
   function fitBoard(canvas: FabricCanvas) {
     const width = canvas.getWidth();
     const height = canvas.getHeight();
@@ -489,12 +734,7 @@ export function ProjectEditorFabricClient({
       (width - 120) / PROJECT_BOARD_WIDTH,
       (height - 120) / PROJECT_BOARD_HEIGHT
     );
-    const nextZoom = clamp(zoomToFit, 0.2, 1.5);
-    const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
-    const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
-    canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
-    setZoom(nextZoom);
-    canvas.requestRenderAll();
+    applyCenteredZoom(canvas, clamp(zoomToFit, 0.2, 1.5));
   }
 
   function applyObjectChrome(target: FabricSceneObject) {
@@ -787,15 +1027,6 @@ export function ProjectEditorFabricClient({
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
       });
-      canvas.on("mouse:wheel", (event) => {
-        const nativeEvent = event.e as WheelEvent;
-        nativeEvent.preventDefault();
-        nativeEvent.stopPropagation();
-        const point = new fabric.Point(nativeEvent.offsetX, nativeEvent.offsetY) as Point;
-        const nextZoom = clamp(canvas.getZoom() * (nativeEvent.deltaY > 0 ? 0.92 : 1.08), 0.2, 3);
-        canvas.zoomToPoint(point, nextZoom);
-        setZoom(nextZoom);
-      });
       canvas.on("mouse:down", (event) => {
         const nativeEvent = event.e as globalThis.MouseEvent;
         if (nativeEvent.button !== 2) return;
@@ -1010,6 +1241,40 @@ export function ProjectEditorFabricClient({
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
+    setAssetPickerOpen(false);
+    setActionMessage({ tone: "info", text: "图片已插入当前画板" });
+  }
+
+  async function saveSelectedImageDetails() {
+    if (!selectedImageAsset || assetDetailsSaving) return;
+
+    setAssetDetailsSaving(true);
+    try {
+      const response = await parseJsonResponse<{
+        asset: ProjectEditorInitialData["assets"][number];
+      }>(
+        await fetch(`/api/projects/${initialData.id}/assets/${selectedImageAsset.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: imageDetailsDraft.title.trim() || null,
+            note: imageDetailsDraft.note.trim() || null,
+          }),
+        })
+      );
+
+      setAssets((current) =>
+        current.map((asset) => (asset.id === response.asset.id ? response.asset : asset))
+      );
+      setActionMessage({ tone: "info", text: "图片信息已保存" });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "保存图片信息失败，请稍后重试",
+      });
+    } finally {
+      setAssetDetailsSaving(false);
+    }
   }
 
   function deleteSelection() {
@@ -1059,8 +1324,7 @@ export function ProjectEditorFabricClient({
       return;
     }
     if (action === "layers-panel") {
-      setLeftTab("layers");
-      setLayerTab("layers");
+      setLeftPanel("layers");
     }
   }
 
@@ -1133,209 +1397,203 @@ export function ProjectEditorFabricClient({
       statusLabel=""
       statusMeta=""
       primaryAction={
-        <div className="relative flex items-center gap-2">
-          <Button
-            className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 hover:bg-white/90"
-            onClick={addTextObject}
-          >
-            <Type className="h-4 w-4" />
-            添加文本
-          </Button>
-          <div className="relative">
-            <EditorChromeButton
-              className="h-10 gap-2 px-4"
-              onClick={() => setShapeMenuOpen((prev) => !prev)}
-            >
-              <Square className="h-4 w-4" />
-              形状
-              <ChevronDown className="h-4 w-4" />
-            </EditorChromeButton>
-            {shapeMenuOpen ? (
-              <div
-                className="absolute right-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                {PROJECT_SHAPE_TYPES.map((shape) => (
-                  <button
-                    key={shape}
-                    type="button"
-                    onClick={() => {
-                      void addShapeObject(shape);
-                      setShapeMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
-                  >
-                    {shape === "circle" ? (
-                      <Circle className="h-4 w-4" />
-                    ) : shape === "triangle" ? (
-                      <Triangle className="h-4 w-4" />
-                    ) : shape === "line" ? (
-                      <Minus className="h-4 w-4" />
-                    ) : (
-                      <Square className="h-4 w-4" />
-                    )}
-                    {SHAPE_LABELS[shape]}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <Button
+          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 hover:bg-white/90"
+          onClick={() => void handleGenerateLayout()}
+          disabled={generating || diagnosing}
+        >
+          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          生成排版
+        </Button>
       }
       secondaryAction={
-        <div className="flex items-center gap-2">
-          <EditorChromeButton className="h-10 gap-2 px-4" onClick={() => void duplicateSelection()}>
-            <Copy className="h-4 w-4" />
-            复制
-          </EditorChromeButton>
-          <EditorChromeButton className="h-10 gap-2 px-4" onClick={deleteSelection}>
-            <Trash2 className="h-4 w-4" />
-            删除
-          </EditorChromeButton>
-        </div>
+        <EditorChromeButton
+          className="h-10 gap-2 px-4"
+          onClick={() => void handleRunDiagnosis()}
+          disabled={diagnosing || generating}
+        >
+          {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+          项目诊断
+        </EditorChromeButton>
       }
       planSummary={planSummary}
-      leftRailLabel="素材 / 图层"
+      leftRailLabel={currentLeftPanelLabel}
       rightRailLabel="属性"
+      leftRailWidthClass={leftPanel ? "w-[368px]" : "w-[92px]"}
       leftRail={
-        <div className="h-full overflow-y-auto px-4 py-4">
-          <Tabs value={leftTab} onValueChange={(value) => setLeftTab(value as typeof leftTab)}>
-            <EditorTabsList className="grid w-full grid-cols-2">
-              <EditorTabsTrigger value="assets" className="w-full justify-center">
-                素材
-              </EditorTabsTrigger>
-              <EditorTabsTrigger value="layers" className="w-full justify-center">
-                图层
-              </EditorTabsTrigger>
-            </EditorTabsList>
-
-            <TabsContent value="assets" className="mt-4 space-y-4">
-              <EditorRailSection title="素材墙">
-                <div className="space-y-3">
-                  <Input
-                    value={assetSearch}
-                    onChange={(event) => setAssetSearch(event.target.value)}
-                    placeholder="搜索素材"
-                    className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white placeholder:text-white/28"
+        <div className="flex h-full min-h-0">
+          <div className="flex w-[92px] shrink-0 flex-col items-center gap-3 border-r border-white/[0.05] bg-[#11100f] px-3 py-4">
+            {LEFT_PANEL_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = leftPanel === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => toggleLeftPanel(item.key)}
+                  title={item.label}
+                  className={cn(
+                    "group relative flex w-full flex-col items-center gap-2 rounded-[24px] border px-2 py-4 text-[11px] font-medium transition-all duration-200",
+                    active
+                      ? "border-white/[0.14] bg-white/[0.09] text-white shadow-[0_18px_30px_-22px_rgba(0,0,0,0.9)]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/52 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-r-full transition-opacity duration-200",
+                      active ? "bg-white/80 opacity-100" : "opacity-0 group-hover:opacity-60"
+                    )}
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    {visibleAssets.map((asset) => (
-                      <button
-                        key={asset.id}
-                        type="button"
-                        onClick={() => void addAssetToCanvas(asset.id)}
-                        className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
-                      >
-                        <div className="aspect-[4/3] overflow-hidden bg-black/30">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                            alt={asset.title ?? "素材"}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div className="p-3">
-                          <p className="truncate text-sm font-medium text-white">
-                            {asset.title ?? "未命名素材"}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                    {visibleAssets.length === 0 ? (
-                      <div className="col-span-2 rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
-                        没有匹配的素材。
-                      </div>
-                    ) : null}
+                  <div
+                    className={cn(
+                      "flex h-11 w-11 items-center justify-center rounded-[18px] border transition-colors",
+                      active
+                        ? "border-white/[0.12] bg-white/[0.08]"
+                        : "border-white/[0.05] bg-transparent group-hover:border-white/[0.08] group-hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
                   </div>
+                  <span className="tracking-[0.02em]">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {leftPanel ? (
+            <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
+              {currentLeftPanelMeta ? (
+                <div className="border-b border-white/[0.05] bg-white/[0.02] px-5 py-4">
+                  <p className="text-[11px] tracking-[0.18em] text-white/36">
+                    {currentLeftPanelMeta.label}
+                  </p>
+                  <p className="mt-2 text-sm text-white/58">{currentLeftPanelMeta.hint}</p>
                 </div>
-              </EditorRailSection>
-            </TabsContent>
-
-            <TabsContent value="layers" className="mt-4 space-y-4">
-              <EditorRailSection title="调整图层">
-                <Tabs value={layerTab} onValueChange={(value) => setLayerTab(value as typeof layerTab)}>
-                  <EditorTabsList className="grid w-full grid-cols-2">
-                    <EditorTabsTrigger value="arrange" className="w-full justify-center">
-                      排布
-                    </EditorTabsTrigger>
-                    <EditorTabsTrigger value="layers" className="w-full justify-center">
-                      图层
-                    </EditorTabsTrigger>
-                  </EditorTabsList>
-
-                  <TabsContent value="arrange" className="mt-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <EditorChromeButton
-                        className="h-10 justify-center"
-                        onClick={() => arrangeActiveObject("forward")}
-                        disabled={!canArrange}
-                      >
-                        上移
-                      </EditorChromeButton>
-                      <EditorChromeButton
-                        className="h-10 justify-center"
-                        onClick={() => arrangeActiveObject("backward")}
-                        disabled={!canArrange}
-                      >
-                        下移
-                      </EditorChromeButton>
-                      <EditorChromeButton
-                        className="h-10 justify-center"
-                        onClick={() => arrangeActiveObject("front")}
-                        disabled={!canArrange}
-                      >
-                        移至最前
-                      </EditorChromeButton>
-                      <EditorChromeButton
-                        className="h-10 justify-center"
-                        onClick={() => arrangeActiveObject("back")}
-                        disabled={!canArrange}
-                      >
-                        移至最底
-                      </EditorChromeButton>
-                    </div>
-                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/52">
-                      选择对象后可以快速调整层级。
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="layers" className="mt-4 space-y-3">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleLayerDragEnd}
-                    >
-                      <SortableContext
-                        items={layerItems.map((item) => item.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-2">
-                          {layerItems.map((item) => (
-                            <SortableLayerRow
-                              key={item.id}
-                              item={item}
-                              selected={selectedLayerIds.includes(item.id)}
-                              onSelect={selectLayerById}
-                              onOpenMenu={(event) => {
-                                event.stopPropagation();
-                                selectLayerById(item.id);
-                                openContextMenuAt(event.clientX, event.clientY);
-                              }}
-                            />
-                          ))}
-                          {layerItems.length === 0 ? (
-                            <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
-                              当前画板还没有图层。
-                            </div>
-                          ) : null}
+              ) : null}
+              {leftPanel === "project" ? (
+                <>
+                  <EditorRailSection title="项目概况">
+                    <EditorInfoList
+                      items={[
+                        { label: "导入方式", value: sourceLabel },
+                        { label: "包装模式", value: packageModeLabel },
+                        { label: "素材数量", value: `${initialData.assets.length} 张` },
+                        { label: "当前画板", value: activeBoard?.name ?? "未命名" },
+                      ]}
+                    />
+                  </EditorRailSection>
+                  <EditorRailSection title="项目背景信息">
+                    <div className="space-y-3">
+                      {factsSnapshot.map((item) => (
+                        <div
+                          key={item.label}
+                          className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] px-4 py-3"
+                        >
+                          <p className="text-xs text-white/40">{item.label}</p>
+                          <p className="mt-2 text-sm leading-6 text-white/82">{item.value}</p>
                         </div>
-                      </SortableContext>
-                    </DndContext>
-                  </TabsContent>
-                </Tabs>
-              </EditorRailSection>
-            </TabsContent>
-          </Tabs>
+                      ))}
+                    </div>
+                  </EditorRailSection>
+                </>
+              ) : null}
+
+              {leftPanel === "layers" ? (
+                <EditorRailSection title="图层管理">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleLayerDragEnd}
+                  >
+                    <SortableContext
+                      items={layerItems.map((item) => item.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {layerItems.map((item) => (
+                          <SortableLayerRow
+                            key={item.id}
+                            item={item}
+                            selected={selectedLayerIds.includes(item.id)}
+                            onSelect={selectLayerById}
+                            onOpenMenu={(event) => {
+                              event.stopPropagation();
+                              selectLayerById(item.id);
+                              openContextMenuAt(event.clientX, event.clientY);
+                            }}
+                          />
+                        ))}
+                        {layerItems.length === 0 ? (
+                          <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                            当前画板还没有图层。
+                          </div>
+                        ) : null}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </EditorRailSection>
+              ) : null}
+
+              {leftPanel === "boards" ? (
+                <>
+                  <EditorRailSection title="画板管理">
+                    <div className="space-y-3">
+                      <EditorChromeButton className="h-10 w-full justify-center" onClick={createBoard}>
+                        新建画板
+                      </EditorChromeButton>
+                      <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/52">
+                        当前共有 {scene.boards.length} 张画板，底部缩略图负责快速切换。
+                      </div>
+                    </div>
+                  </EditorRailSection>
+                  <EditorRailSection title="画板列表">
+                    <div className="space-y-2">
+                      {scene.boardOrder.map((boardId, index) => {
+                        const board = scene.boards.find((item) => item.id === boardId);
+                        if (!board) return null;
+                        const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                        return (
+                          <button
+                            key={board.id}
+                            type="button"
+                            onClick={() => selectBoard(board.id)}
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors",
+                              scene.activeBoardId === board.id
+                                ? "border-white/[0.14] bg-white/[0.08] text-white"
+                                : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:bg-white/[0.05]"
+                            )}
+                          >
+                            <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-white/[0.08] bg-[#0b0b0a]">
+                              {thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={buildPrivateBlobProxyUrl(thumbnailUrl)}
+                                  alt={board.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full bg-white" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-white">
+                                {index + 1}. {board.name}
+                              </p>
+                              <p className="mt-1 truncate text-xs text-white/44">
+                                {board.intent || "未填写意图"}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </EditorRailSection>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       }
       center={
@@ -1403,16 +1661,71 @@ export function ProjectEditorFabricClient({
                     {activeBoard?.name ?? "未命名画板"}
                   </p>
                   <p className="max-w-[280px] truncate text-[11px] text-neutral-500">
-                    滚轮缩放，拖拽素材进入画板。
+                    插入图片、添加文本，使用按钮缩放。
                   </p>
                 </div>
               )}
               <div className="h-8 w-px bg-black/8" />
               <EditorChromeButton
+                className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
+                onClick={() => {
+                  setAssetPickerOpen((prev) => !prev);
+                  setShapeMenuOpen(false);
+                }}
+              >
+                <ImageIcon className="h-4 w-4" />
+                插入图片
+              </EditorChromeButton>
+              <Button
+                className="h-10 gap-2 rounded-full border border-black/8 bg-white px-4 text-neutral-950 hover:bg-neutral-100"
+                onClick={addTextObject}
+              >
+                <Type className="h-4 w-4" />
+                添加文本
+              </Button>
+              <div className="relative">
+                <EditorChromeButton
+                  className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => setShapeMenuOpen((prev) => !prev)}
+                >
+                  <Square className="h-4 w-4" />
+                  形状
+                  <ChevronDown className="h-4 w-4" />
+                </EditorChromeButton>
+                {shapeMenuOpen ? (
+                  <div
+                    className="absolute left-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
+                    {PROJECT_SHAPE_TYPES.map((shape) => (
+                      <button
+                        key={shape}
+                        type="button"
+                        onClick={() => {
+                          void addShapeObject(shape);
+                          setShapeMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      >
+                        {shape === "circle" ? (
+                          <Circle className="h-4 w-4" />
+                        ) : shape === "triangle" ? (
+                          <Triangle className="h-4 w-4" />
+                        ) : shape === "line" ? (
+                          <Minus className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                        {SHAPE_LABELS[shape]}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <EditorChromeButton
                 className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
                 onClick={() => {
-                  setLeftTab("layers");
-                  setLayerTab("layers");
+                  setLeftPanel("layers");
                 }}
               >
                 <Layers className="h-4 w-4" />
@@ -1430,8 +1743,7 @@ export function ProjectEditorFabricClient({
                   const canvas = canvasRef.current;
                   if (!canvas) return;
                   const nextZoom = clamp(canvas.getZoom() - 0.1, 0.2, 3);
-                  canvas.zoomToPoint({ x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 } as Point, nextZoom);
-                  setZoom(nextZoom);
+                  applyCenteredZoom(canvas, nextZoom);
                 }}
               >
                 <ZoomOut className="h-4 w-4" />
@@ -1445,8 +1757,7 @@ export function ProjectEditorFabricClient({
                   const canvas = canvasRef.current;
                   if (!canvas) return;
                   const nextZoom = clamp(canvas.getZoom() + 0.1, 0.2, 3);
-                  canvas.zoomToPoint({ x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 } as Point, nextZoom);
-                  setZoom(nextZoom);
+                  applyCenteredZoom(canvas, nextZoom);
                 }}
               >
                 <ZoomIn className="h-4 w-4" />
@@ -1468,6 +1779,105 @@ export function ProjectEditorFabricClient({
               </div>
             ) : null}
             <canvas ref={hostRef} />
+            {assetPickerOpen ? (
+              <div
+                className="absolute left-6 top-6 z-30 w-[356px] animate-in fade-in-0 slide-in-from-top-2 duration-200"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <div className="rounded-[28px] border border-white/[0.08] bg-[#141311]/96 p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)] backdrop-blur">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">插入图片</p>
+                      <p className="mt-1 text-xs text-white/46">从当前项目素材中挑一张放进画板。</p>
+                    </div>
+                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-xs text-white/54">
+                      {visibleAssets.length} 张
+                    </span>
+                  </div>
+                  <Input
+                    value={assetSearch}
+                    onChange={(event) => setAssetSearch(event.target.value)}
+                    placeholder="搜索素材标题或 ID"
+                    className="mt-4 h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <div className="mt-4 max-h-[440px] space-y-4 overflow-y-auto pr-1">
+                    {featuredAssets.length > 0 ? (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-[11px] font-medium tracking-[0.18em] text-white/36">
+                            当前画板已用
+                          </p>
+                          <span className="text-xs text-white/34">{featuredAssets.length}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {featuredAssets.map((asset) => (
+                            <button
+                              key={asset.id}
+                              type="button"
+                              onClick={() => void addAssetToCanvas(asset.id)}
+                              className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                            >
+                              <div className="aspect-square overflow-hidden bg-black/30">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                                  alt={asset.title ?? "素材"}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                              <div className="px-2 py-2">
+                                <p className="truncate text-xs font-medium text-white/82">
+                                  {asset.title ?? "未命名"}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-[11px] font-medium tracking-[0.18em] text-white/36">
+                          项目素材库
+                        </p>
+                        <span className="text-xs text-white/34">{libraryAssets.length}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {libraryAssets.map((asset) => (
+                          <button
+                            key={asset.id}
+                            type="button"
+                            onClick={() => void addAssetToCanvas(asset.id)}
+                            className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                          >
+                            <div className="aspect-square overflow-hidden bg-black/30">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                                alt={asset.title ?? "素材"}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <div className="px-2 py-2">
+                              <p className="truncate text-xs font-medium text-white/82">
+                                {asset.title ?? "未命名"}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {visibleAssets.length === 0 ? (
+                      <div className="rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-8 text-center text-sm text-white/46">
+                        没有匹配的素材。
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {contextMenu.open ? (
               <div
                 className="fixed z-50 w-56 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 text-sm text-white/88 shadow-[0_20px_48px_-24px_rgba(0,0,0,0.7)]"
@@ -1496,178 +1906,246 @@ export function ProjectEditorFabricClient({
                 )}
               </div>
             ) : null}
+            {actionMessage ? (
+              <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
+                <div
+                  className={cn(
+                    "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur",
+                    actionMessage.tone === "error"
+                      ? "border-red-300/20 bg-red-400/10 text-red-100"
+                      : "border-white/[0.08] bg-[#181715]/88 text-white/82"
+                  )}
+                >
+                  {actionMessage.text}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       }
       rightRail={
-        <div className="h-full overflow-y-auto">
-          <EditorRailSection title="Inspector">
-            <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
-              {activeMeta.kind === "none" ? (
-                <div className="text-sm text-white/52">
-                  选择画板中的元素后，这里会显示可编辑属性。
-                </div>
-              ) : null}
-
-              {activeMeta.kind === "multi" ? (
-                <div className="text-sm text-white/52">
-                  已选 {activeMeta.count} 个对象，可拖拽改变位置或调整大小。
-                </div>
-              ) : null}
-
-              {activeMeta.kind === "text" ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-white/50">文本内容</label>
-                    <Textarea
-                      value={activeMeta.text}
-                      onChange={(event) => updateActiveObject({ text: event.target.value })}
-                      className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
-                    />
+        hasActiveInspector ? (
+          <div className="h-full overflow-y-auto">
+            <EditorRailSection title="属性编辑">
+              <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+                {activeMeta.kind === "multi" ? (
+                  <div className="text-sm text-white/52">
+                    已选 {activeMeta.count} 个对象，可先调整层级或重新选择单个对象编辑属性。
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                ) : null}
+
+                {activeMeta.kind === "text" ? (
+                  <div className="space-y-3">
                     <div>
-                      <label className="text-xs text-white/50">字号</label>
-                      <Input
-                        type="number"
-                        value={activeMeta.fontSize}
-                        onChange={(event) =>
-                          updateActiveObject({ fontSize: Number(event.target.value) || 16 })
-                        }
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                      <label className="text-xs text-white/50">文本内容</label>
+                      <Textarea
+                        value={activeMeta.text}
+                        onChange={(event) => updateActiveObject({ text: event.target.value })}
+                        className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
                       />
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-white/50">字号</label>
+                        <Input
+                          type="number"
+                          value={activeMeta.fontSize}
+                          onChange={(event) =>
+                            updateActiveObject({ fontSize: Number(event.target.value) || 16 })
+                          }
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/50">字重</label>
+                        <Input
+                          type="number"
+                          value={activeMeta.fontWeight}
+                          onChange={(event) =>
+                            updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
+                          }
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-white/50">颜色</label>
+                        <Input
+                          type="color"
+                          value={activeMeta.color}
+                          onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/50">透明度</label>
+                        <Input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={activeMeta.opacity}
+                          onChange={(event) =>
+                            updateActiveObject({ opacity: Number(event.target.value) })
+                          }
+                          className="mt-3"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeMeta.kind === "image" ? (
+                  <div className="space-y-3">
+                    {selectedImageAsset ? (
+                      <>
+                        <div>
+                          <label className="text-xs text-white/50">图片名称</label>
+                          <Input
+                            value={imageDetailsDraft.title}
+                            onChange={(event) =>
+                              setImageDetailsDraft((current) => ({
+                                ...current,
+                                title: event.target.value,
+                              }))
+                            }
+                            placeholder="给这张图片一个更清晰的名称"
+                            className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50">图片描述</label>
+                          <Textarea
+                            value={imageDetailsDraft.note}
+                            onChange={(event) =>
+                              setImageDetailsDraft((current) => ({
+                                ...current,
+                                note: event.target.value,
+                              }))
+                            }
+                            placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
+                            className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => void saveSelectedImageDetails()}
+                          disabled={assetDetailsSaving}
+                          className="h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                        >
+                          {assetDetailsSaving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <PencilLine className="h-4 w-4" />
+                          )}
+                          保存图片信息
+                        </Button>
+                      </>
+                    ) : null}
                     <div>
-                      <label className="text-xs text-white/50">字重</label>
+                      <label className="text-xs text-white/50">透明度</label>
                       <Input
-                        type="number"
-                        value={activeMeta.fontWeight}
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={activeMeta.opacity}
                         onChange={(event) =>
-                          updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
+                          updateActiveObject({ opacity: Number(event.target.value) })
                         }
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                        className="mt-3"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                ) : null}
+
+                {activeMeta.kind === "shape" ? (
+                  <div className="space-y-3">
                     <div>
-                      <label className="text-xs text-white/50">颜色</label>
+                      <label className="text-xs text-white/50">填充色</label>
                       <Input
                         type="color"
-                        value={activeMeta.color}
+                        value={activeMeta.fill}
                         onChange={(event) => updateActiveObject({ fill: event.target.value })}
                         className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-white/50">透明度</label>
+                      <label className="text-xs text-white/50">描边色</label>
                       <Input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={activeMeta.opacity}
-                        onChange={(event) =>
-                          updateActiveObject({ opacity: Number(event.target.value) })
-                        }
-                        className="mt-3"
+                        type="color"
+                        value={activeMeta.stroke ?? "#000000"}
+                        onChange={(event) => updateActiveObject({ stroke: event.target.value })}
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
                       />
                     </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {activeMeta.kind === "image" ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-white/50">透明度</label>
-                    <Input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={activeMeta.opacity}
-                      onChange={(event) =>
-                        updateActiveObject({ opacity: Number(event.target.value) })
-                      }
-                      className="mt-3"
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {activeMeta.kind === "shape" ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-white/50">填充色</label>
-                    <Input
-                      type="color"
-                      value={activeMeta.fill}
-                      onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-white/50">描边色</label>
-                    <Input
-                      type="color"
-                      value={activeMeta.stroke ?? "#000000"}
-                      onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-white/50">描边宽度</label>
-                      <Input
-                        type="number"
-                        value={activeMeta.strokeWidth}
-                        onChange={(event) =>
-                          updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
-                        }
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-white/50">透明度</label>
-                      <Input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={activeMeta.opacity}
-                        onChange={(event) =>
-                          updateActiveObject({ opacity: Number(event.target.value) })
-                        }
-                        className="mt-3"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-white/50">描边宽度</label>
+                        <Input
+                          type="number"
+                          value={activeMeta.strokeWidth}
+                          onChange={(event) =>
+                            updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
+                          }
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/50">透明度</label>
+                        <Input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={activeMeta.opacity}
+                          onChange={(event) =>
+                            updateActiveObject({ opacity: Number(event.target.value) })
+                          }
+                          className="mt-3"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          </EditorRailSection>
+                ) : null}
+              </div>
+            </EditorRailSection>
 
-          <EditorRailSection title="快捷键">
-            <EditorInfoList
-              items={[
-                { label: "删除", value: "Delete / Backspace" },
-                { label: "复制", value: "Cmd/Ctrl + C" },
-                { label: "粘贴", value: "Cmd/Ctrl + V" },
-                { label: "复制当前对象", value: "Cmd/Ctrl + D" },
-                { label: "适应画板", value: "Cmd/Ctrl + 0 / 按钮" },
-                { label: "缩放", value: "滚轮 / 按钮" },
-              ]}
-            />
-          </EditorRailSection>
-
-          <EditorRailSection title="保存状态">
-            <div className="flex items-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.03] px-3 py-3 text-sm text-white/64">
-              <Save className="h-4 w-4" />
-              {saveState}
-            </div>
-          </EditorRailSection>
-        </div>
+            <EditorRailSection title="图层排布">
+              <div className="grid grid-cols-2 gap-2">
+                <EditorChromeButton
+                  className="h-10 justify-center"
+                  onClick={() => arrangeActiveObject("forward")}
+                  disabled={!canArrange}
+                >
+                  上移
+                </EditorChromeButton>
+                <EditorChromeButton
+                  className="h-10 justify-center"
+                  onClick={() => arrangeActiveObject("backward")}
+                  disabled={!canArrange}
+                >
+                  下移
+                </EditorChromeButton>
+                <EditorChromeButton
+                  className="h-10 justify-center"
+                  onClick={() => arrangeActiveObject("front")}
+                  disabled={!canArrange}
+                >
+                  移至最前
+                </EditorChromeButton>
+                <EditorChromeButton
+                  className="h-10 justify-center"
+                  onClick={() => arrangeActiveObject("back")}
+                  disabled={!canArrange}
+                >
+                  移至最底
+                </EditorChromeButton>
+              </div>
+            </EditorRailSection>
+          </div>
+        ) : null
       }
       bottomStrip={
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/[0.06] bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
