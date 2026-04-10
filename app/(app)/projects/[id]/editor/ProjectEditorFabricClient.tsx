@@ -43,7 +43,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   EditorChromeButton,
-  EditorInfoList,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
@@ -71,6 +70,7 @@ import {
   type ProjectShapeType,
 } from "@/lib/project-editor-scene";
 import { cn } from "@/lib/utils";
+import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import type { ProjectEditorInitialData } from "./ProjectEditorClient";
 
 type FabricModule = typeof import("fabric");
@@ -191,8 +191,13 @@ export function ProjectEditorFabricClient({
   const [activeMeta, setActiveMeta] = useState<ActiveObjectMeta>({ kind: "none" });
   const [assetSearch, setAssetSearch] = useState("");
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const [uploadingAssets, setUploadingAssets] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const [projectFactsDraft, setProjectFactsDraft] = useState(initialData.facts);
+  const [factsSaveState, setFactsSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
+    "saved"
+  );
   const [diagnosing, setDiagnosing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [assetDetailsSaving, setAssetDetailsSaving] = useState(false);
@@ -212,6 +217,7 @@ export function ProjectEditorFabricClient({
 
   const hostRef = useRef<HTMLCanvasElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const assetUploadRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<FabricCanvas | null>(null);
   const fabricRef = useRef<FabricModule | null>(null);
   const boardBackgroundRef = useRef<FabricObject | null>(null);
@@ -219,7 +225,9 @@ export function ProjectEditorFabricClient({
   const hydratingRef = useRef(false);
   const boardLoadTokenRef = useRef(0);
   const lastSavedSceneRef = useRef(JSON.stringify(scene));
+  const lastSavedFactsRef = useRef(JSON.stringify(initialData.facts));
   const didHydrateSceneRef = useRef(false);
+  const didHydrateFactsRef = useRef(false);
 
   const [imageDetailsDraft, setImageDetailsDraft] = useState({ title: "", note: "" });
   const assetMap = useMemo(
@@ -263,34 +271,23 @@ export function ProjectEditorFabricClient({
     );
   }, [assetMap, scene.boards]);
   const hasActiveInspector = activeMeta.kind !== "none";
-  const factsSnapshot = [
-    { label: "项目类型", value: initialData.facts.projectType.trim() || "待补充" },
-    { label: "所属行业", value: initialData.facts.industry.trim() || "待补充" },
-    { label: "我的角色", value: initialData.facts.roleTitle.trim() || "待补充" },
-    { label: "背景摘要", value: initialData.facts.background.trim() || "待补充" },
-    { label: "结果摘要", value: initialData.facts.resultSummary.trim() || "待补充" },
-  ];
+  const hasFloatingContext =
+    activeMeta.kind === "text" || activeMeta.kind === "image" || activeMeta.kind === "shape";
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
-  const sourceLabel =
-    initialData.sourceType === "FIGMA"
-      ? "Figma"
-      : initialData.sourceType === "IMAGES"
-        ? "图片导入"
-        : "手动创建";
-  const packageModeLabel =
-    initialData.packageMode === "DEEP"
-      ? "深讲"
-      : initialData.packageMode === "LIGHT"
-        ? "浅讲"
-        : initialData.packageMode === "SUPPORTIVE"
-          ? "补充展示"
-          : "待判断";
   const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
   const selectedImageAsset =
     activeMeta.kind === "image" && activeMeta.assetId
       ? assetMap.get(activeMeta.assetId) ?? null
       : null;
+  const factsSaveLabel =
+    factsSaveState === "saving"
+      ? "正在保存"
+      : factsSaveState === "error"
+        ? "保存失败"
+        : factsSaveState === "dirty"
+          ? "待保存"
+          : "已保存";
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
@@ -506,6 +503,28 @@ export function ProjectEditorFabricClient({
     setSaveState("saved");
   }
 
+  async function persistProjectFacts(
+    factsToSave: ProjectEditorInitialData["facts"],
+    force = false
+  ) {
+    const serialized = JSON.stringify(factsToSave);
+    if (!force && serialized === lastSavedFactsRef.current) {
+      setFactsSaveState("saved");
+      return;
+    }
+
+    setFactsSaveState("saving");
+    await parseJsonResponse(
+      await fetch(`/api/projects/${initialData.id}/facts`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(factsToSave),
+      })
+    );
+    lastSavedFactsRef.current = serialized;
+    setFactsSaveState("saved");
+  }
+
   useEffect(() => {
     if (!didHydrateSceneRef.current) {
       didHydrateSceneRef.current = true;
@@ -522,8 +541,25 @@ export function ProjectEditorFabricClient({
     return () => window.clearTimeout(timeout);
   }, [scene]);
 
+  useEffect(() => {
+    if (!didHydrateFactsRef.current) {
+      didHydrateFactsRef.current = true;
+      return;
+    }
+
+    const serialized = JSON.stringify(projectFactsDraft);
+    if (serialized === lastSavedFactsRef.current) return;
+
+    setFactsSaveState("dirty");
+    const timeout = window.setTimeout(() => {
+      persistProjectFacts(projectFactsDraft).catch(() => setFactsSaveState("error"));
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [projectFactsDraft]);
+
   async function persistCurrentSceneForAction() {
     try {
+      await persistProjectFacts(projectFactsDraft, true);
       await persistScene(scene, true);
     } catch (error) {
       setActionMessage({
@@ -720,8 +756,13 @@ export function ProjectEditorFabricClient({
   function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
     const width = canvas.getWidth();
     const height = canvas.getHeight();
-    const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
-    const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
+    const stageInsetX = 72;
+    const stageInsetTop = 120;
+    const stageInsetBottom = 56;
+    const visibleWidth = Math.max(width - stageInsetX * 2, 0);
+    const visibleHeight = Math.max(height - stageInsetTop - stageInsetBottom, 0);
+    const x = stageInsetX + (visibleWidth - PROJECT_BOARD_WIDTH * nextZoom) / 2;
+    const y = stageInsetTop + (visibleHeight - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
     canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
     setZoom(nextZoom);
     canvas.requestRenderAll();
@@ -730,9 +771,11 @@ export function ProjectEditorFabricClient({
   function fitBoard(canvas: FabricCanvas) {
     const width = canvas.getWidth();
     const height = canvas.getHeight();
+    const availableWidth = Math.max(width - 176, 240);
+    const availableHeight = Math.max(height - 176, 240);
     const zoomToFit = Math.min(
-      (width - 120) / PROJECT_BOARD_WIDTH,
-      (height - 120) / PROJECT_BOARD_HEIGHT
+      availableWidth / PROJECT_BOARD_WIDTH,
+      availableHeight / PROJECT_BOARD_HEIGHT
     );
     applyCenteredZoom(canvas, clamp(zoomToFit, 0.2, 1.5));
   }
@@ -1245,6 +1288,69 @@ export function ProjectEditorFabricClient({
     setActionMessage({ tone: "info", text: "图片已插入当前画板" });
   }
 
+  async function refreshAssets() {
+    const response = await parseJsonResponse<{
+      assets: ProjectEditorInitialData["assets"];
+    }>(await fetch(`/api/projects/${initialData.id}/assets`));
+    setAssets(response.assets);
+    return response.assets;
+  }
+
+  async function handleUploadAssets(files: File[]) {
+    if (files.length === 0) return;
+    const existingIds = new Set(assets.map((asset) => asset.id));
+    setUploadingAssets(true);
+    setActionMessage(null);
+
+    try {
+      const uploadedFiles = await uploadFilesFromBrowser({
+        files,
+        folder: "project-assets",
+        kind: "project-image",
+      });
+
+      await parseJsonResponse(
+        await fetch(`/api/projects/${initialData.id}/assets/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: uploadedFiles }),
+        })
+      );
+
+      const nextAssets = await refreshAssets();
+      const newlyUploaded = nextAssets.filter((asset) => !existingIds.has(asset.id));
+      if (newlyUploaded.length === 1) {
+        await addAssetToCanvas(newlyUploaded[0].id);
+        setActionMessage({ tone: "info", text: "图片已上传并插入当前画板" });
+      } else {
+        setActionMessage({
+          tone: "info",
+          text: `已上传 ${newlyUploaded.length || files.length} 张图片，可继续插入到当前画板`,
+        });
+      }
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "图片上传失败，请稍后重试",
+      });
+    } finally {
+      setUploadingAssets(false);
+    }
+  }
+
+  function handleOpenAssetUpload() {
+    assetUploadRef.current?.click();
+  }
+
+  async function handleAssetFilesPicked(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+    await handleUploadAssets(selectedFiles);
+    if (assetUploadRef.current) {
+      assetUploadRef.current.value = "";
+    }
+  }
+
   async function saveSelectedImageDetails() {
     if (!selectedImageAsset || assetDetailsSaving) return;
 
@@ -1473,27 +1579,100 @@ export function ProjectEditorFabricClient({
               ) : null}
               {leftPanel === "project" ? (
                 <>
-                  <EditorRailSection title="项目概况">
-                    <EditorInfoList
-                      items={[
-                        { label: "导入方式", value: sourceLabel },
-                        { label: "包装模式", value: packageModeLabel },
-                        { label: "素材数量", value: `${initialData.assets.length} 张` },
-                        { label: "当前画板", value: activeBoard?.name ?? "未命名" },
-                      ]}
-                    />
-                  </EditorRailSection>
-                  <EditorRailSection title="项目背景信息">
+                  <EditorRailSection title="项目背景与上下文">
                     <div className="space-y-3">
-                      {factsSnapshot.map((item) => (
-                        <div
-                          key={item.label}
-                          className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] px-4 py-3"
-                        >
-                          <p className="text-xs text-white/40">{item.label}</p>
-                          <p className="mt-2 text-sm leading-6 text-white/82">{item.value}</p>
+                      <div className="rounded-[22px] border border-white/[0.08] bg-[#171513] px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-white">输入项目背景</p>
+                            <p className="mt-1 text-xs text-white/42">
+                              这里的内容会直接作为诊断和排版生成的上下文。
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-[11px]",
+                              factsSaveState === "error"
+                                ? "border-red-300/20 bg-red-400/10 text-red-100"
+                                : "border-white/[0.08] bg-white/[0.04] text-white/54"
+                            )}
+                          >
+                            {factsSaveLabel}
+                          </span>
                         </div>
-                      ))}
+                      </div>
+                      <div className="space-y-3 rounded-[24px] border border-white/[0.06] bg-[#141311] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <div>
+                          <label className="text-xs text-white/44">项目类型</label>
+                          <Input
+                            value={projectFactsDraft.projectType}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                projectType: event.target.value,
+                              }))
+                            }
+                            placeholder="例如 SaaS 后台、品牌官网、移动端应用"
+                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/44">所属行业</label>
+                          <Input
+                            value={projectFactsDraft.industry}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                industry: event.target.value,
+                              }))
+                            }
+                            placeholder="例如 AI、教育、金融、消费品"
+                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/44">我的角色</label>
+                          <Input
+                            value={projectFactsDraft.roleTitle}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                roleTitle: event.target.value,
+                              }))
+                            }
+                            placeholder="例如 产品设计负责人、全栈开发、独立设计师"
+                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/44">背景摘要</label>
+                          <Textarea
+                            value={projectFactsDraft.background}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                background: event.target.value,
+                              }))
+                            }
+                            placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
+                            className="mt-2 min-h-[118px] rounded-[22px] border-white/[0.08] bg-[#1a1816] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/44">结果摘要</label>
+                          <Textarea
+                            value={projectFactsDraft.resultSummary}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                resultSummary: event.target.value,
+                              }))
+                            }
+                            placeholder="补充最终结果、影响、亮点与可量化成果。"
+                            className="mt-2 min-h-[104px] rounded-[22px] border-white/[0.08] bg-[#1a1816] text-white"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </EditorRailSection>
                 </>
@@ -1599,7 +1778,7 @@ export function ProjectEditorFabricClient({
       center={
         <div className="flex h-full min-h-0 flex-col">
           <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-black/6 bg-[#f1eee8]/94 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.42)] backdrop-blur">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-[24px] border border-black/8 bg-[#f3eee7] px-2.5 py-2 text-neutral-950 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.42)]">
               {activeMeta.kind === "text" ? (
                 <div className="flex items-center gap-2">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
@@ -1655,17 +1834,8 @@ export function ProjectEditorFabricClient({
                     className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
                   />
                 </div>
-              ) : (
-                <div className="min-w-0 pr-1">
-                  <p className="max-w-[220px] truncate text-sm font-semibold">
-                    {activeBoard?.name ?? "未命名画板"}
-                  </p>
-                  <p className="max-w-[280px] truncate text-[11px] text-neutral-500">
-                    插入图片、添加文本，使用按钮缩放。
-                  </p>
-                </div>
-              )}
-              <div className="h-8 w-px bg-black/8" />
+              ) : null}
+              {hasFloatingContext ? <div className="h-8 w-px bg-black/8" /> : null}
               <EditorChromeButton
                 className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
                 onClick={() => {
@@ -1770,6 +1940,14 @@ export function ProjectEditorFabricClient({
             className="relative flex-1 overflow-hidden"
             onContextMenu={(event) => event.preventDefault()}
           >
+            <input
+              ref={assetUploadRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(event) => void handleAssetFilesPicked(event.target.files)}
+            />
             {!canvasReady ? (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
                 <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
@@ -1784,15 +1962,35 @@ export function ProjectEditorFabricClient({
                 className="absolute left-6 top-6 z-30 w-[356px] animate-in fade-in-0 slide-in-from-top-2 duration-200"
                 onMouseDown={(event) => event.stopPropagation()}
               >
-                <div className="rounded-[28px] border border-white/[0.08] bg-[#141311]/96 p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)] backdrop-blur">
+                <div className="rounded-[28px] border border-white/[0.08] bg-[#161412] p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-white">插入图片</p>
-                      <p className="mt-1 text-xs text-white/46">从当前项目素材中挑一张放进画板。</p>
+                      <p className="mt-1 text-xs text-white/46">先上传本地图片，也可以复用当前项目素材。</p>
                     </div>
                     <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-xs text-white/54">
                       {visibleAssets.length} 张
                     </span>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={handleOpenAssetUpload}
+                      disabled={uploadingAssets}
+                      className="h-10 flex-1 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                    >
+                      {uploadingAssets ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          上传中
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          上传本地图片
+                        </>
+                      )}
+                    </Button>
                   </div>
                   <Input
                     value={assetSearch}

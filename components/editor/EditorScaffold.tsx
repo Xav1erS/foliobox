@@ -66,8 +66,8 @@ export function EditorScaffold({
   const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta);
 
   return (
-    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0f0f0e] text-white">
-      <header className="border-b border-white/[0.05] bg-[#111110]/92 backdrop-blur-2xl">
+    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0d0d0c] text-white">
+      <header className="border-b border-white/[0.05] bg-[#0f0f0e]/96 shadow-[0_18px_40px_-32px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="flex min-h-[68px] items-center gap-3 px-5 py-2.5">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
@@ -124,7 +124,7 @@ export function EditorScaffold({
         ) : (
           <aside
             className={cn(
-              "flex shrink-0 flex-col border-r border-white/[0.05] bg-[#121110] transition-[width] duration-300 ease-out",
+              "flex shrink-0 flex-col border-r border-white/[0.05] bg-[#11100f] shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
               leftRailWidthClass
             )}
           >
@@ -137,13 +137,13 @@ export function EditorScaffold({
           </aside>
         )}
 
-        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#151413]">
+        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#171513]">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 18% 20%, rgba(255,255,255,0.055), transparent 18%), radial-gradient(circle at 78% 74%, rgba(255,255,255,0.04), transparent 22%), radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1.5px)",
-              backgroundSize: "auto, auto, 30px 30px",
+                "radial-gradient(circle at 18% 20%, rgba(255,255,255,0.05), transparent 18%), radial-gradient(circle at 78% 74%, rgba(255,255,255,0.035), transparent 22%), radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1.5px)",
+              backgroundSize: "auto, auto, 34px 34px",
               maskImage:
                 "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
               WebkitMaskImage:
@@ -163,7 +163,7 @@ export function EditorScaffold({
           ) : (
             <aside
               className={cn(
-                "flex shrink-0 flex-col border-l border-white/[0.05] bg-[#121110] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
+                "flex shrink-0 flex-col border-l border-white/[0.05] bg-[#151311] shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
                 rightRailWidthClass
               )}
             >
@@ -179,7 +179,9 @@ export function EditorScaffold({
       </div>
 
       {bottomStrip ? (
-        <div className="border-t border-white/[0.05] bg-[#121110]/92 px-4 py-2.5 backdrop-blur-2xl">{bottomStrip}</div>
+        <div className="border-t border-white/[0.05] bg-[#0f0f0e]/96 px-4 py-3 shadow-[0_-20px_48px_-36px_rgba(0,0,0,0.82)] backdrop-blur-2xl">
+          {bottomStrip}
+        </div>
       ) : null}
     </div>
   );
@@ -195,7 +197,7 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.015] px-4">
+    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.02] px-4">
       <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
@@ -223,7 +225,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#11100f] text-white/44 transition-colors hover:bg-[#1a1817] hover:text-white"
+      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#100f0e] text-white/44 transition-colors hover:bg-[#1a1817] hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (
