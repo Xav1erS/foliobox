@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
 import {
   DndContext,
@@ -39,17 +40,36 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   EditorChromeButton,
   EditorChromeIconButton,
+  EditorEmptyState,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
+  EditorTabsList,
+  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
+import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
+import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
+import type { PackageRecommendation } from "@/app/api/projects/[id]/package/recommend/route";
+import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
   createProjectBoard,
   createProjectImageNode,
@@ -57,13 +77,16 @@ import {
   markBoardsAsAnalyzed,
   createProjectShapeNode,
   createProjectTextNode,
+  getGenerationScopeBoardIds,
   getSceneBoardById,
+  mergeProjectLayoutDocument,
   normalizeProjectEditorScene,
   PROJECT_BOARD_HEIGHT,
   PROJECT_BOARD_WIDTH,
   PROJECT_SHAPE_TYPES,
   resolveProjectEditorScene,
   resolveProjectAssetMeta,
+  type GenerationScope,
   type ProjectBoard,
   type ProjectBoardImageNode,
   type ProjectBoardNode,
@@ -71,6 +94,11 @@ import {
   type ProjectEditorScene,
   type ProjectShapeType,
 } from "@/lib/project-editor-scene";
+import {
+  STYLE_PRESETS,
+  type StyleProfile,
+  type StyleReferenceSelection,
+} from "@/lib/style-reference-presets";
 import { cn } from "@/lib/utils";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import type { ProjectEditorInitialData } from "./ProjectEditorClient";
@@ -121,6 +149,20 @@ type ContextMenuState = {
 };
 
 type LeftPanelKey = "project" | "layers" | "boards";
+type RightRailPanel = "inspector" | "ai";
+
+type GeneratePrecheck = {
+  actionType: string;
+  styleProfile: StyleProfile;
+  suggestedMode: "continue" | "reuse" | "block";
+  consumesQuota: boolean;
+  failureCounts: boolean;
+  activeProjectRemaining: number;
+  actionRemaining: number;
+  reusableDraftId: string | null;
+  reusableTaskId?: string | null;
+  generationScope?: GenerationScope;
+};
 
 const SHAPE_LABELS: Record<ProjectShapeType, string> = {
   rect: "矩形",
@@ -161,6 +203,13 @@ function clamp(value: number, min: number, max: number) {
 
 const STAGE_PADDING = 88;
 
+function packageModeLabel(mode: string | null) {
+  if (mode === "DEEP") return "深讲";
+  if (mode === "LIGHT") return "浅讲";
+  if (mode === "SUPPORTIVE") return "补充展示";
+  return "待判断";
+}
+
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) {
@@ -177,6 +226,44 @@ function getBoardThumbnailAssetId(board: ProjectBoard) {
   return imageNode?.assetId ?? null;
 }
 
+function getNextStepConclusion(params: {
+  boundaryAnalysis: BoundaryAnalysis | null;
+  completenessAnalysis: CompletenessAnalysis | null;
+  layout: LayoutJson | null;
+  packageMode: string | null;
+  packageRecommendation: PackageRecommendation | null;
+  selectedAssetCount: number;
+}) {
+  const {
+    boundaryAnalysis,
+    completenessAnalysis,
+    layout,
+    packageMode,
+    packageRecommendation,
+    selectedAssetCount,
+  } = params;
+
+  if (layout?.pages?.length) {
+    return "当前项目已经拿到排版建议。继续细调单画板内容，再决定要不要发起新一轮生成。";
+  }
+  if (selectedAssetCount === 0) {
+    return "先上传并插入几张关键素材，再运行项目诊断，让系统理解当前项目。";
+  }
+  if (!boundaryAnalysis || !completenessAnalysis || !packageRecommendation) {
+    return "先运行项目诊断，让系统基于当前画板上下文补齐边界、完整度和包装模式判断。";
+  }
+  if (!completenessAnalysis.canProceed) {
+    return (
+      completenessAnalysis.prioritySuggestions[0] ??
+      "先把当前画板里的关键信息补齐，再继续排版。"
+    );
+  }
+  if (!packageMode) {
+    return `建议先确认“${packageModeLabel(packageRecommendation.recommendedMode)}”模式，再生成排版建议。`;
+  }
+  return "当前信息已经够用，可以直接以当前画板范围继续生成排版建议。";
+}
+
 export function ProjectEditorFabricClient({
   initialData,
   planSummary,
@@ -184,12 +271,23 @@ export function ProjectEditorFabricClient({
   initialData: ProjectEditorInitialData;
   planSummary: PlanSummaryCopy;
 }) {
+  const router = useRouter();
   const [scene, setScene] = useState<ProjectEditorScene>(() =>
     resolveProjectEditorScene(initialData.layout, {
       assets: initialData.assets,
       projectName: initialData.name,
     })
   );
+  const [stage, setStage] = useState(initialData.stage);
+  const [packageMode, setPackageMode] = useState(initialData.packageMode);
+  const [boundaryAnalysis, setBoundaryAnalysis] = useState(initialData.boundaryAnalysis);
+  const [completenessAnalysis, setCompletenessAnalysis] = useState(
+    initialData.completenessAnalysis
+  );
+  const [packageRecommendation, setPackageRecommendation] = useState(
+    initialData.packageRecommendation
+  );
+  const [layout, setLayout] = useState<LayoutJson | null>(initialData.layout);
   const [canvasReady, setCanvasReady] = useState(false);
   const [assets, setAssets] = useState(initialData.assets);
   const [activeMeta, setActiveMeta] = useState<ActiveObjectMeta>({ kind: "none" });
@@ -197,14 +295,33 @@ export function ProjectEditorFabricClient({
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [projectFactsDraft, setProjectFactsDraft] = useState(initialData.facts);
   const [factsSaveState, setFactsSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
     "saved"
   );
+  const [rightPanel, setRightPanel] = useState<RightRailPanel>("inspector");
   const [diagnosing, setDiagnosing] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [checkingPrecheck, setCheckingPrecheck] = useState(false);
+  const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
+  const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
+    const styleProfile = initialData.layout?.styleProfile;
+    if (styleProfile?.source === "preset" && styleProfile.presetKey) {
+      return { source: "preset", presetKey: styleProfile.presetKey };
+    }
+    if (styleProfile?.source === "reference_set" && styleProfile.referenceSetId) {
+      return {
+        source: "reference_set",
+        referenceSetId: styleProfile.referenceSetId,
+        referenceSetName: styleProfile.referenceSetName ?? null,
+      };
+    }
+    return { source: "none" };
+  });
   const [assetDetailsSaving, setAssetDetailsSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState<{
     tone: "info" | "error";
     text: string;
@@ -274,9 +391,79 @@ export function ProjectEditorFabricClient({
       })
     );
   }, [assetMap, scene.boards]);
+  const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
+  const selectedAssets = useMemo(() => assets.filter((asset) => asset.selected), [assets]);
+  const aiHistory = useMemo(
+    () =>
+      [
+        boundaryAnalysis
+          ? { key: "boundary", label: "边界分析", summary: boundaryAnalysis.projectSummary }
+          : null,
+        completenessAnalysis
+          ? {
+              key: "completeness",
+              label: "完整度检查",
+              summary: completenessAnalysis.overallComment,
+            }
+          : null,
+        packageRecommendation
+          ? {
+              key: "package",
+              label: "包装模式推荐",
+              summary: packageRecommendation.reasoning,
+            }
+          : null,
+        layout?.narrativeSummary
+          ? {
+              key: "layout",
+              label: "排版结果",
+              summary: layout.narrativeSummary,
+            }
+          : null,
+      ].filter(Boolean) as Array<{ key: string; label: string; summary: string }>,
+    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
+  );
+  const currentConclusion = useMemo(
+    () =>
+      layout?.narrativeSummary ??
+      packageRecommendation?.reasoning ??
+      completenessAnalysis?.overallComment ??
+      boundaryAnalysis?.projectSummary ??
+      "先运行项目诊断，系统会基于当前画板上下文返回边界、完整度和包装模式建议。",
+    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
+  );
+  const nextStepConclusion = useMemo(
+    () =>
+      getNextStepConclusion({
+        boundaryAnalysis,
+        completenessAnalysis,
+        layout,
+        packageMode,
+        packageRecommendation,
+        selectedAssetCount: selectedAssets.length,
+      }),
+    [boundaryAnalysis, completenessAnalysis, layout, packageMode, packageRecommendation, selectedAssets.length]
+  );
+  const aiHighlights = useMemo(
+    () =>
+      [
+        ...(boundaryAnalysis?.suggestions ?? []),
+        ...(packageRecommendation?.reasoning ? [packageRecommendation.reasoning] : []),
+      ].slice(0, 3),
+    [boundaryAnalysis?.suggestions, packageRecommendation?.reasoning]
+  );
+  const aiIssues = useMemo(
+    () =>
+      [
+        ...(boundaryAnalysis?.risks ?? []),
+        ...(completenessAnalysis?.prioritySuggestions ?? []),
+      ].slice(0, 4),
+    [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
+  );
   const hasActiveInspector = activeMeta.kind !== "none";
   const hasFloatingContext =
     activeMeta.kind === "text" || activeMeta.kind === "image" || activeMeta.kind === "shape";
+  const showRightRail = hasActiveInspector || rightPanel === "ai";
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
   const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
@@ -292,6 +479,14 @@ export function ProjectEditorFabricClient({
         : factsSaveState === "dirty"
           ? "待保存"
           : "已保存";
+  const sceneSaveLabel =
+    saveState === "saving"
+      ? "画板保存中"
+      : saveState === "error"
+        ? "画板保存失败"
+        : saveState === "dirty"
+          ? "画板待保存"
+          : "画板已保存";
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
@@ -319,12 +514,131 @@ export function ProjectEditorFabricClient({
     );
   }
 
-  function getCurrentGenerationScope() {
-    const boardId = activeBoard?.id ?? scene.activeBoardId;
-    return {
-      mode: "current" as const,
-      boardIds: boardId ? [boardId] : [],
-    };
+  function setGenerationMode(mode: GenerationScope["mode"]) {
+    setScene((current) => {
+      if (mode === "all") {
+        return normalizeProjectEditorScene({
+          ...current,
+          generationScope: { mode: "all", boardIds: current.boardOrder },
+        });
+      }
+
+      if (mode === "selected") {
+        const selectedIds =
+          current.generationScope.mode === "selected" && current.generationScope.boardIds.length > 0
+            ? current.generationScope.boardIds
+            : [current.activeBoardId];
+        return normalizeProjectEditorScene({
+          ...current,
+          generationScope: { mode: "selected", boardIds: selectedIds },
+        });
+      }
+
+      return normalizeProjectEditorScene({
+        ...current,
+        generationScope: { mode: "current", boardIds: [current.activeBoardId] },
+      });
+    });
+  }
+
+  function toggleBoardInSelection(boardId: string) {
+    setScene((current) => {
+      const currentIds =
+        current.generationScope.mode === "selected"
+          ? current.generationScope.boardIds
+          : [boardId];
+      const exists = currentIds.includes(boardId);
+      const nextIds = exists
+        ? currentIds.filter((value) => value !== boardId)
+        : [...currentIds, boardId];
+
+      if (nextIds.length === 0) {
+        return normalizeProjectEditorScene({
+          ...current,
+          generationScope: { mode: "current", boardIds: [current.activeBoardId] },
+        });
+      }
+
+      return normalizeProjectEditorScene({
+        ...current,
+        generationScope: { mode: "selected", boardIds: nextIds },
+      });
+    });
+  }
+
+  async function ensureLayoutStage(mode: string) {
+    let currentStage = stage;
+    let guard = 0;
+
+    while (!["LAYOUT", "READY"].includes(currentStage) && guard < 6) {
+      const response = await parseJsonResponse<{ stage: string; packageMode?: string }>(
+        await fetch(`/api/projects/${initialData.id}/stage`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentStage === "PACKAGE" ? { packageMode: mode } : {}),
+        })
+      );
+
+      currentStage = response.stage;
+      setStage(currentStage);
+      if (response.packageMode) {
+        setPackageMode(response.packageMode);
+      }
+      guard += 1;
+    }
+
+    return currentStage;
+  }
+
+  function getResolvedStyleSelection() {
+    if (styleSelection.source === "reference_set") {
+      const matched = initialData.styleReferenceSets.find(
+        (item) => item.id === styleSelection.referenceSetId
+      );
+      return {
+        source: "reference_set" as const,
+        referenceSetId: matched?.id ?? styleSelection.referenceSetId ?? null,
+        referenceSetName: matched?.name ?? styleSelection.referenceSetName ?? null,
+      };
+    }
+
+    if (styleSelection.source === "preset") {
+      return {
+        source: "preset" as const,
+        presetKey: styleSelection.presetKey ?? null,
+      };
+    }
+
+    return { source: "none" as const };
+  }
+
+  async function refreshGeneratePrecheck() {
+    setCheckingPrecheck(true);
+    setActionError("");
+    try {
+      await persistCurrentSceneForAction();
+      const data = await parseJsonResponse<GeneratePrecheck>(
+        await fetch(`/api/projects/${initialData.id}/layout/precheck`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            styleSelection: getResolvedStyleSelection(),
+            generationScope: scene.generationScope,
+          }),
+        })
+      );
+      setGeneratePrecheck(data);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "生成预检失败");
+      setGeneratePrecheck(null);
+    } finally {
+      setCheckingPrecheck(false);
+    }
+  }
+
+  async function handleOpenGenerate() {
+    setGenerateOpen(true);
+    await refreshGeneratePrecheck();
   }
 
   function getLayerItemsFromCanvas(canvas: FabricCanvas) {
@@ -504,6 +818,9 @@ export function ProjectEditorFabricClient({
     }
 
     lastSavedSceneRef.current = serialized;
+    setLayout((current) =>
+      mergeProjectLayoutDocument(current, { editorScene: sceneToSave }) as LayoutJson
+    );
     setSaveState("saved");
   }
 
@@ -577,55 +894,89 @@ export function ProjectEditorFabricClient({
   async function handleRunDiagnosis() {
     if (!activeBoard || diagnosing) return;
     setDiagnosing(true);
+    setRightPanel("ai");
+    setActionError("");
     setActionMessage(null);
 
     try {
       await persistCurrentSceneForAction();
-      const generationScope = getCurrentGenerationScope();
+      const generationScope = scene.generationScope;
       const payload = JSON.stringify({ generationScope });
-      const [boundaryResult, completenessResult, packageResult] =
-        await Promise.allSettled([
-          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/boundary/analyze`, {
+      const [boundaryResult, completenessResult, packageResult] = await Promise.allSettled([
+        parseJsonResponse<{ analysis: BoundaryAnalysis }>(
+          await fetch(`/api/projects/${initialData.id}/boundary/analyze`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,
-          })),
-          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/completeness/analyze`, {
+          })
+        ),
+        parseJsonResponse<{ analysis: CompletenessAnalysis }>(
+          await fetch(`/api/projects/${initialData.id}/completeness/analyze`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,
-          })),
-          parseJsonResponse(await fetch(`/api/projects/${initialData.id}/package/recommend`, {
+          })
+        ),
+        parseJsonResponse<{ recommendation: PackageRecommendation }>(
+          await fetch(`/api/projects/${initialData.id}/package/recommend`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,
-          })),
-        ]);
+          })
+        ),
+      ]);
 
-      const failures = [boundaryResult, completenessResult, packageResult].filter(
-        (item) => item.status === "rejected"
-      ) as PromiseRejectedResult[];
+      const failures: string[] = [];
+      let successCount = 0;
+      let nextCompleteness: CompletenessAnalysis | null = null;
+      let nextBoundary: BoundaryAnalysis | null = null;
 
-      const nextStatus = failures.length > 0 ? "needs_attention" : "analyzed";
-      setScene((current) =>
-        markBoardsAsAnalyzed(current, generationScope.boardIds, nextStatus)
-      );
-      setActionMessage({
-        tone: failures.length > 0 ? "error" : "info",
-        text:
-          failures.length > 0
-            ? `项目诊断部分完成：${failures
-                .map((item) =>
-                  item.reason instanceof Error ? item.reason.message : "请求失败"
-                )
-                .join("；")}`
-            : "项目诊断已完成",
-      });
+      if (boundaryResult.status === "fulfilled") {
+        nextBoundary = boundaryResult.value.analysis;
+        setBoundaryAnalysis(nextBoundary);
+        successCount += 1;
+      } else {
+        failures.push(
+          `边界分析：${boundaryResult.reason instanceof Error ? boundaryResult.reason.message : "失败"}`
+        );
+      }
+
+      if (completenessResult.status === "fulfilled") {
+        nextCompleteness = completenessResult.value.analysis;
+        setCompletenessAnalysis(nextCompleteness);
+        successCount += 1;
+      } else {
+        failures.push(
+          `完整度检查：${completenessResult.reason instanceof Error ? completenessResult.reason.message : "失败"}`
+        );
+      }
+
+      if (packageResult.status === "fulfilled") {
+        setPackageRecommendation(packageResult.value.recommendation);
+        successCount += 1;
+      } else {
+        failures.push(
+          `包装模式推荐：${packageResult.reason instanceof Error ? packageResult.reason.message : "失败"}`
+        );
+      }
+
+      if (successCount > 0) {
+        const nextStatus =
+          nextCompleteness?.canProceed === false || nextBoundary?.isBoundaryClean === false
+            ? "needs_attention"
+            : "analyzed";
+        setScene((current) => markBoardsAsAnalyzed(current, generationBoardIds, nextStatus));
+      }
+
+      if (failures.length > 0) {
+        setActionError(
+          successCount > 0 ? `部分诊断已完成；${failures.join("；")}` : failures.join("；")
+        );
+      } else {
+        setActionMessage({ tone: "info", text: "项目诊断已完成" });
+      }
     } catch (error) {
-      setActionMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "项目诊断失败，请稍后重试",
-      });
+      setActionError(error instanceof Error ? error.message : "项目诊断失败，请稍后重试");
     } finally {
       setDiagnosing(false);
     }
@@ -634,28 +985,73 @@ export function ProjectEditorFabricClient({
   async function handleGenerateLayout() {
     if (!activeBoard || generating) return;
     setGenerating(true);
+    setActionError("");
     setActionMessage(null);
 
     try {
+      const resolvedMode = packageMode ?? packageRecommendation?.recommendedMode ?? null;
+      if (!resolvedMode) {
+        setActionError("请先运行项目诊断，拿到包装模式建议后再生成排版。");
+        return;
+      }
+
       await persistCurrentSceneForAction();
-      const generationScope = getCurrentGenerationScope();
-      await parseJsonResponse(
+      if (!packageMode) {
+        const stageData = await parseJsonResponse<{ packageMode?: string; stage?: string }>(
+          await fetch(`/api/projects/${initialData.id}/stage`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ packageMode: resolvedMode, preserveStage: true }),
+          })
+        );
+
+        if (stageData.packageMode) {
+          setPackageMode(stageData.packageMode);
+        }
+        if (stageData.stage) {
+          setStage(stageData.stage);
+        }
+      }
+
+      await ensureLayoutStage(resolvedMode);
+
+      const data = await parseJsonResponse<{
+        layoutJson: LayoutJson;
+        reused?: boolean;
+      }>(
         await fetch(`/api/projects/${initialData.id}/layout/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ generationScope }),
+          body: JSON.stringify({
+            styleSelection: getResolvedStyleSelection(),
+            generationScope: scene.generationScope,
+          }),
         })
       );
-      setScene((current) => markBoardsAfterGeneration(current, generationScope.boardIds));
-      setActionMessage({
-        tone: "info",
-        text: "生成排版已提交，当前画板保持不变，可继续手动微调。",
-      });
+
+      const nextLayout = data.layoutJson;
+      setLayout(nextLayout);
+      if (nextLayout.editorScene) {
+        const nextScene = resolveProjectEditorScene(nextLayout, {
+          assets,
+          projectName: initialData.name,
+        });
+        setScene(nextScene);
+        lastSavedSceneRef.current = JSON.stringify(nextScene);
+      } else {
+        setScene((current) => markBoardsAfterGeneration(current, generationBoardIds));
+      }
+
+      if (data.reused) {
+        setActionMessage({ tone: "info", text: "命中可复用排版结果，本次没有额外计次。" });
+      } else {
+        setActionMessage({ tone: "info", text: "排版建议已生成，可继续结合单画板细调。" });
+      }
+      setGenerateOpen(false);
+      setRightPanel("ai");
+      router.refresh();
     } catch (error) {
-      setActionMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "生成排版失败，请稍后重试",
-      });
+      setActionError(error instanceof Error ? error.message : "生成排版失败，请稍后重试");
     } finally {
       setGenerating(false);
     }
@@ -696,6 +1092,12 @@ export function ProjectEditorFabricClient({
       note: meta.note ?? "",
     });
   }, [selectedImageAsset]);
+
+  useEffect(() => {
+    if (hasActiveInspector) {
+      setRightPanel("inspector");
+    }
+  }, [hasActiveInspector]);
 
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
@@ -1494,17 +1896,19 @@ export function ProjectEditorFabricClient({
     activeMeta.kind === "text" || activeMeta.kind === "image" || activeMeta.kind === "shape";
 
   return (
-    <EditorScaffold
+    <>
+      <EditorScaffold
       objectLabel=""
       objectName={initialData.name}
       backHref="/projects"
       backLabel="全部项目"
       statusLabel=""
       statusMeta=""
+      topNote={`${sceneSaveLabel} · ${factsSaveLabel}`}
       primaryAction={
         <Button
           className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed]"
-          onClick={() => void handleGenerateLayout()}
+          onClick={() => void handleOpenGenerate()}
           disabled={generating || diagnosing}
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -2139,293 +2543,633 @@ export function ProjectEditorFabricClient({
         </div>
       }
       rightRail={
-        hasActiveInspector ? (
-          <div className="h-full overflow-y-auto">
-            <EditorRailSection title="属性编辑">
-              <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-[#1a1714] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <div className="flex items-center justify-between rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-                  <div>
-                    <p className="text-[11px] tracking-[0.16em] text-white/34">选中对象</p>
-                    <p className="mt-1 text-sm text-white/64">
-                      {activeMeta.kind === "text"
-                        ? "文本"
-                        : activeMeta.kind === "image"
-                          ? "图片"
-                          : activeMeta.kind === "shape"
-                            ? "形状"
-                            : activeMeta.kind === "multi"
-                              ? "多选"
-                              : "对象"}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-white/[0.08] bg-[#14110f] px-2.5 py-1 text-[11px] text-white/52">
-                    {activeMeta.kind === "multi" ? `${activeMeta.count} items` : "single"}
-                  </span>
-                </div>
-                {activeMeta.kind === "multi" ? (
-                  <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/52">
-                    已选 {activeMeta.count} 个对象，可先调整层级或重新选择单个对象编辑属性。
-                  </div>
-                ) : null}
+        showRightRail ? (
+          <div className="flex h-full flex-col">
+            <Tabs
+              value={rightPanel}
+              onValueChange={(value) => setRightPanel(value as RightRailPanel)}
+              className="flex h-full min-h-0 flex-col"
+            >
+              <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#171411] px-4 py-3 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.85)]">
+                <EditorTabsList className="grid h-11 grid-cols-2 rounded-[18px] bg-white/[0.03]">
+                  <EditorTabsTrigger value="inspector">Inspector</EditorTabsTrigger>
+                  <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
+                </EditorTabsList>
+              </div>
 
-                {activeMeta.kind === "text" ? (
-                  <div className="space-y-3">
-                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
-                      <label className="text-xs text-white/50">文本内容</label>
-                      <Textarea
-                        value={activeMeta.text}
-                        onChange={(event) => updateActiveObject({ text: event.target.value })}
-                        className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                      />
-                    </div>
-                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
-                      <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-white/50">字号</label>
-                        <Input
-                          type="number"
-                          value={activeMeta.fontSize}
-                          onChange={(event) =>
-                            updateActiveObject({ fontSize: Number(event.target.value) || 16 })
-                          }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-white/50">字重</label>
-                        <Input
-                          type="number"
-                          value={activeMeta.fontWeight}
-                          onChange={(event) =>
-                            updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
-                          }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                        />
-                      </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-white/50">颜色</label>
-                        <Input
-                          type="color"
-                          value={activeMeta.color}
-                          onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-white/50">透明度</label>
-                        <Input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={activeMeta.opacity}
-                          onChange={(event) =>
-                            updateActiveObject({ opacity: Number(event.target.value) })
-                          }
-                          className="mt-3"
-                        />
-                      </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <TabsContent value="inspector" className="mt-0">
+                  {hasActiveInspector ? (
+                    <div className="h-full overflow-y-auto">
+                      <EditorRailSection title="属性编辑">
+                        <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-[#1a1714] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                          <div className="flex items-center justify-between rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                            <div>
+                              <p className="text-[11px] tracking-[0.16em] text-white/34">选中对象</p>
+                              <p className="mt-1 text-sm text-white/64">
+                                {activeMeta.kind === "text"
+                                  ? "文本"
+                                  : activeMeta.kind === "image"
+                                    ? "图片"
+                                    : activeMeta.kind === "shape"
+                                      ? "形状"
+                                      : activeMeta.kind === "multi"
+                                        ? "多选"
+                                        : "对象"}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-white/[0.08] bg-[#14110f] px-2.5 py-1 text-[11px] text-white/52">
+                              {activeMeta.kind === "multi" ? `${activeMeta.count} items` : "single"}
+                            </span>
+                          </div>
+                          {activeMeta.kind === "multi" ? (
+                            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/52">
+                              已选 {activeMeta.count} 个对象，可先调整层级或重新选择单个对象编辑属性。
+                            </div>
+                          ) : null}
 
-                {activeMeta.kind === "image" ? (
-                  <div className="space-y-3">
-                    {selectedImageAsset ? (
-                      <>
-                        <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
-                          <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">素材语义</p>
-                          <label className="text-xs text-white/50">图片名称</label>
-                          <Input
-                            value={imageDetailsDraft.title}
-                            onChange={(event) =>
-                              setImageDetailsDraft((current) => ({
-                                ...current,
-                                title: event.target.value,
-                              }))
-                            }
-                            placeholder="给这张图片一个更清晰的名称"
-                            className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                          />
-                          <label className="mt-3 block text-xs text-white/50">图片描述</label>
-                          <Textarea
-                            value={imageDetailsDraft.note}
-                            onChange={(event) =>
-                              setImageDetailsDraft((current) => ({
-                                ...current,
-                                note: event.target.value,
-                              }))
-                            }
-                            placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
-                            className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => void saveSelectedImageDetails()}
-                            disabled={assetDetailsSaving}
-                            className="mt-3 h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
-                          >
-                            {assetDetailsSaving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <PencilLine className="h-4 w-4" />
-                            )}
-                            保存图片信息
-                          </Button>
+                          {activeMeta.kind === "text" ? (
+                            <div className="space-y-3">
+                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
+                                <label className="text-xs text-white/50">文本内容</label>
+                                <Textarea
+                                  value={activeMeta.text}
+                                  onChange={(event) => updateActiveObject({ text: event.target.value })}
+                                  className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                />
+                              </div>
+                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">字号</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.fontSize}
+                                      onChange={(event) =>
+                                        updateActiveObject({ fontSize: Number(event.target.value) || 16 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">字重</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.fontWeight}
+                                      onChange={(event) =>
+                                        updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">颜色</label>
+                                    <Input
+                                      type="color"
+                                      value={activeMeta.color}
+                                      onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">透明度</label>
+                                    <Input
+                                      type="range"
+                                      min={0}
+                                      max={1}
+                                      step={0.05}
+                                      value={activeMeta.opacity}
+                                      onChange={(event) =>
+                                        updateActiveObject({ opacity: Number(event.target.value) })
+                                      }
+                                      className="mt-3"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {activeMeta.kind === "image" ? (
+                            <div className="space-y-3">
+                              {selectedImageAsset ? (
+                                <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                  <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">素材语义</p>
+                                  <label className="text-xs text-white/50">图片名称</label>
+                                  <Input
+                                    value={imageDetailsDraft.title}
+                                    onChange={(event) =>
+                                      setImageDetailsDraft((current) => ({
+                                        ...current,
+                                        title: event.target.value,
+                                      }))
+                                    }
+                                    placeholder="给这张图片一个更清晰的名称"
+                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                  />
+                                  <label className="mt-3 block text-xs text-white/50">图片描述</label>
+                                  <Textarea
+                                    value={imageDetailsDraft.note}
+                                    onChange={(event) =>
+                                      setImageDetailsDraft((current) => ({
+                                        ...current,
+                                        note: event.target.value,
+                                      }))
+                                    }
+                                    placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
+                                    className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() => void saveSelectedImageDetails()}
+                                    disabled={assetDetailsSaving}
+                                    className="mt-3 h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                                  >
+                                    {assetDetailsSaving ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <PencilLine className="h-4 w-4" />
+                                    )}
+                                    保存图片信息
+                                  </Button>
+                                </div>
+                              ) : null}
+                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
+                                <label className="text-xs text-white/50">透明度</label>
+                                <Input
+                                  type="range"
+                                  min={0}
+                                  max={1}
+                                  step={0.05}
+                                  value={activeMeta.opacity}
+                                  onChange={(event) =>
+                                    updateActiveObject({ opacity: Number(event.target.value) })
+                                  }
+                                  className="mt-3"
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {activeMeta.kind === "shape" ? (
+                            <div className="space-y-3">
+                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
+                                <label className="text-xs text-white/50">填充色</label>
+                                <Input
+                                  type="color"
+                                  value={activeMeta.fill}
+                                  onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                                  className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
+                                />
+                                <label className="mt-3 block text-xs text-white/50">描边色</label>
+                                <Input
+                                  type="color"
+                                  value={activeMeta.stroke ?? "#000000"}
+                                  onChange={(event) => updateActiveObject({ stroke: event.target.value })}
+                                  className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
+                                />
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">描边宽度</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.strokeWidth}
+                                      onChange={(event) =>
+                                        updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">透明度</label>
+                                    <Input
+                                      type="range"
+                                      min={0}
+                                      max={1}
+                                      step={0.05}
+                                      value={activeMeta.opacity}
+                                      onChange={(event) =>
+                                        updateActiveObject({ opacity: Number(event.target.value) })
+                                      }
+                                      className="mt-3"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                      </>
-                    ) : null}
-                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
-                      <label className="text-xs text-white/50">透明度</label>
-                      <Input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={activeMeta.opacity}
-                        onChange={(event) =>
-                          updateActiveObject({ opacity: Number(event.target.value) })
-                        }
-                        className="mt-3"
-                      />
-                    </div>
-                  </div>
-                ) : null}
+                      </EditorRailSection>
 
-                {activeMeta.kind === "shape" ? (
-                  <div className="space-y-3">
-                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
-                      <label className="text-xs text-white/50">填充色</label>
-                      <Input
-                        type="color"
-                        value={activeMeta.fill}
-                        onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                      />
-                      <label className="mt-3 block text-xs text-white/50">描边色</label>
-                      <Input
-                        type="color"
-                        value={activeMeta.stroke ?? "#000000"}
-                        onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                      />
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-white/50">描边宽度</label>
-                        <Input
-                          type="number"
-                          value={activeMeta.strokeWidth}
-                          onChange={(event) =>
-                            updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
-                          }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-white/50">透明度</label>
-                        <Input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={activeMeta.opacity}
-                          onChange={(event) =>
-                            updateActiveObject({ opacity: Number(event.target.value) })
-                          }
-                          className="mt-3"
-                        />
-                      </div>
-                      </div>
+                      <EditorRailSection title="图层排布">
+                        <div className="grid grid-cols-2 gap-2">
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => arrangeActiveObject("forward")}
+                            disabled={!canArrange}
+                          >
+                            上移
+                          </EditorChromeButton>
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => arrangeActiveObject("backward")}
+                            disabled={!canArrange}
+                          >
+                            下移
+                          </EditorChromeButton>
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => arrangeActiveObject("front")}
+                            disabled={!canArrange}
+                          >
+                            移至最前
+                          </EditorChromeButton>
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => arrangeActiveObject("back")}
+                            disabled={!canArrange}
+                          >
+                            移至最底
+                          </EditorChromeButton>
+                        </div>
+                      </EditorRailSection>
                     </div>
-                  </div>
-                ) : null}
-              </div>
-            </EditorRailSection>
+                  ) : (
+                    <div className="p-4">
+                      <EditorEmptyState>选中画板中的元素后，这里会显示可编辑属性。</EditorEmptyState>
+                    </div>
+                  )}
+                </TabsContent>
 
-            <EditorRailSection title="图层排布">
-              <div className="grid grid-cols-2 gap-2">
-                <EditorChromeButton
-                  className="h-10 justify-center"
-                  onClick={() => arrangeActiveObject("forward")}
-                  disabled={!canArrange}
-                >
-                  上移
-                </EditorChromeButton>
-                <EditorChromeButton
-                  className="h-10 justify-center"
-                  onClick={() => arrangeActiveObject("backward")}
-                  disabled={!canArrange}
-                >
-                  下移
-                </EditorChromeButton>
-                <EditorChromeButton
-                  className="h-10 justify-center"
-                  onClick={() => arrangeActiveObject("front")}
-                  disabled={!canArrange}
-                >
-                  移至最前
-                </EditorChromeButton>
-                <EditorChromeButton
-                  className="h-10 justify-center"
-                  onClick={() => arrangeActiveObject("back")}
-                  disabled={!canArrange}
-                >
-                  移至最底
-                </EditorChromeButton>
+                <TabsContent value="ai" className="mt-0">
+                  <div className="h-full overflow-y-auto">
+                    <EditorRailSection title="看到了什么">
+                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                        <CardContent className="p-4 text-sm leading-7 text-white/74">
+                          {currentConclusion}
+                        </CardContent>
+                      </Card>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="亮点">
+                      <div className="space-y-2">
+                        {aiHighlights.length > 0 ? (
+                          aiHighlights.map((point) => (
+                            <Card key={point} className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                              <CardContent className="p-4 text-sm leading-7 text-white/74">
+                                {point}
+                              </CardContent>
+                            </Card>
+                          ))
+                        ) : (
+                          <EditorEmptyState>先运行项目诊断，系统会返回当前亮点和可讲的重点。</EditorEmptyState>
+                        )}
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="问题">
+                      <div className="space-y-2">
+                        {aiIssues.length > 0 ? (
+                          aiIssues.map((point) => (
+                            <Card key={point} className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                              <CardContent className="p-4 text-sm leading-7 text-white/74">
+                                {point}
+                              </CardContent>
+                            </Card>
+                          ))
+                        ) : (
+                          <EditorEmptyState>当前还没有明确问题项，或者你还没跑过诊断。</EditorEmptyState>
+                        )}
+                      </div>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="下一步">
+                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                        <CardContent className="p-4 text-sm leading-7 text-white/74">
+                          {nextStepConclusion}
+                        </CardContent>
+                      </Card>
+                    </EditorRailSection>
+
+                    <EditorRailSection title="和上次相比">
+                      {aiHistory.length > 1 ? (
+                        <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                          <CardContent className="p-4 text-sm leading-7 text-white/74">
+                            已累计 {aiHistory.length} 条 AI 结果。当前最新结论会优先参考你正在编辑的画板范围。
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <EditorEmptyState>还没有形成可比较的历史版本。</EditorEmptyState>
+                      )}
+                    </EditorRailSection>
+
+                    <EditorRailSection title="是否可继续排版">
+                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                        <CardContent className="flex items-center justify-between gap-3 p-4">
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              {layout?.pages?.length
+                                ? "已有排版建议"
+                                : completenessAnalysis?.canProceed
+                                  ? "可以继续"
+                                  : "建议先补强"}
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-white/56">
+                              {layout?.pages?.length
+                                ? `当前已有 ${layout.totalPages} 页排版建议，可继续结合单画板细调。`
+                                : completenessAnalysis?.canProceed
+                                  ? "当前材料和事实已经够用，可以继续生成。"
+                                  : "先补足问题链、角色事实或结果证据，再发起下一轮生成更稳。"}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "rounded-full border-white/10 px-3 py-1 text-white",
+                              (layout?.pages?.length || completenessAnalysis?.canProceed) &&
+                                "border-white/[0.18] bg-white/[0.08] text-white"
+                            )}
+                          >
+                            {layout?.pages?.length
+                              ? "Ready"
+                              : completenessAnalysis?.canProceed
+                                ? "Proceed"
+                                : "Needs work"}
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    </EditorRailSection>
+                  </div>
+                </TabsContent>
               </div>
-            </EditorRailSection>
+            </Tabs>
           </div>
         ) : null
       }
       bottomStrip={
         <div className="mx-auto flex max-w-[1220px] items-center gap-1.5 overflow-x-auto rounded-[28px] border border-white/[0.06] bg-[#14110f] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
-          <div className="shrink-0 px-3 text-sm font-medium text-white/44">
-            {scene.boards.length} 张画板
+          <div className="shrink-0 px-3">
+            <p className="text-sm font-medium text-white/44">{scene.boards.length} 张画板</p>
+            <p className="mt-1 text-[11px] text-white/26">
+              范围：{scene.generationScope.mode === "all" ? "全部" : scene.generationScope.mode === "selected" ? "已选" : "当前"}
+            </p>
           </div>
           {scene.boardOrder.map((boardId) => {
             const board = scene.boards.find((item) => item.id === boardId);
             if (!board) return null;
             const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+            const selectedForScope =
+              scene.generationScope.mode === "all" ||
+              (scene.generationScope.mode === "selected" &&
+                scene.generationScope.boardIds.includes(board.id)) ||
+              (scene.generationScope.mode === "current" && scene.activeBoardId === board.id);
             return (
-              <EditorStripButton
-                key={board.id}
-                active={scene.activeBoardId === board.id}
-                className="w-[96px] p-1.5"
-                onClick={() =>
-                  setScene((current) =>
-                    normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
-                  )
-                }
-              >
-                <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0b0a]">
-                  {thumbnailUrl ? (
-                    <div className="aspect-video">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={buildPrivateBlobProxyUrl(thumbnailUrl)}
-                        alt={board.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-3">
-                      <div className="h-full w-full rounded-[12px] border border-black/6 bg-white" />
-                    </div>
+              <div key={board.id} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleBoardInSelection(board.id);
+                  }}
+                  className={cn(
+                    "absolute right-2 top-2 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] transition-colors",
+                    selectedForScope
+                      ? "border-white/[0.18] bg-[#0f0f0e] text-white"
+                      : "border-white/[0.08] bg-[#14110f]/90 text-white/42 hover:text-white/72"
                   )}
-                </div>
-              </EditorStripButton>
+                  aria-label={selectedForScope ? "取消加入生成范围" : "加入生成范围"}
+                >
+                  {selectedForScope ? "✓" : "+"}
+                </button>
+                <EditorStripButton
+                  active={scene.activeBoardId === board.id}
+                  className={cn(
+                    "w-[96px] p-1.5",
+                    selectedForScope && "border-white/[0.16] ring-1 ring-white/[0.08]"
+                  )}
+                  onClick={() =>
+                    setScene((current) =>
+                      normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
+                    )
+                  }
+                >
+                  <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0b0a]">
+                    {thumbnailUrl ? (
+                      <div className="aspect-video">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={buildPrivateBlobProxyUrl(thumbnailUrl)}
+                          alt={board.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-3">
+                        <div className="h-full w-full rounded-[12px] border border-black/6 bg-white" />
+                      </div>
+                    )}
+                  </div>
+                </EditorStripButton>
+              </div>
             );
           })}
         </div>
       }
-    />
+      />
+      {actionError ? (
+        <div className="border-t border-red-300/12 bg-red-400/8 px-4 py-3 text-sm text-red-100">
+          {actionError}
+        </div>
+      ) : null}
+
+      <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
+        <DialogContent className="max-w-2xl border-white/[0.08] bg-[#161311] text-white">
+          <DialogHeader>
+            <DialogTitle>生成排版</DialogTitle>
+            <DialogDescription className="text-white/56">
+              系统会基于当前画板范围、项目上下文和包装模式生成新的排版建议，不会覆盖你已经摆好的单画板内容。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm text-white/70">
+            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                    生成范围
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    className="h-9 rounded-full border-white/[0.08] bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                    onClick={() => void refreshGeneratePrecheck()}
+                  >
+                    重新检查
+                  </Button>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {[
+                    { mode: "current", label: "当前画板", detail: activeBoard?.name ?? "当前页" },
+                    {
+                      mode: "selected",
+                      label: "已选画板",
+                      detail:
+                        scene.generationScope.mode === "selected"
+                          ? `${scene.generationScope.boardIds.length} 张`
+                          : "从底部缩略图勾选",
+                    },
+                    { mode: "all", label: "全部画板", detail: `${scene.boardOrder.length} 张` },
+                  ].map((item) => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left transition-colors",
+                        scene.generationScope.mode === item.mode
+                          ? "border-white/[0.16] bg-white/[0.1] text-white"
+                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                      )}
+                      onClick={() => setGenerationMode(item.mode as GenerationScope["mode"])}
+                    >
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/44">{item.detail}</p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                    预检
+                  </Badge>
+                  {generatePrecheck?.suggestedMode === "reuse" ? (
+                    <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                      可复用
+                    </Badge>
+                  ) : null}
+                </div>
+                {checkingPrecheck ? (
+                  <div className="flex items-center gap-2 text-white/54">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    正在检查当前输入是否可复用、是否会计次。
+                  </div>
+                ) : generatePrecheck ? (
+                  <>
+                    <p>
+                      {generatePrecheck.suggestedMode === "reuse"
+                        ? "当前命中了可复用排版结果，这次继续生成不会额外计次。"
+                        : `本次会消耗：${generatePrecheck.actionRemaining > 0 ? "当前项目排版 1 次" : "当前项目排版额度已用完"}`}
+                    </p>
+                    <p>若失败，不计次。</p>
+                  </>
+                ) : (
+                  <p>打开弹窗后会自动做一次预检。</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+              <CardContent className="p-4">
+                <div>
+                  <p className="text-sm font-medium text-white">风格参考</p>
+                  <p className="mt-1 text-sm leading-6 text-white/50">
+                    风格参考只影响标题层级、留白密度和包装样式，不改变当前画板结构。
+                  </p>
+                </div>
+                <Separator className="my-4 bg-white/[0.06]" />
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 text-left transition-colors",
+                      styleSelection.source === "none"
+                        ? "border-white/[0.16] bg-white/[0.1] text-white"
+                        : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                    )}
+                    onClick={() => setStyleSelection({ source: "none" })}
+                  >
+                    <p className="text-sm font-medium">不使用风格参考</p>
+                    <p className="mt-1 text-xs leading-5 text-white/44">保持默认中性风格，优先稳定生成结构。</p>
+                  </button>
+                  {STYLE_PRESETS.slice(0, 3).map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left transition-colors",
+                        styleSelection.source === "preset" && styleSelection.presetKey === preset.key
+                          ? "border-white/[0.16] bg-white/[0.1] text-white"
+                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                      )}
+                      onClick={() => setStyleSelection({ source: "preset", presetKey: preset.key })}
+                    >
+                      <p className="text-sm font-medium">{preset.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/44">{preset.description}</p>
+                    </button>
+                  ))}
+                  {initialData.styleReferenceSets.slice(0, 2).map((set) => (
+                    <button
+                      key={set.id}
+                      type="button"
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left transition-colors md:col-span-2",
+                        styleSelection.source === "reference_set" && styleSelection.referenceSetId === set.id
+                          ? "border-white/[0.16] bg-white/[0.1] text-white"
+                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                      )}
+                      onClick={() =>
+                        setStyleSelection({
+                          source: "reference_set",
+                          referenceSetId: set.id,
+                          referenceSetName: set.name,
+                        })
+                      }
+                    >
+                      <p className="text-sm font-medium">{set.name}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/44">
+                        {set.description ?? `引用 ${set.imageUrls.length} 张风格参考图。`}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button
+              variant="outline"
+              className="rounded-full border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.08]"
+              onClick={() => setGenerateOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              className="rounded-full bg-white text-neutral-950 hover:bg-neutral-100"
+              onClick={() => void handleGenerateLayout()}
+              disabled={
+                generating ||
+                checkingPrecheck ||
+                generatePrecheck?.suggestedMode === "block" ||
+                (!packageMode && !packageRecommendation)
+              }
+            >
+              {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              开始生成
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
