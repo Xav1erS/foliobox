@@ -19,6 +19,10 @@
 - 工作台 IA、项目管理与状态流：`private-docs/spec-system-v3/06_Workspace_IA_v3.md`
 - 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v3/07_Quality_Engineering_v3.md`
 - 整站体验基线、文案语气、CTA 与视觉达标线：`private-docs/spec-system-v3/08_Experience_Baseline_v3.md`
+- Project Editor 详细规范：`private-docs/spec-system-v3/09_Project_Editor_Detailed_Spec_v1.md`
+- Portfolio Editor 详细规范：`private-docs/spec-system-v3/10_Portfolio_Editor_Detailed_Spec_v1.md`
+- 编辑器统一交互原则：`private-docs/spec-system-v3/11_Editor_Interaction_Principles_v1.md`
+- Editor 产品质量基线：`private-docs/Editor_Product_Quality_Bar_2026-04-10.md`
 - 文档维护规则与冲突处理：`private-docs/spec-system-v3/99_Document_Maintenance_Rules_v3.md`
 
 使用规则：
@@ -27,6 +31,9 @@
 - 专题规则分别以对应专题文档为准，不回到主 spec 重复判断
 - 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v3.md` 为准
 - 跨页面共享的体验基线、文案语气、CTA 规则与桌面端 / 移动端达标线统一以 `08_Experience_Baseline_v3.md` 为准
+- `Project Editor` 与 `Portfolio Editor` 的对象级行为，分别以 `09` 与 `10` 为准
+- 两个 editor 的共用心智、骨架、交互与主次动作关系统一以 `11_Editor_Interaction_Principles_v1.md` 为准
+- editor 的产品级验收口径、按钮状态完整性、微交互与“产品而不是玩具”的质量要求，统一参考 `private-docs/Editor_Product_Quality_Bar_2026-04-10.md`
 - 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules_v3.md` 为准
 - `private-docs/archive-legacy/` 下的旧文档仅作历史参考，不作为当前实现依据
 - 如果旧文档、旧备注或本文其他段落与 v3 文档冲突，一律以 `private-docs/spec-system-v3/` 下文档为准
@@ -37,6 +44,7 @@
 - 再阅读 `00_README_Document_Map_v3.md`
 - 再按任务命中范围读取 `01` 到 `07` 和 `99` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付、工作台 IA、质量工程或文档维护规则，必须读取对应文档
 - 若任务涉及用户可见页面的视觉、文案、CTA、桌面端 / 移动端体验判断，必须额外读取 `08_Experience_Baseline_v3.md`
+- 若任务涉及 `Project Editor` 或 `Portfolio Editor` 的布局、面板、画板、浮层、Inspector、AI 接入、底部缩略条、拖拽、对象编辑或 editor 内动作优先级，必须额外读取 `09` / `10` / `11` 中命中的文档
 - 在开始修改代码前，先输出本次任务命中的文档清单
 - 在开始修改代码前，先明确说明：
   - 本次任务涉及哪几份文档
@@ -84,6 +92,58 @@
 - 本约定写入 `CLAUDE.md` 后，作为后续会话的仓库内长期规则
 - 但 agent 不应假设自己一定”自动记住”；每次开始涉及产品实现的任务时，仍应先读取本文件与 `private-docs/CURRENT_SPEC.md`
 - 如果上下文很长、对规则边界不确定，优先回读 `CLAUDE.md` 与 `99_Document_Maintenance_Rules_v3.md`，而不是凭印象继续实现
+
+### Editor 产品标准（长期生效）
+
+对于 `Project Editor` 与 `Portfolio Editor`，默认按以下标准执行：
+
+- FolioBox 要做的是一个**垂直类、AI-native 的 Canva / Figma**，目标是让用户在编辑过程中自然沉淀结构、语义与上下文，再把这些高质量上下文提供给 AI
+- 编辑器是产品主战场，不是后台页，也不是功能样机；**产品，不是玩具**
+- 不以“功能能用”作为完成标准；必须同时评估：
+  - UI 视觉质量
+  - 交互动作合理性
+  - 动效是否帮助理解状态
+  - 功能摆放在当前位置是否合理
+  - 是否真的帮助 AI 获得更多上下文
+- 面向 editor 的实现，不允许把中间主舞台退化成：
+  - 表单页
+  - 检查清单页
+  - 大段说明页
+  - 后台管理页
+- 每一个按钮都必须至少考虑：
+  - 默认
+  - hover
+  - active / pressed
+  - focus
+  - disabled
+  - loading
+- 每一个高频交互都必须有明确反馈：
+  - 选中
+  - 拖拽
+  - 放置
+  - 排序
+  - 缩放
+  - 切页
+  - 保存中
+  - 保存失败
+  - AI 处理中
+- 动效默认不追求花哨，追求“帮助理解”：
+  - 面板展开 / 收起
+  - 选中态切换
+  - 拖放命中
+  - 缩略图切换
+  - 工具条浮现
+  - 保存状态变化
+- 编辑器里的信息摆放必须先问“为什么在这里”，而不是“这里还能塞什么”
+- 配额、预算、历史解释、帮助说明等次级信息，不得压过主舞台；除非当前动作必须知道，否则不要抢占中央编辑区域
+- 对 editor 的交付验收，不以 `npm test` / `npm run build` 通过结束；还必须做至少一轮真实页面视觉与交互复核
+
+执行红线：
+
+- 如果一个 editor 页面看起来更像后台，而不像创作工具，视为未达标
+- 如果一个功能虽然可用，但按钮状态、拖拽反馈、选中态或层级不完整，视为未达标
+- 如果一个 AI 能力没有明显利用当前画板、当前对象、当前素材、当前文本结构的上下文，视为未达标
+- 如果实现选择是为了省事而牺牲产品心智，必须回退并重做
 
 ---
 

@@ -643,6 +643,7 @@ export function ProjectEditorClient({
   const [factsMessage, setFactsMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
+  const [assetSearch, setAssetSearch] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [updatingAssetFlags, setUpdatingAssetFlags] = useState(false);
@@ -701,6 +702,23 @@ export function ProjectEditorClient({
     () => assets.filter((asset) => asset.selected),
     [assets]
   );
+  const visibleAssets = useMemo(() => {
+    const keyword = assetSearch.trim().toLowerCase();
+    if (!keyword) return assets;
+
+    return assets.filter((asset) => {
+      const meta = resolveProjectAssetMeta(asset.metaJson);
+      const haystack = [
+        asset.title ?? "",
+        meta.note ?? "",
+        meta.roleTag ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(keyword);
+    });
+  }, [assetSearch, assets]);
   const activeBoard = useMemo(
     () => getSceneBoardById(scene, scene.activeBoardId) ?? scene.boards[0] ?? null,
     [scene]
@@ -1657,27 +1675,11 @@ export function ProjectEditorClient({
     { label: "结果摘要", value: facts.resultSummary.trim() ? "已补充结果" : "待补充" },
   ];
 
-  const readinessChecklist = [
-    {
-      label: "项目事实",
-      done: [facts.projectType, facts.industry, facts.roleTitle].filter(Boolean).length >= 2,
-    },
-    { label: "已选素材", done: selectedAssets.length >= 3 },
-    {
-      label: "项目诊断",
-      done: Boolean(boundaryAnalysis && completenessAnalysis && packageRecommendation),
-    },
-    {
-      label: "排版建议",
-      done: Boolean(layout?.pages?.length),
-    },
-  ];
-
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <EditorScaffold
-          objectLabel="Project"
+          objectLabel="项目"
           objectName={initialData.name}
           backHref="/projects"
           backLabel="全部项目"
@@ -1825,11 +1827,17 @@ export function ProjectEditorClient({
                     <EditorRailSection title="素材墙" className="flex-1">
                       <Input
                         placeholder="搜索素材标题或备注"
+                        value={assetSearch}
+                        onChange={(event) => setAssetSearch(event.target.value)}
                         className={cn("col-span-2 mb-3 h-10", editorFieldClass)}
                       />
+                      <div className="col-span-2 mb-1 flex items-center justify-between text-xs text-white/38">
+                        <span>已显示 {visibleAssets.length} / {assets.length} 张素材</span>
+                        <span>{usedAssetIds.size} 张已在画板中使用</span>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
-                        {assets.length > 0 ? (
-                          assets.map((asset) => (
+                        {visibleAssets.length > 0 ? (
+                          visibleAssets.map((asset) => (
                             <DraggableAssetCard
                               key={asset.id}
                               asset={asset}
@@ -1841,7 +1849,9 @@ export function ProjectEditorClient({
                           ))
                         ) : (
                           <EditorEmptyState className="col-span-2">
-                            还没有素材。先上传过程图、关键界面或结果画面，再拖进当前画板。
+                            {assets.length > 0
+                              ? "没有匹配的素材。试试别的关键词，或清空搜索。"
+                              : "还没有素材。先上传过程图、关键界面或结果画面，再拖进当前画板。"}
                           </EditorEmptyState>
                         )}
                         {updatingAssetFlags ? (
@@ -2071,7 +2081,7 @@ export function ProjectEditorClient({
             <Tabs value={rightPanel} onValueChange={(value) => setRightPanel(value as RightRailPanel)} className="flex h-full flex-col">
               <div className="border-b border-white/[0.06] p-3">
                 <EditorTabsList className="grid w-full grid-cols-2">
-                  <EditorTabsTrigger value="inspector">Inspector</EditorTabsTrigger>
+                  <EditorTabsTrigger value="inspector">属性</EditorTabsTrigger>
                   <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
                 </EditorTabsList>
               </div>
