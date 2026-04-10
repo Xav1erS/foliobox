@@ -1,61 +1,136 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ActiveSelection, Canvas as FabricCanvas, FabricImage, FabricObject, Point, Textbox } from "fabric";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Point, Textbox } from "fabric";
 import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  ChevronDown,
+  Circle,
   Copy,
   Loader2,
+  Minus,
   Save,
+  Square,
   Trash2,
+  Triangle,
   Type,
+  Layers,
+  MoreHorizontal,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   EditorChromeButton,
   EditorInfoList,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
+  EditorTabsList,
+  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import {
   createProjectImageNode,
+  createProjectShapeNode,
   createProjectTextNode,
   getSceneBoardById,
   normalizeProjectEditorScene,
   PROJECT_BOARD_HEIGHT,
   PROJECT_BOARD_WIDTH,
+  PROJECT_SHAPE_TYPES,
   resolveProjectEditorScene,
   type ProjectBoard,
   type ProjectBoardImageNode,
   type ProjectBoardNode,
   type ProjectBoardTextNode,
   type ProjectEditorScene,
+  type ProjectShapeType,
 } from "@/lib/project-editor-scene";
 import { cn } from "@/lib/utils";
 import type { ProjectEditorInitialData } from "./ProjectEditorClient";
 
 type FabricModule = typeof import("fabric");
 
-type SelectionSummary =
-  | { kind: "none"; label: string }
-  | { kind: "single"; label: string }
-  | { kind: "multi"; label: string };
+type ActiveObjectMeta =
+  | { kind: "none" }
+  | { kind: "multi"; count: number }
+  | {
+      kind: "text";
+      id: string;
+      text: string;
+      fontSize: number;
+      fontWeight: number;
+      color: string;
+      opacity: number;
+    }
+  | {
+      kind: "image";
+      id: string;
+      opacity: number;
+    }
+  | {
+      kind: "shape";
+      id: string;
+      shape: ProjectShapeType;
+      fill: string;
+      stroke: string | null;
+      strokeWidth: number;
+      opacity: number;
+    };
+
+type LayerItem = {
+  id: string;
+  label: string;
+  type: "text" | "image" | "shape";
+  shape?: ProjectShapeType;
+  assetId?: string;
+  previewUrl?: string | null;
+};
+
+type ContextMenuState = {
+  open: boolean;
+  x: number;
+  y: number;
+};
+
+const SHAPE_LABELS: Record<ProjectShapeType, string> = {
+  rect: "矩形",
+  square: "正方形",
+  circle: "圆形",
+  triangle: "三角形",
+  line: "线段",
+};
 
 type FabricSceneObject = FabricObject & {
   data?: {
     nodeId?: string;
-    nodeType?: "text" | "image";
+    nodeType?: "text" | "image" | "shape";
     assetId?: string;
+    shapeType?: ProjectShapeType;
     role?: ProjectBoardTextNode["role"];
   };
 };
 
-function newNodeId(prefix: "text" | "image") {
+function newNodeId(prefix: "text" | "image" | "shape") {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -85,13 +160,20 @@ export function ProjectEditorFabricClient({
     })
   );
   const [canvasReady, setCanvasReady] = useState(false);
-  const [selectionSummary, setSelectionSummary] = useState<SelectionSummary>({
-    kind: "none",
-    label: "未选中对象",
-  });
+  const [activeMeta, setActiveMeta] = useState<ActiveObjectMeta>({ kind: "none" });
   const [assetSearch, setAssetSearch] = useState("");
   const [zoom, setZoom] = useState(1);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
+  const [leftTab, setLeftTab] = useState<"assets" | "layers">("assets");
+  const [layerTab, setLayerTab] = useState<"arrange" | "layers">("layers");
+  const [layerItems, setLayerItems] = useState<LayerItem[]>([]);
+  const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([]);
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    open: false,
+    x: 0,
+    y: 0,
+  });
 
   const hostRef = useRef<HTMLCanvasElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -107,6 +189,9 @@ export function ProjectEditorFabricClient({
   const assetMap = useMemo(
     () => new Map(initialData.assets.map((asset) => [asset.id, asset])),
     [initialData.assets]
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
   const activeBoard = useMemo(
     () => getSceneBoardById(scene, scene.activeBoardId) ?? scene.boards[0] ?? null,
@@ -127,6 +212,164 @@ export function ProjectEditorFabricClient({
       })
     );
   }, [assetMap, scene.boards]);
+
+  function getLayerItemsFromCanvas(canvas: FabricCanvas) {
+    const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
+      (object) => object !== boardBackgroundRef.current
+    );
+    const ordered = [...objects].reverse();
+    return ordered.map((object) => {
+      const data = object.data ?? {};
+      if (!object.data) {
+        object.data = data;
+      }
+      const nodeType =
+        data.nodeType ??
+        (object.type === "textbox" ? "text" : object.type === "image" ? "image" : "shape");
+      const nodeId = data.nodeId ?? newNodeId(nodeType);
+      if (!data.nodeId) {
+        data.nodeId = nodeId;
+      }
+
+      let label = "图层";
+      let previewUrl: string | null | undefined = undefined;
+      let shape: ProjectShapeType | undefined;
+
+      if (nodeType === "text") {
+        const text = (object as unknown as Textbox).text ?? "文本";
+        label = text.length > 16 ? `${text.slice(0, 16)}…` : text;
+      } else if (nodeType === "image") {
+        const asset = data.assetId ? assetMap.get(data.assetId) : null;
+        label = asset?.title ?? "图片";
+        previewUrl = asset?.imageUrl ?? null;
+      } else {
+        shape = data.shapeType ?? "rect";
+        label = SHAPE_LABELS[shape] ?? "形状";
+      }
+
+      return {
+        id: nodeId,
+        label,
+        type: nodeType,
+        shape,
+        assetId: data.assetId,
+        previewUrl,
+      } satisfies LayerItem;
+    });
+  }
+
+  function refreshLayerState(canvas: FabricCanvas | null) {
+    if (!canvas) return;
+    setLayerItems(getLayerItemsFromCanvas(canvas));
+    const activeObjects = canvas.getActiveObjects() as FabricSceneObject[];
+    const ids = activeObjects
+      .map((object) => object.data?.nodeId)
+      .filter((id): id is string => Boolean(id));
+    setSelectedLayerIds(ids);
+  }
+
+  function openContextMenuAt(x: number, y: number) {
+    setContextMenu({ open: true, x, y });
+  }
+
+  function closeContextMenu() {
+    setContextMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+  }
+
+  function updateActiveObject(patch: Partial<FabricObject> & Partial<Textbox>) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject() as FabricObject | ActiveSelection | null;
+    if (!activeObject || activeObject.type === "activeSelection") return;
+    activeObject.set(patch);
+    activeObject.setCoords();
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
+  function getCanvasObjectById(canvas: FabricCanvas, id: string) {
+    return (canvas.getObjects() as FabricSceneObject[]).find(
+      (object) => object.data?.nodeId === id
+    );
+  }
+
+  function selectLayerById(id: string) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const object = getCanvasObjectById(canvas, id);
+    if (!object) return;
+    canvas.setActiveObject(object);
+    canvas.requestRenderAll();
+    updateSelectionSummary(canvas);
+  }
+
+  function arrangeActiveObject(action: "forward" | "backward" | "front" | "back") {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject() as FabricObject | ActiveSelection | null;
+    if (!activeObject || activeObject.type === "activeSelection") return;
+    const objects = canvas.getObjects();
+    const currentIndex = objects.indexOf(activeObject);
+    const backgroundIndex = boardBackgroundRef.current
+      ? objects.indexOf(boardBackgroundRef.current)
+      : -1;
+    const bottomIndex = backgroundIndex >= 0 ? backgroundIndex + 1 : 0;
+    const topIndex = objects.length - 1;
+
+    const moveToIndex = (object: FabricObject, index: number) => {
+      const mover = object as unknown as { moveTo: (value: number) => void };
+      mover.moveTo(index);
+    };
+
+    if (action === "front") {
+      moveToIndex(activeObject, topIndex);
+    } else if (action === "back") {
+      moveToIndex(activeObject, bottomIndex);
+    } else if (action === "forward") {
+      moveToIndex(activeObject, Math.min(currentIndex + 1, topIndex));
+    } else {
+      moveToIndex(activeObject, Math.max(currentIndex - 1, bottomIndex));
+    }
+    if (boardBackgroundRef.current) {
+      canvas.sendObjectToBack(boardBackgroundRef.current);
+    }
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    refreshLayerState(canvas);
+  }
+
+  function handleLayerDragEnd(event: DragEndEvent) {
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+    if (!overId || activeId === overId) return;
+    const oldIndex = layerItems.findIndex((item) => item.id === activeId);
+    const newIndex = layerItems.findIndex((item) => item.id === overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const nextItems = arrayMove(layerItems, oldIndex, newIndex);
+    setLayerItems(nextItems);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
+      (object) => object !== boardBackgroundRef.current
+    );
+    const objectMap = new Map(objects.map((object) => [object.data?.nodeId, object]));
+    const orderedBottomToTop = [...nextItems].reverse();
+    orderedBottomToTop.forEach((item, index) => {
+      const object = objectMap.get(item.id);
+      if (object) {
+        const mover = object as unknown as { moveTo: (value: number) => void };
+        mover.moveTo(index);
+      }
+    });
+    if (boardBackgroundRef.current) {
+      canvas.sendObjectToBack(boardBackgroundRef.current);
+    }
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+  }
 
   async function persistScene(sceneToSave: ProjectEditorScene, force = false) {
     const serialized = JSON.stringify(sceneToSave);
@@ -166,40 +409,77 @@ export function ProjectEditorFabricClient({
     return () => window.clearTimeout(timeout);
   }, [scene]);
 
+  useEffect(() => {
+    if (!contextMenu.open) return;
+    const handler = () => closeContextMenu();
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [contextMenu.open]);
+
+  useEffect(() => {
+    if (!shapeMenuOpen) return;
+    const handler = () => setShapeMenuOpen(false);
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [shapeMenuOpen]);
+
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
-      setSelectionSummary({ kind: "none", label: "未选中对象" });
+      setActiveMeta({ kind: "none" });
       return;
     }
 
     const activeObjects = canvas.getActiveObjects() as FabricSceneObject[];
+    refreshLayerState(canvas);
     if (activeObjects.length === 0) {
-      setSelectionSummary({ kind: "none", label: "未选中对象" });
+      setActiveMeta({ kind: "none" });
       return;
     }
 
     if (activeObjects.length > 1) {
-      setSelectionSummary({ kind: "multi", label: `已选 ${activeObjects.length} 个对象` });
+      setActiveMeta({ kind: "multi", count: activeObjects.length });
       return;
     }
 
     const current = activeObjects[0];
     const data = current.data;
     if (data?.nodeType === "image") {
-      const assetTitle = data.assetId ? assetMap.get(data.assetId)?.title : null;
-      setSelectionSummary({
-        kind: "single",
-        label: assetTitle ? `图片 · ${assetTitle}` : "图片节点",
+      setActiveMeta({
+        kind: "image",
+        id: data.nodeId ?? "image",
+        opacity: typeof current.opacity === "number" ? current.opacity : 1,
       });
       return;
     }
 
-    if (data?.nodeType === "text") {
-      setSelectionSummary({ kind: "single", label: "文本节点" });
+    if (data?.nodeType === "text" || current.type === "textbox") {
+      const textbox = current as unknown as Textbox;
+      setActiveMeta({
+        kind: "text",
+        id: data?.nodeId ?? "text",
+        text: textbox.text ?? "",
+        fontSize: Number(textbox.fontSize) || 32,
+        fontWeight: Number(textbox.fontWeight) || 500,
+        color: String(textbox.fill ?? "#111111"),
+        opacity: typeof textbox.opacity === "number" ? textbox.opacity : 1,
+      });
       return;
     }
 
-    setSelectionSummary({ kind: "single", label: "已选对象" });
+    if (data?.nodeType === "shape") {
+      setActiveMeta({
+        kind: "shape",
+        id: data.nodeId ?? "shape",
+        shape: data.shapeType ?? "rect",
+        fill: typeof current.fill === "string" ? current.fill : "#111111",
+        stroke: typeof current.stroke === "string" ? current.stroke : null,
+        strokeWidth: typeof current.strokeWidth === "number" ? current.strokeWidth : 0,
+        opacity: typeof current.opacity === "number" ? current.opacity : 1,
+      });
+      return;
+    }
+
+    setActiveMeta({ kind: "none" });
   }
 
   function fitBoard(canvas: FabricCanvas) {
@@ -279,6 +559,24 @@ export function ProjectEditorFabricClient({
         return acc;
       }
 
+      if (data?.nodeType === "shape") {
+        acc.push(
+          createProjectShapeNode(data.shapeType ?? "rect", {
+            id: data.nodeId ?? newNodeId("shape"),
+            x: Math.round(left),
+            y: Math.round(top),
+            width: Math.round(width),
+            height: Math.round(height),
+            fill: typeof object.fill === "string" ? object.fill : "#111111",
+            stroke: typeof object.stroke === "string" ? object.stroke : null,
+            strokeWidth: typeof object.strokeWidth === "number" ? object.strokeWidth : 0,
+            opacity: typeof object.opacity === "number" ? object.opacity : 1,
+            zIndex: index + 1,
+          })
+        );
+        return acc;
+      }
+
       return acc;
     }, []);
 
@@ -328,8 +626,6 @@ export function ProjectEditorFabricClient({
       fill: "#ffffff",
       selectable: false,
       evented: false,
-      rx: 18,
-      ry: 18,
       shadow: new fabric.Shadow({
         color: "rgba(0,0,0,0.22)",
         blur: 26,
@@ -361,6 +657,58 @@ export function ProjectEditorFabricClient({
         };
         applyObjectChrome(textbox);
         canvas.add(textbox);
+        continue;
+      }
+
+      if (node.type === "shape") {
+        let shape: FabricSceneObject | null = null;
+        const base = {
+          left: node.x,
+          top: node.y,
+          fill: node.fill,
+          stroke: node.stroke ?? undefined,
+          strokeWidth: node.strokeWidth,
+          opacity: node.opacity,
+        };
+
+        if (node.shape === "circle") {
+          shape = new fabric.Ellipse({
+            ...base,
+            rx: node.width / 2,
+            ry: node.height / 2,
+          }) as unknown as FabricSceneObject;
+        } else if (node.shape === "triangle") {
+          shape = new fabric.Triangle({
+            ...base,
+            width: node.width,
+            height: node.height,
+          }) as unknown as FabricSceneObject;
+        } else if (node.shape === "line") {
+          shape = new fabric.Line([0, 0, node.width, 0], {
+            ...base,
+            fill: undefined,
+            stroke: node.stroke ?? "#111111",
+            strokeWidth: node.strokeWidth || 4,
+            strokeLineCap: "round",
+            strokeUniform: true,
+          }) as unknown as FabricSceneObject;
+        } else {
+          shape = new fabric.Rect({
+            ...base,
+            width: node.width,
+            height: node.height,
+            rx: node.shape === "square" ? 0 : 0,
+            ry: node.shape === "square" ? 0 : 0,
+          }) as unknown as FabricSceneObject;
+        }
+
+        shape.data = {
+          nodeId: node.id,
+          nodeType: "shape",
+          shapeType: node.shape,
+        };
+        applyObjectChrome(shape);
+        canvas.add(shape);
         continue;
       }
 
@@ -423,10 +771,22 @@ export function ProjectEditorFabricClient({
       canvas.on("selection:created", () => updateSelectionSummary(canvas));
       canvas.on("selection:updated", () => updateSelectionSummary(canvas));
       canvas.on("selection:cleared", () => updateSelectionSummary(canvas));
-      canvas.on("object:modified", () => syncActiveBoardFromCanvas());
-      canvas.on("object:added", () => syncActiveBoardFromCanvas());
-      canvas.on("object:removed", () => syncActiveBoardFromCanvas());
-      canvas.on("text:changed", () => syncActiveBoardFromCanvas());
+      canvas.on("object:modified", () => {
+        syncActiveBoardFromCanvas();
+        refreshLayerState(canvas);
+      });
+      canvas.on("object:added", () => {
+        syncActiveBoardFromCanvas();
+        refreshLayerState(canvas);
+      });
+      canvas.on("object:removed", () => {
+        syncActiveBoardFromCanvas();
+        refreshLayerState(canvas);
+      });
+      canvas.on("text:changed", () => {
+        syncActiveBoardFromCanvas();
+        refreshLayerState(canvas);
+      });
       canvas.on("mouse:wheel", (event) => {
         const nativeEvent = event.e as WheelEvent;
         nativeEvent.preventDefault();
@@ -435,6 +795,17 @@ export function ProjectEditorFabricClient({
         const nextZoom = clamp(canvas.getZoom() * (nativeEvent.deltaY > 0 ? 0.92 : 1.08), 0.2, 3);
         canvas.zoomToPoint(point, nextZoom);
         setZoom(nextZoom);
+      });
+      canvas.on("mouse:down", (event) => {
+        const nativeEvent = event.e as globalThis.MouseEvent;
+        if (nativeEvent.button !== 2) return;
+        nativeEvent.preventDefault();
+        nativeEvent.stopPropagation();
+        if (event.target) {
+          canvas.setActiveObject(event.target as FabricObject);
+          updateSelectionSummary(canvas);
+        }
+        openContextMenuAt(nativeEvent.clientX, nativeEvent.clientY);
       });
 
       const observer = new ResizeObserver(resize);
@@ -552,6 +923,65 @@ export function ProjectEditorFabricClient({
     updateSelectionSummary(canvas);
   }
 
+  async function addShapeObject(shape: ProjectShapeType) {
+    const fabric = fabricRef.current;
+    const canvas = canvasRef.current;
+    if (!fabric || !canvas) return;
+
+    const base = {
+      left: 220,
+      top: 180,
+      fill: "#111111",
+      stroke: undefined,
+      strokeWidth: 0,
+      opacity: 1,
+    };
+
+    let object: FabricSceneObject | null = null;
+
+    if (shape === "circle") {
+      object = new fabric.Ellipse({
+        ...base,
+        rx: 140,
+        ry: 140,
+      }) as unknown as FabricSceneObject;
+    } else if (shape === "triangle") {
+      object = new fabric.Triangle({
+        ...base,
+        width: 280,
+        height: 240,
+      }) as unknown as FabricSceneObject;
+    } else if (shape === "line") {
+      object = new fabric.Line([0, 0, 320, 0], {
+        ...base,
+        fill: undefined,
+        stroke: "#111111",
+        strokeWidth: 6,
+        strokeLineCap: "round",
+        strokeUniform: true,
+      }) as unknown as FabricSceneObject;
+    } else {
+      const size = shape === "square" ? 240 : 320;
+      object = new fabric.Rect({
+        ...base,
+        width: size,
+        height: shape === "square" ? size : 220,
+      }) as unknown as FabricSceneObject;
+    }
+
+    object.data = {
+      nodeId: newNodeId("shape"),
+      nodeType: "shape",
+      shapeType: shape,
+    };
+    applyObjectChrome(object);
+    canvas.add(object);
+    canvas.setActiveObject(object);
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
   async function addAssetToCanvas(assetId: string) {
     const fabric = fabricRef.current;
     const canvas = canvasRef.current;
@@ -593,6 +1023,45 @@ export function ProjectEditorFabricClient({
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
+  }
+
+  async function handleContextAction(action: string) {
+    if (action === "copy") {
+      await cloneActiveObject();
+      return;
+    }
+    if (action === "paste") {
+      await pasteClipboard();
+      return;
+    }
+    if (action === "duplicate") {
+      await duplicateSelection();
+      return;
+    }
+    if (action === "delete") {
+      deleteSelection();
+      return;
+    }
+    if (action === "front") {
+      arrangeActiveObject("front");
+      return;
+    }
+    if (action === "back") {
+      arrangeActiveObject("back");
+      return;
+    }
+    if (action === "forward") {
+      arrangeActiveObject("forward");
+      return;
+    }
+    if (action === "backward") {
+      arrangeActiveObject("backward");
+      return;
+    }
+    if (action === "layers-panel") {
+      setLeftTab("layers");
+      setLayerTab("layers");
+    }
   }
 
   useEffect(() => {
@@ -639,6 +1108,22 @@ export function ProjectEditorFabricClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeBoard?.id]);
 
+  const contextMenuItems = [
+    { id: "copy", label: "复制", shortcut: "⌘C" },
+    { id: "paste", label: "粘贴", shortcut: "⌘V" },
+    { id: "duplicate", label: "创建副本", shortcut: "⌘D" },
+    { id: "delete", label: "删除", shortcut: "DELETE" },
+    { id: "sep-1", type: "sep" as const },
+    { id: "forward", label: "上移一层" },
+    { id: "backward", label: "下移一层" },
+    { id: "front", label: "移至最前" },
+    { id: "back", label: "移至最底" },
+    { id: "sep-2", type: "sep" as const },
+    { id: "layers-panel", label: "图层面板" },
+  ];
+  const canArrange =
+    activeMeta.kind === "text" || activeMeta.kind === "image" || activeMeta.kind === "shape";
+
   return (
     <EditorScaffold
       objectLabel="项目 · 编辑器"
@@ -648,13 +1133,54 @@ export function ProjectEditorFabricClient({
       statusLabel="编辑中"
       statusMeta={`${scene.boards.length} 张画板 · ${initialData.assets.length} 张素材`}
       primaryAction={
-        <Button
-          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 hover:bg-white/90"
-          onClick={addTextObject}
-        >
-          <Type className="h-4 w-4" />
-          添加文本
-        </Button>
+        <div className="relative flex items-center gap-2">
+          <Button
+            className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 hover:bg-white/90"
+            onClick={addTextObject}
+          >
+            <Type className="h-4 w-4" />
+            添加文本
+          </Button>
+          <div className="relative">
+            <EditorChromeButton
+              className="h-10 gap-2 px-4"
+              onClick={() => setShapeMenuOpen((prev) => !prev)}
+            >
+              <Square className="h-4 w-4" />
+              形状
+              <ChevronDown className="h-4 w-4" />
+            </EditorChromeButton>
+            {shapeMenuOpen ? (
+              <div
+                className="absolute right-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                {PROJECT_SHAPE_TYPES.map((shape) => (
+                  <button
+                    key={shape}
+                    type="button"
+                    onClick={() => {
+                      void addShapeObject(shape);
+                      setShapeMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  >
+                    {shape === "circle" ? (
+                      <Circle className="h-4 w-4" />
+                    ) : shape === "triangle" ? (
+                      <Triangle className="h-4 w-4" />
+                    ) : shape === "line" ? (
+                      <Minus className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                    {SHAPE_LABELS[shape]}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
       }
       secondaryAction={
         <div className="flex items-center gap-2">
@@ -669,64 +1195,229 @@ export function ProjectEditorFabricClient({
         </div>
       }
       planSummary={planSummary}
-      leftRailLabel="素材"
+      leftRailLabel="素材 / 图层"
       rightRailLabel="属性"
       leftRail={
-        <div className="h-full overflow-y-auto">
-          <EditorRailSection title="素材墙">
-            <div className="space-y-3">
-              <Input
-                value={assetSearch}
-                onChange={(event) => setAssetSearch(event.target.value)}
-                placeholder="搜索素材"
-                className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white placeholder:text-white/28"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                {visibleAssets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    onClick={() => void addAssetToCanvas(asset.id)}
-                    className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
-                  >
-                    <div className="aspect-[4/3] overflow-hidden bg-black/30">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                        alt={asset.title ?? "素材"}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <p className="truncate text-sm font-medium text-white">
-                        {asset.title ?? "未命名素材"}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-                {visibleAssets.length === 0 ? (
-                  <div className="col-span-2 rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
-                    没有匹配的素材。
+        <div className="h-full overflow-y-auto px-4 py-4">
+          <Tabs value={leftTab} onValueChange={(value) => setLeftTab(value as typeof leftTab)}>
+            <EditorTabsList className="grid w-full grid-cols-2">
+              <EditorTabsTrigger value="assets" className="w-full justify-center">
+                素材
+              </EditorTabsTrigger>
+              <EditorTabsTrigger value="layers" className="w-full justify-center">
+                图层
+              </EditorTabsTrigger>
+            </EditorTabsList>
+
+            <TabsContent value="assets" className="mt-4 space-y-4">
+              <EditorRailSection title="素材墙">
+                <div className="space-y-3">
+                  <Input
+                    value={assetSearch}
+                    onChange={(event) => setAssetSearch(event.target.value)}
+                    placeholder="搜索素材"
+                    className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white placeholder:text-white/28"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    {visibleAssets.map((asset) => (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => void addAssetToCanvas(asset.id)}
+                        className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                      >
+                        <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                            alt={asset.title ?? "素材"}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="p-3">
+                          <p className="truncate text-sm font-medium text-white">
+                            {asset.title ?? "未命名素材"}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                    {visibleAssets.length === 0 ? (
+                      <div className="col-span-2 rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                        没有匹配的素材。
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            </div>
-          </EditorRailSection>
+                </div>
+              </EditorRailSection>
+            </TabsContent>
+
+            <TabsContent value="layers" className="mt-4 space-y-4">
+              <EditorRailSection title="调整图层">
+                <Tabs value={layerTab} onValueChange={(value) => setLayerTab(value as typeof layerTab)}>
+                  <EditorTabsList className="grid w-full grid-cols-2">
+                    <EditorTabsTrigger value="arrange" className="w-full justify-center">
+                      排布
+                    </EditorTabsTrigger>
+                    <EditorTabsTrigger value="layers" className="w-full justify-center">
+                      图层
+                    </EditorTabsTrigger>
+                  </EditorTabsList>
+
+                  <TabsContent value="arrange" className="mt-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <EditorChromeButton
+                        className="h-10 justify-center"
+                        onClick={() => arrangeActiveObject("forward")}
+                        disabled={!canArrange}
+                      >
+                        上移
+                      </EditorChromeButton>
+                      <EditorChromeButton
+                        className="h-10 justify-center"
+                        onClick={() => arrangeActiveObject("backward")}
+                        disabled={!canArrange}
+                      >
+                        下移
+                      </EditorChromeButton>
+                      <EditorChromeButton
+                        className="h-10 justify-center"
+                        onClick={() => arrangeActiveObject("front")}
+                        disabled={!canArrange}
+                      >
+                        移至最前
+                      </EditorChromeButton>
+                      <EditorChromeButton
+                        className="h-10 justify-center"
+                        onClick={() => arrangeActiveObject("back")}
+                        disabled={!canArrange}
+                      >
+                        移至最底
+                      </EditorChromeButton>
+                    </div>
+                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/52">
+                      选择对象后可以快速调整层级。
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="layers" className="mt-4 space-y-3">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleLayerDragEnd}
+                    >
+                      <SortableContext
+                        items={layerItems.map((item) => item.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {layerItems.map((item) => (
+                            <SortableLayerRow
+                              key={item.id}
+                              item={item}
+                              selected={selectedLayerIds.includes(item.id)}
+                              onSelect={selectLayerById}
+                              onOpenMenu={(event) => {
+                                event.stopPropagation();
+                                selectLayerById(item.id);
+                                openContextMenuAt(event.clientX, event.clientY);
+                              }}
+                            />
+                          ))}
+                          {layerItems.length === 0 ? (
+                            <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                              当前画板还没有图层。
+                            </div>
+                          ) : null}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </TabsContent>
+                </Tabs>
+              </EditorRailSection>
+            </TabsContent>
+          </Tabs>
         </div>
       }
       center={
         <div className="flex h-full min-h-0 flex-col">
           <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
             <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-black/6 bg-[#f1eee8]/94 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.42)] backdrop-blur">
-              <div className="min-w-0 pr-1">
-                <p className="max-w-[220px] truncate text-sm font-semibold">
-                  {activeBoard?.name ?? "未命名画板"}
-                </p>
-                <p className="max-w-[280px] truncate text-[11px] text-neutral-500">
-                  滚轮缩放，拖拽素材进入画板。
-                </p>
-              </div>
+              {activeMeta.kind === "text" ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
+                    文本
+                  </span>
+                  <Input
+                    type="number"
+                    value={activeMeta.fontSize}
+                    onChange={(event) =>
+                      updateActiveObject({ fontSize: Number(event.target.value) || 16 })
+                    }
+                    className="h-9 w-[84px] rounded-full border-black/10 bg-white text-sm text-neutral-800"
+                  />
+                  <Input
+                    type="color"
+                    value={activeMeta.color}
+                    onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                  />
+                </div>
+              ) : activeMeta.kind === "image" ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
+                    图片
+                  </span>
+                  <span className="text-xs text-neutral-500">透明度</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={activeMeta.opacity}
+                    onChange={(event) =>
+                      updateActiveObject({ opacity: Number(event.target.value) })
+                    }
+                  />
+                </div>
+              ) : activeMeta.kind === "shape" ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
+                    形状
+                  </span>
+                  <Input
+                    type="color"
+                    value={activeMeta.fill}
+                    onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                  />
+                  <Input
+                    type="color"
+                    value={activeMeta.stroke ?? "#000000"}
+                    onChange={(event) => updateActiveObject({ stroke: event.target.value })}
+                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                  />
+                </div>
+              ) : (
+                <div className="min-w-0 pr-1">
+                  <p className="max-w-[220px] truncate text-sm font-semibold">
+                    {activeBoard?.name ?? "未命名画板"}
+                  </p>
+                  <p className="max-w-[280px] truncate text-[11px] text-neutral-500">
+                    滚轮缩放，拖拽素材进入画板。
+                  </p>
+                </div>
+              )}
               <div className="h-8 w-px bg-black/8" />
+              <EditorChromeButton
+                className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
+                onClick={() => {
+                  setLeftTab("layers");
+                  setLayerTab("layers");
+                }}
+              >
+                <Layers className="h-4 w-4" />
+                调整图层
+              </EditorChromeButton>
               <EditorChromeButton
                 className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
                 onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
@@ -763,7 +1454,11 @@ export function ProjectEditorFabricClient({
             </div>
           </div>
 
-          <div ref={workspaceRef} className="relative flex-1 overflow-hidden">
+          <div
+            ref={workspaceRef}
+            className="relative flex-1 overflow-hidden"
+            onContextMenu={(event) => event.preventDefault()}
+          >
             {!canvasReady ? (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
                 <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
@@ -773,17 +1468,183 @@ export function ProjectEditorFabricClient({
               </div>
             ) : null}
             <canvas ref={hostRef} />
+            {contextMenu.open ? (
+              <div
+                className="fixed z-50 w-56 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 text-sm text-white/88 shadow-[0_20px_48px_-24px_rgba(0,0,0,0.7)]"
+                style={{ left: contextMenu.x, top: contextMenu.y }}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                {contextMenuItems.map((item) =>
+                  "type" in item && item.type === "sep" ? (
+                    <div key={item.id} className="my-2 h-px bg-white/[0.06]" />
+                  ) : (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      onClick={() => {
+                        closeContextMenu();
+                        void handleContextAction(item.id);
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      {"shortcut" in item ? (
+                        <span className="text-xs text-white/40">{item.shortcut}</span>
+                      ) : null}
+                    </button>
+                  )
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       }
       rightRail={
         <div className="h-full overflow-y-auto">
-          <EditorRailSection title="当前选中">
-            <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
-              <p className="text-sm font-medium text-white">{selectionSummary.label}</p>
-              <p className="mt-2 text-sm leading-6 text-white/52">
-                选中对象后可拖拽、缩放或删除；双击文本进入编辑。
-              </p>
+          <EditorRailSection title="Inspector">
+            <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+              {activeMeta.kind === "none" ? (
+                <div className="text-sm text-white/52">
+                  选择画板中的元素后，这里会显示可编辑属性。
+                </div>
+              ) : null}
+
+              {activeMeta.kind === "multi" ? (
+                <div className="text-sm text-white/52">
+                  已选 {activeMeta.count} 个对象，可拖拽改变位置或调整大小。
+                </div>
+              ) : null}
+
+              {activeMeta.kind === "text" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-white/50">文本内容</label>
+                    <Textarea
+                      value={activeMeta.text}
+                      onChange={(event) => updateActiveObject({ text: event.target.value })}
+                      className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-white/50">字号</label>
+                      <Input
+                        type="number"
+                        value={activeMeta.fontSize}
+                        onChange={(event) =>
+                          updateActiveObject({ fontSize: Number(event.target.value) || 16 })
+                        }
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50">字重</label>
+                      <Input
+                        type="number"
+                        value={activeMeta.fontWeight}
+                        onChange={(event) =>
+                          updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
+                        }
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-white/50">颜色</label>
+                      <Input
+                        type="color"
+                        value={activeMeta.color}
+                        onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50">透明度</label>
+                      <Input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={activeMeta.opacity}
+                        onChange={(event) =>
+                          updateActiveObject({ opacity: Number(event.target.value) })
+                        }
+                        className="mt-3"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {activeMeta.kind === "image" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-white/50">透明度</label>
+                    <Input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={activeMeta.opacity}
+                      onChange={(event) =>
+                        updateActiveObject({ opacity: Number(event.target.value) })
+                      }
+                      className="mt-3"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {activeMeta.kind === "shape" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-white/50">填充色</label>
+                    <Input
+                      type="color"
+                      value={activeMeta.fill}
+                      onChange={(event) => updateActiveObject({ fill: event.target.value })}
+                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/50">描边色</label>
+                    <Input
+                      type="color"
+                      value={activeMeta.stroke ?? "#000000"}
+                      onChange={(event) => updateActiveObject({ stroke: event.target.value })}
+                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-white/50">描边宽度</label>
+                      <Input
+                        type="number"
+                        value={activeMeta.strokeWidth}
+                        onChange={(event) =>
+                          updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
+                        }
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50">透明度</label>
+                      <Input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={activeMeta.opacity}
+                        onChange={(event) =>
+                          updateActiveObject({ opacity: Number(event.target.value) })
+                        }
+                        className="mt-3"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </EditorRailSection>
 
@@ -847,5 +1708,86 @@ export function ProjectEditorFabricClient({
         </div>
       }
     />
+  );
+}
+
+function SortableLayerRow({
+  item,
+  selected,
+  onSelect,
+  onOpenMenu,
+}: {
+  item: LayerItem;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onOpenMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 rounded-2xl border px-2 py-2 transition-colors",
+        selected
+          ? "border-white/40 bg-white/[0.08] text-white"
+          : "border-white/[0.08] bg-white/[0.02] text-white/72 hover:bg-white/[0.05]",
+        isDragging ? "opacity-70" : "opacity-100"
+      )}
+      role="listitem"
+    >
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.04] text-white/60"
+        {...attributes}
+        {...listeners}
+        aria-label="拖拽排序"
+      >
+        <div className="grid grid-cols-2 gap-[3px]">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span key={index} className="h-1 w-1 rounded-full bg-white/40" />
+          ))}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelect(item.id)}
+        className="flex flex-1 items-center gap-2 text-left"
+      >
+        <div className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] text-[10px] font-semibold text-white/70">
+          {item.type === "image" && item.previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={buildPrivateBlobProxyUrl(item.previewUrl)}
+              alt={item.label}
+              className="h-full w-full object-cover"
+            />
+          ) : item.type === "text" ? (
+            "T"
+          ) : (
+            SHAPE_LABELS[item.shape ?? "rect"].slice(0, 1)
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{item.label}</p>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={onOpenMenu}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
+        aria-label="更多操作"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+    </div>
   );
 }

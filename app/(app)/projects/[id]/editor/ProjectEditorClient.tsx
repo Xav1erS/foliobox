@@ -110,6 +110,7 @@ import {
   type ProjectBoard,
   type ProjectBoardImageNode,
   type ProjectBoardNode,
+  type ProjectBoardShapeNode,
   type ProjectBoardStatus,
   type ProjectBoardTextNode,
   type ProjectEditorScene,
@@ -117,6 +118,7 @@ import {
   type ProjectTextRole,
   createProjectBoard,
   createProjectImageNode,
+  createProjectShapeNode,
   createProjectTextNode,
   markBoardsAsAnalyzed,
 } from "@/lib/project-editor-scene";
@@ -272,34 +274,48 @@ function duplicateBoard(board: ProjectBoard) {
       hasAnalysis: false,
       hasPendingSuggestion: board.aiMarkers.hasPendingSuggestion,
     },
-    nodes: board.nodes.map((node) =>
-      node.type === "text"
-        ? createProjectTextNode({
-            text: node.text,
-            role: node.role,
-            x: node.x + 48,
-            y: node.y + 48,
-            width: node.width,
-            height: node.height,
-            fontSize: node.fontSize,
-            fontWeight: node.fontWeight,
-            lineHeight: node.lineHeight,
-            align: node.align,
-            color: node.color,
-            zIndex: node.zIndex,
-          })
-        : createProjectImageNode(node.assetId, {
-            x: node.x + 48,
-            y: node.y + 48,
-            width: node.width,
-            height: node.height,
-            fit: node.fit,
-            crop: node.crop,
-            note: node.note,
-            roleTag: node.roleTag,
-            zIndex: node.zIndex,
-          })
-    ),
+    nodes: board.nodes.map((node) => {
+      if (node.type === "text") {
+        return createProjectTextNode({
+          text: node.text,
+          role: node.role,
+          x: node.x + 48,
+          y: node.y + 48,
+          width: node.width,
+          height: node.height,
+          fontSize: node.fontSize,
+          fontWeight: node.fontWeight,
+          lineHeight: node.lineHeight,
+          align: node.align,
+          color: node.color,
+          zIndex: node.zIndex,
+        });
+      }
+      if (node.type === "image") {
+        return createProjectImageNode(node.assetId, {
+          x: node.x + 48,
+          y: node.y + 48,
+          width: node.width,
+          height: node.height,
+          fit: node.fit,
+          crop: node.crop,
+          note: node.note,
+          roleTag: node.roleTag,
+          zIndex: node.zIndex,
+        });
+      }
+      return createProjectShapeNode(node.shape, {
+        x: node.x + 48,
+        y: node.y + 48,
+        width: node.width,
+        height: node.height,
+        fill: node.fill,
+        stroke: node.stroke,
+        strokeWidth: node.strokeWidth,
+        opacity: node.opacity,
+        zIndex: node.zIndex,
+      });
+    }),
   });
 }
 
@@ -3127,6 +3143,10 @@ const BoardDropSurface = forwardRef<
                   ) : null}
                 </div>
               );
+            }
+
+            if (node.type !== "image") {
+              return null;
             }
 
             const asset = assets.get(node.assetId);

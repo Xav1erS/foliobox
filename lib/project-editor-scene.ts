@@ -23,6 +23,15 @@ export const PROJECT_TEXT_ROLES = [
 ] as const;
 export type ProjectTextRole = (typeof PROJECT_TEXT_ROLES)[number];
 
+export const PROJECT_SHAPE_TYPES = [
+  "rect",
+  "square",
+  "circle",
+  "triangle",
+  "line",
+] as const;
+export type ProjectShapeType = (typeof PROJECT_SHAPE_TYPES)[number];
+
 export const PROJECT_BOARD_STATUSES = [
   "empty",
   "draft",
@@ -84,14 +93,31 @@ const ProjectBoardImageNodeSchema = z.object({
   zIndex: z.number(),
 });
 
+const ProjectBoardShapeNodeSchema = z.object({
+  id: z.string(),
+  type: z.literal("shape"),
+  shape: z.enum(PROJECT_SHAPE_TYPES),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  fill: z.string(),
+  stroke: z.string().nullable(),
+  strokeWidth: z.number(),
+  opacity: z.number(),
+  zIndex: z.number(),
+});
+
 export const ProjectBoardNodeSchema = z.discriminatedUnion("type", [
   ProjectBoardTextNodeSchema,
   ProjectBoardImageNodeSchema,
+  ProjectBoardShapeNodeSchema,
 ]);
 
 export type ProjectBoardNode = z.infer<typeof ProjectBoardNodeSchema>;
 export type ProjectBoardTextNode = z.infer<typeof ProjectBoardTextNodeSchema>;
 export type ProjectBoardImageNode = z.infer<typeof ProjectBoardImageNodeSchema>;
+export type ProjectBoardShapeNode = z.infer<typeof ProjectBoardShapeNodeSchema>;
 
 export const ProjectBoardSchema = z.object({
   id: z.string(),
@@ -266,6 +292,25 @@ export function createProjectImageNode(
   };
 }
 
+export function createProjectShapeNode(
+  shape: ProjectShapeType,
+  patch?: Partial<ProjectBoardShapeNode>
+): ProjectBoardShapeNode {
+  return {
+    id: patch?.id ?? createSceneId("shape"),
+    type: "shape",
+    shape,
+    x: patch?.x ?? 240,
+    y: patch?.y ?? 220,
+    width: patch?.width ?? 320,
+    height: patch?.height ?? 200,
+    fill: patch?.fill ?? "#111111",
+    stroke: patch?.stroke ?? null,
+    strokeWidth: patch?.strokeWidth ?? 0,
+    opacity: patch?.opacity ?? 1,
+    zIndex: patch?.zIndex ?? 3,
+  };
+}
 export function createProjectBoard(
   patch?: Partial<ProjectBoard>
 ): ProjectBoard {
@@ -482,30 +527,46 @@ export function serializeSceneForHash(scene: ProjectEditorScene) {
       name: board.name,
       intent: board.intent,
       status: board.status,
-      nodes: board.nodes.map((node) =>
-        node.type === "text"
-          ? {
-              id: node.id,
-              type: node.type,
-              role: node.role,
-              text: node.text,
-              x: node.x,
-              y: node.y,
-              width: node.width,
-              height: node.height,
-            }
-          : {
-              id: node.id,
-              type: node.type,
-              assetId: node.assetId,
-              roleTag: node.roleTag,
-              note: node.note,
-              x: node.x,
-              y: node.y,
-              width: node.width,
-              height: node.height,
-            }
-      ),
+      nodes: board.nodes.map((node) => {
+        if (node.type === "text") {
+          return {
+            id: node.id,
+            type: node.type,
+            role: node.role,
+            text: node.text,
+            x: node.x,
+            y: node.y,
+            width: node.width,
+            height: node.height,
+          };
+        }
+        if (node.type === "image") {
+          return {
+            id: node.id,
+            type: node.type,
+            assetId: node.assetId,
+            roleTag: node.roleTag,
+            note: node.note,
+            x: node.x,
+            y: node.y,
+            width: node.width,
+            height: node.height,
+          };
+        }
+        return {
+          id: node.id,
+          type: node.type,
+          shape: node.shape,
+          fill: node.fill,
+          stroke: node.stroke,
+          strokeWidth: node.strokeWidth,
+          opacity: node.opacity,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+        };
+      }),
     };
   });
 }
@@ -565,6 +626,12 @@ export function summarizeProjectSceneForAI({
         .slice(0, 4)
         .join("；");
 
+      const shapeSummary = board.nodes
+        .filter((node): node is ProjectBoardShapeNode => node.type === "shape")
+        .map((node) => node.shape)
+        .slice(0, 6)
+        .join("、");
+
       return [
         `画板 ${index + 1}`,
         `名称：${board.name || "未命名"}`,
@@ -572,6 +639,7 @@ export function summarizeProjectSceneForAI({
         `状态：${board.status}`,
         `文本内容：${textSummary || "无"}`,
         `引用素材：${imageSummary || "无"}`,
+        `图形元素：${shapeSummary || "无"}`,
       ].join("\n");
     })
     .filter(Boolean)
