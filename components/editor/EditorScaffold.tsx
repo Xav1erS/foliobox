@@ -18,7 +18,7 @@ import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
 
 export const editorFieldClass =
-  "border-white/10 bg-white/[0.03] text-white placeholder:text-white/28";
+  "rounded-2xl border-white/[0.08] bg-[#17191d] text-white placeholder:text-white/24 shadow-none";
 
 type EditorScaffoldProps = {
   objectLabel: string;
@@ -61,30 +61,30 @@ export function EditorScaffold({
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   return (
-    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#101114] text-white">
-      <header className="border-b border-white/10 bg-[#16171b]/96 backdrop-blur">
-        <div className="flex min-h-14 items-center gap-3 px-4 py-2">
-          <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3 text-sm">
+    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0f1013] text-white">
+      <header className="border-b border-white/[0.05] bg-[#101114]/92 backdrop-blur-2xl">
+        <div className="flex min-h-[68px] items-center gap-3 px-5 py-2.5">
+          <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
             {backLabel}
           </EditorChromeLink>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-white/32">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/36">
               <span>{objectLabel}</span>
               {statusLabel ? (
-                <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-white/56">
+                <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-white/62">
                   {statusLabel}
                 </span>
               ) : null}
               {statusMeta ? <span>{statusMeta}</span> : null}
             </div>
             <div className="mt-1 flex min-w-0 items-center gap-3">
-              <h1 className="truncate text-xl font-semibold tracking-tight text-white">
+              <h1 className="truncate text-[22px] font-semibold tracking-[-0.035em] text-white">
                 {objectName}
               </h1>
               {topNote ? (
-                <div className="hidden min-w-0 max-w-xl truncate text-sm text-white/44 xl:block">
+                <div className="hidden min-w-0 max-w-xl truncate text-sm text-white/36 xl:block">
                   {topNote}
                 </div>
               ) : null}
@@ -94,7 +94,7 @@ export function EditorScaffold({
           {planSummary ? (
             <Link
               href={planSummary.href}
-              className="hidden rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/64 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
+              className="hidden rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/58 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
             >
               {planSummary.title}
             </Link>
@@ -115,7 +115,7 @@ export function EditorScaffold({
             onClick={() => setLeftCollapsed(false)}
           />
         ) : (
-          <aside className="flex w-[320px] shrink-0 flex-col border-r border-white/10 bg-[#17191d]">
+          <aside className="flex w-[332px] shrink-0 flex-col border-r border-white/[0.05] bg-[#121317]">
             <RailHeader
               label={leftRailLabel}
               side="left"
@@ -125,17 +125,17 @@ export function EditorScaffold({
           </aside>
         )}
 
-        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#1b1d22]">
+        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#17181c]">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{
               backgroundImage:
-                "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+                "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1.4px)",
               backgroundSize: "28px 28px",
               maskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0.28) 100%)",
+                "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
               WebkitMaskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0.28) 100%)",
+                "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
             }}
           />
           <div className="relative h-full overflow-hidden">{center}</div>
@@ -148,7 +148,7 @@ export function EditorScaffold({
             onClick={() => setRightCollapsed(false)}
           />
         ) : (
-          <aside className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-[#17191d]">
+          <aside className="flex w-[332px] shrink-0 flex-col border-l border-white/[0.05] bg-[#121317]">
             <RailHeader
               label={rightRailLabel}
               side="right"
@@ -160,7 +160,7 @@ export function EditorScaffold({
       </div>
 
       {bottomStrip ? (
-        <div className="border-t border-white/10 bg-[#121317] px-4 py-3">{bottomStrip}</div>
+        <div className="border-t border-white/[0.05] bg-[#121317]/92 px-4 py-3 backdrop-blur-2xl">{bottomStrip}</div>
       ) : null}
     </div>
   );
@@ -176,8 +176,8 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-11 items-center justify-between border-b border-white/10 px-3">
-      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] px-4">
+      <p className="text-[11px] text-white/38">
         {label}
       </p>
       <EditorChromeIconButton onClick={onCollapse} aria-label={`折叠${label}`}>
@@ -204,7 +204,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-white/10 bg-[#15161a] text-white/48 transition-colors hover:bg-[#1a1c21] hover:text-white"
+      className="flex w-10 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#0e1116] text-white/44 transition-colors hover:bg-[#151922] hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (
@@ -212,7 +212,7 @@ function CollapsedRailButton({
       ) : (
         <PanelRightOpen className="h-4 w-4" />
       )}
-      <span className="rotate-180 text-[10px] font-mono uppercase tracking-[0.18em] [writing-mode:vertical-rl]">
+      <span className="rotate-180 text-[10px] tracking-[0.14em] [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -229,8 +229,8 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-white/10 px-4 py-4", className)}>
-      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+    <section className={cn("border-b border-white/[0.05] px-4 py-4", className)}>
+      <p className="text-[11px] text-white/40">
         {title}
       </p>
       <div className="mt-3">{children}</div>
@@ -272,7 +272,7 @@ export function EditorMiniButton({
         className
       )}
     >
-      <div className="pointer-events-auto rounded-md border border-white/10 bg-[#17191d]/96 p-1 shadow-[0_18px_60px_-40px_rgba(0,0,0,0.65)]">
+      <div className="pointer-events-auto rounded-2xl border border-white/[0.08] bg-[#14171d]/92 p-1.5 shadow-[0_30px_80px_-44px_rgba(0,0,0,0.72)]">
         {children}
       </div>
     </div>
@@ -289,10 +289,10 @@ export function EditorCanvasChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.16em]",
+        "inline-flex items-center rounded-full border px-3 py-1 text-[11px]",
         active
-          ? "border-sky-400/60 bg-sky-400/14 text-sky-100"
-          : "border-white/10 bg-white/[0.03] text-white/46"
+          ? "border-white/[0.16] bg-white/[0.08] text-white"
+          : "border-white/[0.08] bg-white/[0.03] text-white/52"
       )}
     >
       {children}
@@ -319,10 +319,10 @@ export function EditorSurfaceButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full rounded-xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+        "w-full rounded-2xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
         active
-          ? "border-sky-400/70 bg-sky-400/10 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.16)]"
-          : "border-white/10 bg-white/[0.03] text-white/72 hover:bg-white/[0.05]",
+          ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.05)]"
+          : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:bg-white/[0.05]",
         className
       )}
     >
@@ -341,7 +341,7 @@ export function EditorEmptyState({
   return (
     <div
       className={cn(
-        "rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46",
+        "rounded-[24px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/46",
         className
       )}
     >
@@ -366,10 +366,10 @@ export function EditorStripButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-lg border px-3 py-3 text-left transition-colors",
+        "shrink-0 rounded-[20px] border px-3 py-3 text-left transition-colors",
         active
-          ? "border-sky-400/70 bg-sky-400/10 text-white"
-          : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.05]",
+          ? "border-white/[0.16] bg-white/[0.08] text-white"
+          : "border-white/[0.08] bg-white/[0.03] text-white/64 hover:bg-white/[0.05]",
         className
       )}
     >
@@ -404,7 +404,7 @@ export function EditorChromeButton({
     <Button
       variant={variant}
       className={cn(
-        "border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white",
+        "rounded-full border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white",
         className
       )}
       {...props}
@@ -419,7 +419,7 @@ export function EditorChromeIconButton({
   return (
     <EditorChromeButton
       size="icon"
-      className={cn("h-8 w-8 rounded-md text-white/54", className)}
+      className={cn("h-8 w-8 rounded-full text-white/54", className)}
       {...props}
     />
   );
@@ -438,7 +438,7 @@ export function EditorChromeLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex h-9 items-center rounded-md border border-white/10 bg-white/[0.03] text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white",
+        "inline-flex h-10 items-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white",
         className
       )}
     >
@@ -453,7 +453,7 @@ export function EditorTabsList({
 }: ComponentProps<typeof TabsList>) {
   return (
     <TabsList
-      className={cn("rounded-lg bg-white/[0.04] p-1", className)}
+      className={cn("rounded-full bg-white/[0.04] p-1", className)}
       {...props}
     />
   );
@@ -466,7 +466,7 @@ export function EditorTabsTrigger({
   return (
     <TabsTrigger
       className={cn(
-        "rounded-md text-white/54 data-[state=active]:bg-white data-[state=active]:text-neutral-900",
+        "rounded-full px-4 text-white/54 transition-colors data-[state=active]:bg-white/[0.08] data-[state=active]:text-white",
         className
       )}
       {...props}

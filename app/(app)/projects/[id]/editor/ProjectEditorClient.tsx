@@ -70,13 +70,11 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadZone } from "@/components/app/ImageUploadZone";
 import {
-  EditorCanvasChip,
   EditorChromeButton,
   EditorChromeIconButton,
   EditorEmptyState,
   editorFieldClass,
   EditorInfoList,
-  EditorMiniButton,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
@@ -376,7 +374,7 @@ function useElementSize<T extends HTMLElement>() {
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+    <p className="text-[11px] text-white/42">
       {children}
     </p>
   );
@@ -390,7 +388,12 @@ function EditorPanelCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("border-white/10 bg-white/[0.03] text-white shadow-none", className)}>
+    <Card
+      className={cn(
+        "rounded-[24px] border-white/[0.08] bg-[#1a1c21] text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.68)]",
+        className
+      )}
+    >
       <CardContent className="p-4">{children}</CardContent>
     </Card>
   );
@@ -414,18 +417,18 @@ function LeftRailIconButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full flex-col items-center gap-2 rounded-xl border px-2 py-3 text-[10px] font-mono uppercase tracking-[0.16em] transition-colors",
+        "group flex w-full flex-col items-center gap-2 rounded-[18px] border px-2 py-3 text-[11px] transition-colors",
         active
-          ? "border-lime-300/50 bg-lime-300/10 text-lime-100"
-          : "border-white/10 bg-white/[0.02] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
+          ? "border-white/[0.14] bg-white/[0.07] text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
+          : "border-white/[0.08] bg-white/[0.02] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
       )}
       aria-label={label}
       title={label}
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-current/20 bg-black/10">
+      <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-current/20 bg-black/10">
         {Icon ? <Icon className="h-4 w-4" /> : <span>{shortLabel}</span>}
       </span>
-      <span className="[writing-mode:vertical-rl]">{label}</span>
+      <span className="leading-none">{label}</span>
     </button>
   );
 }
@@ -458,10 +461,10 @@ function DraggableAssetCard({
           : undefined,
       }}
       className={cn(
-        "rounded-2xl border transition-all",
+        "overflow-hidden rounded-[22px] border transition-all",
         active
-          ? "border-lime-300/50 bg-lime-300/[0.08]"
-          : "border-white/10 bg-white/[0.03]",
+          ? "border-white/[0.18] bg-white/[0.08] shadow-[0_18px_36px_-26px_rgba(0,0,0,0.75)]"
+          : "border-white/[0.08] bg-[#1a1c21]",
         isDragging && "opacity-70"
       )}
     >
@@ -471,8 +474,8 @@ function DraggableAssetCard({
         {...attributes}
         {...listeners}
       >
-        <div className="flex items-start gap-3 p-3">
-          <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+        <div className="relative">
+          <div className="aspect-[4/3] overflow-hidden bg-black/30">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={buildPrivateBlobProxyUrl(asset.imageUrl)}
@@ -480,38 +483,38 @@ function DraggableAssetCard({
               className="h-full w-full object-cover"
             />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap gap-1.5">
-              {asset.selected ? <Badge className="border-none bg-white text-neutral-950">已纳入</Badge> : null}
-              {used ? <Badge variant="outline" className="border-lime-300/40 text-lime-100">已上板</Badge> : null}
-              {asset.isCover ? <Badge variant="outline" className="border-sky-300/40 text-sky-100">封面</Badge> : null}
-              {meta.roleTag ? (
-                <Badge variant="outline" className="border-white/20 text-white/70">
-                  {meta.roleTag}
-                </Badge>
-              ) : null}
-            </div>
-            <p className="mt-3 truncate text-sm font-medium text-white">
-              {asset.title ?? "未命名素材"}
-            </p>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
-              {meta.note ?? "拖到中间画板即可放进当前页面。"}
-            </p>
+          <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
+            {asset.selected ? <Badge className="border-none bg-white text-neutral-950">已纳入</Badge> : null}
+            {used ? <Badge variant="outline" className="border-white/18 text-white">已上板</Badge> : null}
+            {asset.isCover ? <Badge variant="outline" className="border-white/18 text-white/70">封面</Badge> : null}
           </div>
+          {meta.roleTag ? (
+            <div className="absolute bottom-2 left-2 rounded-full border border-white/[0.08] bg-black/55 px-2 py-1 text-[10px] text-white/72 backdrop-blur">
+              {meta.roleTag}
+            </div>
+          ) : null}
+        </div>
+        <div className="p-3">
+          <p className="truncate text-sm font-medium text-white">
+            {asset.title ?? "未命名素材"}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/42">
+            {meta.note ?? "拖到中央画板即可加入当前页。"}
+          </p>
         </div>
       </button>
-      <div className="flex items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+      <div className="grid grid-cols-2 gap-px border-t border-white/[0.08] bg-white/[0.08]">
         <button
           type="button"
           onClick={() => onToggleSelected(asset.id)}
-          className="text-xs text-white/54 transition-colors hover:text-white"
+          className="bg-[#1a1c21] px-3 py-2 text-xs text-white/58 transition-colors hover:text-white"
         >
-          {asset.selected ? "从生成中移除" : "纳入生成"}
+          {asset.selected ? "移出生成" : "纳入生成"}
         </button>
         <button
           type="button"
           onClick={() => onSetCover(asset.id)}
-          className="text-xs text-white/54 transition-colors hover:text-white"
+          className="bg-[#1a1c21] px-3 py-2 text-xs text-white/58 transition-colors hover:text-white"
         >
           设为封面
         </button>
@@ -549,7 +552,7 @@ function SortableBoardStripItem({
       }}
       className={cn("shrink-0", isDragging && "opacity-60")}
     >
-      <EditorStripButton active={active} className="relative w-48 overflow-hidden p-0" onClick={onClick}>
+      <EditorStripButton active={active} className="relative w-40 overflow-hidden rounded-[24px] p-0" onClick={onClick}>
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
           <button
             type="button"
@@ -558,10 +561,10 @@ function SortableBoardStripItem({
               onToggleScope();
             }}
             className={cn(
-              "rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.14em]",
+              "rounded-full border px-2 py-0.5 text-[10px]",
               selectedForScope
-                ? "border-lime-300/50 bg-lime-300/10 text-lime-100"
-                : "border-white/10 bg-black/30 text-white/50"
+                ? "border-white/[0.16] bg-white/[0.08] text-white"
+                : "border-white/[0.08] bg-black/30 text-white/50"
             )}
           >
             批量
@@ -569,7 +572,7 @@ function SortableBoardStripItem({
           <button
             type="button"
             onClick={(event) => event.stopPropagation()}
-            className="rounded-md border border-white/10 bg-black/30 p-1 text-white/50"
+            className="rounded-full border border-white/[0.08] bg-black/30 p-1 text-white/50"
             aria-label="拖拽排序"
             {...attributes}
             {...listeners}
@@ -577,8 +580,8 @@ function SortableBoardStripItem({
             <GripVertical className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="p-3">
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b0c0f]">
+        <div className="p-2.5">
+          <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0c0f]">
             {thumbnailUrl ? (
               <div className="aspect-video">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -590,20 +593,15 @@ function SortableBoardStripItem({
               </div>
             ) : (
               <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.08]">
-                <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/32">
+                <span className="text-[10px] text-white/32">
                   1920 x 1080
                 </span>
               </div>
             )}
           </div>
-          <div className="mt-3">
-            <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] text-white/38">
-              {boardStatusLabel(board.status)}
-            </p>
-            <p className="mt-2 truncate text-sm font-medium text-white">{board.name}</p>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
-              {board.intent || "还没有给这张画板写意图。"}
-            </p>
+          <div className="mt-2.5 px-1 pb-1">
+            <p className="truncate text-[11px] text-white/40">{boardStatusLabel(board.status)}</p>
+            <p className="mt-1 truncate text-sm font-medium text-white">{board.name}</p>
           </div>
         </div>
       </EditorStripButton>
@@ -1684,10 +1682,10 @@ export function ProjectEditorClient({
           backHref="/projects"
           backLabel="全部项目"
           statusLabel={stageInfo?.label ?? "草稿"}
-          statusMeta={`${scene.boards.length} boards · ${assets.length} assets`}
+          statusMeta={`${scene.boards.length} 张画板 · ${assets.length} 张素材`}
           primaryAction={
             <Button
-              className="h-9 gap-2 border-none bg-lime-300 px-4 text-neutral-950 hover:bg-lime-200"
+              className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.55)] hover:bg-white/90"
               onClick={handleOpenGenerate}
             >
               <Wand2 className="h-4 w-4" />
@@ -1696,7 +1694,7 @@ export function ProjectEditorClient({
           }
           secondaryAction={
             <EditorChromeButton
-              className="h-9 gap-2 px-4"
+              className="h-10 gap-2 px-4"
               onClick={handleRunDiagnosis}
               disabled={diagnosing}
             >
@@ -1705,11 +1703,11 @@ export function ProjectEditorClient({
             </EditorChromeButton>
           }
           planSummary={planSummary}
-          leftRailLabel="Project Workspace"
-          rightRailLabel="Inspector / AI"
+          leftRailLabel="素材与项目"
+          rightRailLabel="属性与 AI"
           leftRail={
             <div className="flex h-full min-h-0">
-              <div className="flex w-[76px] shrink-0 flex-col gap-2 border-r border-white/10 bg-[#111318] p-3">
+              <div className="flex w-[82px] shrink-0 flex-col gap-2 border-r border-white/[0.06] bg-[#101114] p-3">
                 {LEFT_PANEL_ITEMS.map((item) => (
                   <LeftRailIconButton
                     key={item.key}
@@ -1791,7 +1789,7 @@ export function ProjectEditorClient({
                         />
                         <Button
                           variant="outline"
-                          className="h-10 w-full border-white/10 bg-white text-neutral-950 hover:bg-white/90"
+                          className="h-11 w-full rounded-full border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
                           onClick={handleSaveFacts}
                           disabled={savingFacts}
                         >
@@ -1815,7 +1813,7 @@ export function ProjectEditorClient({
                         onError={(message) => setActionError(message)}
                       />
                       <Button
-                        className="mt-3 h-10 w-full border-none bg-white text-neutral-950 hover:bg-white/90"
+                        className="mt-3 h-11 w-full rounded-full border border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
                         onClick={handleUploadAssets}
                         disabled={uploadingAssets || pendingFiles.length === 0}
                       >
@@ -1824,8 +1822,12 @@ export function ProjectEditorClient({
                       </Button>
                     </EditorRailSection>
 
-                    <EditorRailSection title="素材库" className="flex-1">
-                      <div className="space-y-3">
+                    <EditorRailSection title="素材墙" className="flex-1">
+                      <Input
+                        placeholder="搜索素材标题或备注"
+                        className={cn("col-span-2 mb-3 h-10", editorFieldClass)}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
                         {assets.length > 0 ? (
                           assets.map((asset) => (
                             <DraggableAssetCard
@@ -1838,12 +1840,12 @@ export function ProjectEditorClient({
                             />
                           ))
                         ) : (
-                          <EditorEmptyState>
+                          <EditorEmptyState className="col-span-2">
                             还没有素材。先上传过程图、关键界面或结果画面，再拖进当前画板。
                           </EditorEmptyState>
                         )}
                         {updatingAssetFlags ? (
-                          <p className="text-xs text-white/42">正在同步素材状态…</p>
+                          <p className="col-span-2 text-xs text-white/42">正在同步素材状态…</p>
                         ) : null}
                       </div>
                     </EditorRailSection>
@@ -1932,7 +1934,7 @@ export function ProjectEditorClient({
                                       className="h-full w-full object-cover"
                                     />
                                   ) : (
-                                    <div className="flex h-full items-center justify-center text-[10px] font-mono uppercase tracking-[0.16em] text-white/28">
+                                    <div className="flex h-full items-center justify-center text-[10px] text-white/28">
                                       16:9
                                     </div>
                                   )}
@@ -1976,47 +1978,62 @@ export function ProjectEditorClient({
             </div>
           }
           center={
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="border-b border-white/10 bg-[#13151a]/80 px-6 py-4 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <EditorCanvasChip active>{activeBoard?.name ?? "Untitled board"}</EditorCanvasChip>
-                    <EditorCanvasChip active={selectedAssets.length >= 3}>
-                      Assets {selectedAssets.length}
-                    </EditorCanvasChip>
-                    <EditorCanvasChip active={generationBoardIds.length > 0}>
-                      Scope {scene.generationScope.mode}
-                    </EditorCanvasChip>
-                    {readinessChecklist.map((item) => (
-                      <EditorCanvasChip key={item.label} active={item.done}>
-                        {item.label}
-                      </EditorCanvasChip>
-                    ))}
+            <div className="relative flex h-full min-h-0 flex-col">
+              <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
+                <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-white/[0.08] bg-[#f5f5f5]/95 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.45)] backdrop-blur">
+                  <div className="min-w-0 pr-1">
+                    <p className="max-w-[180px] truncate text-sm font-semibold">
+                      {activeBoard?.name ?? "Untitled board"}
+                    </p>
+                    <p className="max-w-[220px] truncate text-[11px] text-neutral-500">
+                      {activeBoard?.intent || "把左侧素材拖进画板，先搭出这一页的主结构。"}
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <EditorChromeButton className="h-9 gap-2 px-3" onClick={addTextNode}>
-                      <Type className="h-4 w-4" />
-                      添加文本
-                    </EditorChromeButton>
-                    <EditorChromeIconButton onClick={() => setZoom(-0.1)} aria-label="缩小画板">
-                      <ZoomOut className="h-4 w-4" />
-                    </EditorChromeIconButton>
-                    <button
-                      type="button"
-                      onClick={resetZoom}
-                      className="inline-flex h-9 items-center rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-white/68 transition-colors hover:bg-white/[0.08] hover:text-white"
-                    >
-                      {Math.round(scene.viewport.zoom * 100)}%
-                    </button>
-                    <EditorChromeIconButton onClick={() => setZoom(0.1)} aria-label="放大画板">
-                      <ZoomIn className="h-4 w-4" />
-                    </EditorChromeIconButton>
-                  </div>
+                  <div className="h-8 w-px bg-neutral-300" />
+                  <span className="inline-flex items-center rounded-full border border-neutral-300 bg-neutral-100 px-3 py-1 text-[11px] text-neutral-700">
+                    {boardStatusLabel(activeBoard?.status ?? "empty")}
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-neutral-300 bg-neutral-100 px-3 py-1 text-[11px] text-neutral-700">
+                    {scene.generationScope.mode === "current"
+                      ? "当前页"
+                      : scene.generationScope.mode === "selected"
+                        ? `已选 ${generationBoardIds.length}`
+                        : `全部 ${scene.boardOrder.length}`}
+                  </span>
+                  <div className="h-8 w-px bg-neutral-300" />
+                  <EditorChromeButton
+                    className="h-10 gap-2 border-neutral-300 bg-white px-4 text-neutral-950 hover:bg-neutral-100 hover:text-neutral-950"
+                    onClick={addTextNode}
+                  >
+                    <Type className="h-4 w-4" />
+                    添加文本
+                  </EditorChromeButton>
+                  <div className="h-8 w-px bg-neutral-300" />
+                  <EditorChromeIconButton
+                    className="text-neutral-600 hover:text-neutral-950"
+                    onClick={() => setZoom(-0.1)}
+                    aria-label="缩小画板"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </EditorChromeIconButton>
+                  <button
+                    type="button"
+                    onClick={resetZoom}
+                    className="inline-flex h-10 items-center rounded-full border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-neutral-950"
+                  >
+                    {Math.round(scene.viewport.zoom * 100)}%
+                  </button>
+                  <EditorChromeIconButton
+                    className="text-neutral-600 hover:text-neutral-950"
+                    onClick={() => setZoom(0.1)}
+                    aria-label="放大画板"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </EditorChromeIconButton>
                 </div>
               </div>
 
-              <div ref={boardViewportRef} className="relative flex-1 overflow-auto px-8 py-8">
+              <div ref={boardViewportRef} className="relative flex-1 overflow-auto px-12 pb-10 pt-24">
                 <div className="flex min-h-full min-w-full items-center justify-center">
                   <div className="relative" style={{ width: boardRender.width, height: boardRender.height }}>
                     <BoardDropSurface
@@ -2047,20 +2064,12 @@ export function ProjectEditorClient({
                     />
                   </div>
                 </div>
-
-                <EditorMiniButton side="left">
-                  <div className="flex items-center gap-2">
-                    <EditorChromeIconButton onClick={() => window.history.back()} aria-label="返回项目列表">
-                      <ArrowLeft className="h-4 w-4" />
-                    </EditorChromeIconButton>
-                  </div>
-                </EditorMiniButton>
               </div>
             </div>
           }
           rightRail={
             <Tabs value={rightPanel} onValueChange={(value) => setRightPanel(value as RightRailPanel)} className="flex h-full flex-col">
-              <div className="border-b border-white/10 p-3">
+              <div className="border-b border-white/[0.06] p-3">
                 <EditorTabsList className="grid w-full grid-cols-2">
                   <EditorTabsTrigger value="inspector">Inspector</EditorTabsTrigger>
                   <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
@@ -2312,7 +2321,7 @@ export function ProjectEditorClient({
                                   : node
                               )
                             }
-                            className="w-full accent-lime-300"
+                            className="w-full accent-white"
                           />
                         </div>
                         <div className="space-y-2">
@@ -2333,7 +2342,7 @@ export function ProjectEditorClient({
                                   : node
                               )
                             }
-                            className="w-full accent-lime-300"
+                            className="w-full accent-white"
                           />
                         </div>
                         <div className="space-y-2">
@@ -2354,7 +2363,7 @@ export function ProjectEditorClient({
                                   : node
                               )
                             }
-                            className="w-full accent-lime-300"
+                            className="w-full accent-white"
                           />
                         </div>
                       </div>
@@ -2499,7 +2508,7 @@ export function ProjectEditorClient({
                           <FieldLabel>对齐</FieldLabel>
                           <div className="grid grid-cols-3 gap-2">
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "left" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              className={cn("h-10", selectedNode.align === "left" && "border-white/[0.18] bg-white/[0.1] text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "left" } : node
@@ -2509,7 +2518,7 @@ export function ProjectEditorClient({
                               <AlignLeft className="h-4 w-4" />
                             </EditorChromeButton>
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "center" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              className={cn("h-10", selectedNode.align === "center" && "border-white/[0.18] bg-white/[0.1] text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "center" } : node
@@ -2519,7 +2528,7 @@ export function ProjectEditorClient({
                               <AlignCenter className="h-4 w-4" />
                             </EditorChromeButton>
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "right" && "border-lime-300/50 bg-lime-300/10 text-lime-100")}
+                              className={cn("h-10", selectedNode.align === "right" && "border-white/[0.18] bg-white/[0.1] text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "right" } : node
@@ -2637,7 +2646,7 @@ export function ProjectEditorClient({
                         className={cn(
                           "rounded-full border-white/10 px-3 py-1 text-white",
                           (layout?.pages?.length || completenessAnalysis?.canProceed) &&
-                            "border-lime-300/40 text-lime-100"
+                            "border-white/[0.18] bg-white/[0.08] text-white"
                         )}
                       >
                         {layout?.pages?.length
@@ -2653,7 +2662,7 @@ export function ProjectEditorClient({
             </Tabs>
           }
           bottomStrip={
-            <div className="flex items-start gap-3 overflow-x-auto pb-1">
+            <div className="mx-auto flex max-w-[1280px] items-start gap-3 overflow-x-auto rounded-[28px] border border-white/[0.06] bg-[#17191d] p-3 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
               <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
                 {scene.boardOrder.map((boardId) => {
                   const board = scene.boards.find((item) => item.id === boardId);
@@ -2676,10 +2685,8 @@ export function ProjectEditorClient({
                   );
                 })}
               </SortableContext>
-              <EditorStripButton className="w-40 border-dashed" onClick={addBoard}>
-                <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
-                  New
-                </p>
+              <EditorStripButton className="w-32 border-dashed" onClick={addBoard}>
+                <p className="text-[10px] opacity-60">新页面</p>
                 <p className="mt-2 text-sm font-medium">新建画板</p>
               </EditorStripButton>
             </div>
@@ -2706,7 +2713,7 @@ export function ProjectEditorClient({
             <Card className="shadow-none">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
                     范围
                   </Badge>
                   <Button variant="outline" className="h-9 px-3" onClick={refreshGeneratePrecheck}>
@@ -2748,7 +2755,7 @@ export function ProjectEditorClient({
             <Card className="shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
                     预检
                   </Badge>
                   {generatePrecheck?.suggestedMode === "reuse" ? (
@@ -2912,60 +2919,48 @@ const BoardDropSurface = forwardRef<
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
-            Current Board
-          </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">{board.name}</h2>
-          <p className="mt-1 text-sm text-white/44">{board.intent || "还没有给这张画板定义意图。"}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
-            Canvas
-          </p>
-          <p className="mt-2 text-sm text-white/68">
-            {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
-          </p>
-        </div>
-      </div>
-
+    <div className="space-y-5">
       <div
         ref={assignRefs}
         onClick={onSelectBoard}
         className={cn(
-          "relative block overflow-hidden rounded-[30px] border bg-[#0f1013] text-left shadow-[0_60px_140px_-70px_rgba(0,0,0,0.85)] transition-all",
-          isOver ? "border-lime-300/60 ring-2 ring-lime-300/30" : "border-white/10"
+          "relative block overflow-hidden rounded-[34px] border bg-[#0d0e11] text-left shadow-[0_70px_140px_-72px_rgba(0,0,0,0.88)] transition-all",
+          isOver ? "border-white/[0.22] ring-2 ring-white/[0.16]" : "border-white/[0.08]"
         )}
         style={{
           width: render.width,
           height: render.height,
           backgroundColor: board.frame.background,
           backgroundImage:
-            "radial-gradient(circle at top left, rgba(255,255,255,0.06), transparent 28%), radial-gradient(circle at bottom right, rgba(255,255,255,0.04), transparent 24%)",
+            "radial-gradient(circle at top left, rgba(255,255,255,0.06), transparent 24%), radial-gradient(circle at bottom right, rgba(255,255,255,0.03), transparent 22%)",
         }}
       >
         <div
-          className="absolute inset-0 opacity-80"
+          className="absolute inset-0 opacity-60"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
+              "radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1.5px)",
+            backgroundSize: "28px 28px",
           }}
         />
+        <div className="pointer-events-none absolute left-6 top-6 z-[1] flex items-start justify-between gap-4">
+          <div className="rounded-full border border-white/[0.08] bg-[#111317]/76 px-3 py-1.5 text-[11px] text-white/56 backdrop-blur">
+            {board.name}
+          </div>
+        </div>
+        <div className="pointer-events-none absolute right-6 top-6 z-[1] rounded-full border border-white/[0.08] bg-[#111317]/76 px-3 py-1.5 text-[11px] text-white/46 backdrop-blur">
+          {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
+        </div>
 
         {board.nodes.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center px-10">
-            <div className="max-w-xl rounded-[24px] border border-dashed border-white/14 bg-black/20 px-8 py-10 text-center">
-              <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-white/38">
-                Empty board
+            <div className="max-w-lg rounded-[30px] border border-white/[0.08] bg-[#111317]/84 px-8 py-10 text-center shadow-[0_40px_90px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
+              <p className="text-[11px] text-white/36">Empty board</p>
+              <p className="mt-4 text-[30px] font-semibold tracking-[-0.04em] text-white">
+                把第一张素材拖进来
               </p>
-              <p className="mt-4 text-lg font-medium text-white">
-                左侧拖一张素材进来，或者先添加文本节点。
-              </p>
-              <p className="mt-3 text-sm leading-7 text-white/52">
-                中央只保留一张 1920×1080 画板，底部缩略图负责切换；当前画板不会被 AI 生成覆盖。
+              <p className="mt-3 text-sm leading-7 text-white/48">
+                先搭出这一页的主视觉和标题层级，底部缩略图负责切换，其余页面不会挤进主画布。
               </p>
             </div>
           </div>
@@ -2990,7 +2985,7 @@ const BoardDropSurface = forwardRef<
                   key={node.id}
                   className={cn(
                     "absolute rounded-2xl transition-all",
-                    selected && "ring-2 ring-lime-300/60"
+                    selected && "ring-2 ring-white/65"
                   )}
                   style={nodeStyle}
                 >
@@ -3010,7 +3005,7 @@ const BoardDropSurface = forwardRef<
                           onCancelInlineText();
                         }
                       }}
-                      className="h-full w-full resize-none rounded-2xl border border-lime-300/60 bg-black/50 px-4 py-3 text-white outline-none"
+                      className="h-full w-full resize-none rounded-[22px] border border-white/[0.22] bg-[#0d0f13]/82 px-4 py-3 text-white outline-none backdrop-blur"
                       style={{
                         fontSize: `${(node.fontSize / PROJECT_BOARD_WIDTH) * render.width}px`,
                         fontWeight: node.fontWeight,
@@ -3030,7 +3025,10 @@ const BoardDropSurface = forwardRef<
                         event.stopPropagation();
                         onBeginInlineEdit(node);
                       }}
-                      className="flex h-full w-full items-start rounded-2xl px-4 py-3 text-left"
+                      className={cn(
+                        "flex h-full w-full items-start rounded-[22px] px-4 py-3 text-left transition-colors",
+                        selected ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
+                      )}
                       style={{
                         justifyContent:
                           node.align === "center"
@@ -3052,7 +3050,7 @@ const BoardDropSurface = forwardRef<
                     <button
                       type="button"
                       onPointerDown={(event) => onStartMove(event, node)}
-                      className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-[#0d0f12]/95 text-white/70 shadow-lg"
                       aria-label="拖拽文本"
                     >
                       <GripVertical className="h-4 w-4" />
@@ -3070,8 +3068,8 @@ const BoardDropSurface = forwardRef<
               <div
                 key={node.id}
                 className={cn(
-                  "absolute overflow-hidden rounded-[24px] border bg-black/20 transition-all",
-                  selected ? "border-lime-300/70 ring-2 ring-lime-300/40" : "border-white/10"
+                  "absolute overflow-hidden rounded-[26px] border bg-black/20 transition-all shadow-[0_20px_40px_-32px_rgba(0,0,0,0.6)]",
+                  selected ? "border-white/[0.22] ring-2 ring-white/[0.16]" : "border-white/[0.08]"
                 )}
                 style={nodeStyle}
               >
@@ -3106,13 +3104,13 @@ const BoardDropSurface = forwardRef<
                 </button>
                 {selected ? (
                   <>
-                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-white/70">
+                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/[0.08] bg-black/45 px-2 py-1 text-[10px] text-white/70">
                       {node.roleTag ?? "image"}
                     </div>
                     <button
                       type="button"
                       onPointerDown={(event) => onStartResize(event, node)}
-                      className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0d0f12]/95 text-white/70 shadow-lg"
+                      className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-[#0d0f12]/95 text-white/70 shadow-lg"
                       aria-label="缩放图片"
                     >
                       <GripVertical className="h-4 w-4 rotate-90" />
