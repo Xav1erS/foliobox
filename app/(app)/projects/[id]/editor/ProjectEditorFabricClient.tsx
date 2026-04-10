@@ -26,6 +26,7 @@ import {
   LayoutTemplate,
   Loader2,
   Minus,
+  PanelLeftClose,
   PencilLine,
   Sparkles,
   Square,
@@ -43,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   EditorChromeButton,
+  EditorChromeIconButton,
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
@@ -156,6 +158,8 @@ function newNodeId(prefix: "text" | "image" | "shape") {
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
+
+const STAGE_PADDING = 88;
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
@@ -756,13 +760,8 @@ export function ProjectEditorFabricClient({
   function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
     const width = canvas.getWidth();
     const height = canvas.getHeight();
-    const stageInsetX = 72;
-    const stageInsetTop = 120;
-    const stageInsetBottom = 56;
-    const visibleWidth = Math.max(width - stageInsetX * 2, 0);
-    const visibleHeight = Math.max(height - stageInsetTop - stageInsetBottom, 0);
-    const x = stageInsetX + (visibleWidth - PROJECT_BOARD_WIDTH * nextZoom) / 2;
-    const y = stageInsetTop + (visibleHeight - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
+    const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
+    const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
     canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
     setZoom(nextZoom);
     canvas.requestRenderAll();
@@ -771,8 +770,8 @@ export function ProjectEditorFabricClient({
   function fitBoard(canvas: FabricCanvas) {
     const width = canvas.getWidth();
     const height = canvas.getHeight();
-    const availableWidth = Math.max(width - 176, 240);
-    const availableHeight = Math.max(height - 176, 240);
+    const availableWidth = Math.max(width - STAGE_PADDING * 2, 240);
+    const availableHeight = Math.max(height - STAGE_PADDING * 2, 240);
     const zoomToFit = Math.min(
       availableWidth / PROJECT_BOARD_WIDTH,
       availableHeight / PROJECT_BOARD_HEIGHT
@@ -1504,7 +1503,7 @@ export function ProjectEditorFabricClient({
       statusMeta=""
       primaryAction={
         <Button
-          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 hover:bg-white/90"
+          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed]"
           onClick={() => void handleGenerateLayout()}
           disabled={generating || diagnosing}
         >
@@ -1514,7 +1513,7 @@ export function ProjectEditorFabricClient({
       }
       secondaryAction={
         <EditorChromeButton
-          className="h-10 gap-2 px-4"
+          className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/82 hover:bg-white/[0.08] hover:text-white"
           onClick={() => void handleRunDiagnosis()}
           disabled={diagnosing || generating}
         >
@@ -1526,9 +1525,10 @@ export function ProjectEditorFabricClient({
       leftRailLabel={currentLeftPanelLabel}
       rightRailLabel="属性"
       leftRailWidthClass={leftPanel ? "w-[368px]" : "w-[92px]"}
+      hideLeftRailHeader
       leftRail={
         <div className="flex h-full min-h-0">
-          <div className="flex w-[92px] shrink-0 flex-col items-center gap-3 border-r border-white/[0.05] bg-[#11100f] px-3 py-4">
+          <div className="flex w-[92px] shrink-0 flex-col items-center gap-3 border-r border-white/[0.05] bg-[#110f0d] px-3 py-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {LEFT_PANEL_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = leftPanel === item.key;
@@ -1541,7 +1541,7 @@ export function ProjectEditorFabricClient({
                   className={cn(
                     "group relative flex w-full flex-col items-center gap-2 rounded-[24px] border px-2 py-4 text-[11px] font-medium transition-all duration-200",
                     active
-                      ? "border-white/[0.14] bg-white/[0.09] text-white shadow-[0_18px_30px_-22px_rgba(0,0,0,0.9)]"
+                      ? "translate-x-[1px] border-white/[0.14] bg-white/[0.09] text-white shadow-[0_18px_30px_-22px_rgba(0,0,0,0.9)]"
                       : "border-white/[0.06] bg-white/[0.02] text-white/52 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
                   )}
                 >
@@ -1553,9 +1553,9 @@ export function ProjectEditorFabricClient({
                   />
                   <div
                     className={cn(
-                      "flex h-11 w-11 items-center justify-center rounded-[18px] border transition-colors",
+                      "flex h-11 w-11 items-center justify-center rounded-[18px] border transition-all duration-200",
                       active
-                        ? "border-white/[0.12] bg-white/[0.08]"
+                        ? "border-white/[0.12] bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                         : "border-white/[0.05] bg-transparent group-hover:border-white/[0.08] group-hover:bg-white/[0.04]"
                     )}
                   >
@@ -1569,19 +1569,28 @@ export function ProjectEditorFabricClient({
 
           {leftPanel ? (
             <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
-              {currentLeftPanelMeta ? (
-                <div className="border-b border-white/[0.05] bg-white/[0.02] px-5 py-4">
-                  <p className="text-[11px] tracking-[0.18em] text-white/36">
-                    {currentLeftPanelMeta.label}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.85)]">
+                <div className="min-w-0">
+                  <p className="text-[11px] tracking-[0.18em] text-white/34">
+                    {currentLeftPanelMeta?.label ?? "面板"}
                   </p>
-                  <p className="mt-2 text-sm text-white/58">{currentLeftPanelMeta.hint}</p>
+                  {currentLeftPanelMeta ? (
+                    <p className="mt-1 truncate text-xs text-white/42">{currentLeftPanelMeta.hint}</p>
+                  ) : null}
                 </div>
-              ) : null}
+                <EditorChromeIconButton
+                  className="h-9 w-9 border-white/[0.08] bg-white/[0.04] text-white/62 hover:bg-white/[0.08] hover:text-white"
+                  onClick={() => setLeftPanel(null)}
+                  aria-label="收起左侧面板"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </EditorChromeIconButton>
+              </div>
               {leftPanel === "project" ? (
                 <>
                   <EditorRailSection title="项目背景与上下文">
-                    <div className="space-y-3">
-                      <div className="rounded-[22px] border border-white/[0.08] bg-[#171513] px-4 py-3">
+                    <div className="space-y-2.5">
+                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium text-white">输入项目背景</p>
@@ -1601,7 +1610,7 @@ export function ProjectEditorFabricClient({
                           </span>
                         </div>
                       </div>
-                      <div className="space-y-3 rounded-[24px] border border-white/[0.06] bg-[#141311] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className="space-y-2.5 rounded-[22px] border border-white/[0.06] bg-[#14110f] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                         <div>
                           <label className="text-xs text-white/44">项目类型</label>
                           <Input
@@ -1613,7 +1622,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 SaaS 后台、品牌官网、移动端应用"
-                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
@@ -1627,7 +1636,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
@@ -1641,7 +1650,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 产品设计负责人、全栈开发、独立设计师"
-                            className="mt-2 h-11 rounded-2xl border-white/[0.08] bg-[#1a1816] text-white"
+                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
@@ -1655,7 +1664,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
-                            className="mt-2 min-h-[118px] rounded-[22px] border-white/[0.08] bg-[#1a1816] text-white"
+                            className="mt-1.5 min-h-[108px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
@@ -1669,7 +1678,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="补充最终结果、影响、亮点与可量化成果。"
-                            className="mt-2 min-h-[104px] rounded-[22px] border-white/[0.08] bg-[#1a1816] text-white"
+                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                       </div>
@@ -1721,7 +1730,7 @@ export function ProjectEditorFabricClient({
                       <EditorChromeButton className="h-10 w-full justify-center" onClick={createBoard}>
                         新建画板
                       </EditorChromeButton>
-                      <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/52">
+                      <div className="rounded-[18px] border border-white/[0.08] bg-[#171411] px-3 py-2 text-xs text-white/52">
                         当前共有 {scene.boards.length} 张画板，底部缩略图负责快速切换。
                       </div>
                     </div>
@@ -1778,9 +1787,9 @@ export function ProjectEditorFabricClient({
       center={
         <div className="flex h-full min-h-0 flex-col">
           <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-[24px] border border-black/8 bg-[#f3eee7] px-2.5 py-2 text-neutral-950 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.42)]">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-[26px] border border-[#d8cfc4] bg-[#f4efe7] px-2.5 py-2 text-neutral-950 shadow-[0_24px_54px_-30px_rgba(0,0,0,0.4)]">
               {activeMeta.kind === "text" ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     文本
                   </span>
@@ -1800,7 +1809,7 @@ export function ProjectEditorFabricClient({
                   />
                 </div>
               ) : activeMeta.kind === "image" ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     图片
                   </span>
@@ -1817,7 +1826,7 @@ export function ProjectEditorFabricClient({
                   />
                 </div>
               ) : activeMeta.kind === "shape" ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     形状
                   </span>
@@ -1835,103 +1844,111 @@ export function ProjectEditorFabricClient({
                   />
                 </div>
               ) : null}
-              {hasFloatingContext ? <div className="h-8 w-px bg-black/8" /> : null}
-              <EditorChromeButton
-                className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={() => {
-                  setAssetPickerOpen((prev) => !prev);
-                  setShapeMenuOpen(false);
-                }}
-              >
-                <ImageIcon className="h-4 w-4" />
-                插入图片
-              </EditorChromeButton>
-              <Button
-                className="h-10 gap-2 rounded-full border border-black/8 bg-white px-4 text-neutral-950 hover:bg-neutral-100"
-                onClick={addTextObject}
-              >
-                <Type className="h-4 w-4" />
-                添加文本
-              </Button>
-              <div className="relative">
+              {hasFloatingContext ? <div className="h-8 w-px bg-black/10" /> : null}
+              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
-                  className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                  onClick={() => setShapeMenuOpen((prev) => !prev)}
+                  className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => {
+                    setAssetPickerOpen((prev) => !prev);
+                    setShapeMenuOpen(false);
+                  }}
                 >
-                  <Square className="h-4 w-4" />
-                  形状
-                  <ChevronDown className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4" />
+                  插入图片
                 </EditorChromeButton>
-                {shapeMenuOpen ? (
-                  <div
-                    className="absolute left-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
-                    onMouseDown={(event) => event.stopPropagation()}
+                <Button
+                  className="h-10 gap-2 rounded-full border border-black/8 bg-white px-4 text-neutral-950 shadow-none hover:bg-neutral-100"
+                  onClick={addTextObject}
+                >
+                  <Type className="h-4 w-4" />
+                  添加文本
+                </Button>
+                <div className="relative">
+                  <EditorChromeButton
+                    className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                    onClick={() => setShapeMenuOpen((prev) => !prev)}
                   >
-                    {PROJECT_SHAPE_TYPES.map((shape) => (
-                      <button
-                        key={shape}
-                        type="button"
-                        onClick={() => {
-                          void addShapeObject(shape);
-                          setShapeMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
-                      >
-                        {shape === "circle" ? (
-                          <Circle className="h-4 w-4" />
-                        ) : shape === "triangle" ? (
-                          <Triangle className="h-4 w-4" />
-                        ) : shape === "line" ? (
-                          <Minus className="h-4 w-4" />
-                        ) : (
-                          <Square className="h-4 w-4" />
-                        )}
-                        {SHAPE_LABELS[shape]}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                    <Square className="h-4 w-4" />
+                    形状
+                    <ChevronDown className="h-4 w-4" />
+                  </EditorChromeButton>
+                  {shapeMenuOpen ? (
+                    <div
+                      className="absolute left-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      {PROJECT_SHAPE_TYPES.map((shape) => (
+                        <button
+                          key={shape}
+                          type="button"
+                          onClick={() => {
+                            void addShapeObject(shape);
+                            setShapeMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        >
+                          {shape === "circle" ? (
+                            <Circle className="h-4 w-4" />
+                          ) : shape === "triangle" ? (
+                            <Triangle className="h-4 w-4" />
+                          ) : shape === "line" ? (
+                            <Minus className="h-4 w-4" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                          {SHAPE_LABELS[shape]}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              <EditorChromeButton
-                className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={() => {
-                  setLeftPanel("layers");
-                }}
-              >
-                <Layers className="h-4 w-4" />
-                调整图层
-              </EditorChromeButton>
-              <EditorChromeButton
-                className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
-              >
-                适应画板
-              </EditorChromeButton>
-              <EditorChromeButton
-                className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={() => {
-                  const canvas = canvasRef.current;
-                  if (!canvas) return;
-                  const nextZoom = clamp(canvas.getZoom() - 0.1, 0.2, 3);
-                  applyCenteredZoom(canvas, nextZoom);
-                }}
-              >
-                <ZoomOut className="h-4 w-4" />
-              </EditorChromeButton>
-              <span className="inline-flex h-10 items-center rounded-full border border-black/8 bg-white px-3 text-sm text-neutral-700">
-                {Math.round(zoom * 100)}%
-              </span>
-              <EditorChromeButton
-                className="h-10 border-black/8 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={() => {
-                  const canvas = canvasRef.current;
-                  if (!canvas) return;
-                  const nextZoom = clamp(canvas.getZoom() + 0.1, 0.2, 3);
-                  applyCenteredZoom(canvas, nextZoom);
-                }}
-              >
-                <ZoomIn className="h-4 w-4" />
-              </EditorChromeButton>
+              <div className="h-8 w-px bg-black/10" />
+              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+                <EditorChromeButton
+                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => {
+                    setLeftPanel("layers");
+                  }}
+                >
+                  <Layers className="h-4 w-4" />
+                  调整图层
+                </EditorChromeButton>
+                <EditorChromeButton
+                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
+                >
+                  适应画板
+                </EditorChromeButton>
+              </div>
+              <div className="h-8 w-px bg-black/10" />
+              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+                <EditorChromeButton
+                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    const nextZoom = clamp(canvas.getZoom() - 0.1, 0.2, 3);
+                    applyCenteredZoom(canvas, nextZoom);
+                  }}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </EditorChromeButton>
+                <span className="inline-flex h-10 items-center rounded-full border border-black/8 bg-white px-3 text-sm font-medium text-neutral-700">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <EditorChromeButton
+                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  onClick={() => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    const nextZoom = clamp(canvas.getZoom() + 0.1, 0.2, 3);
+                    applyCenteredZoom(canvas, nextZoom);
+                  }}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </EditorChromeButton>
+              </div>
             </div>
           </div>
 
@@ -1962,7 +1979,7 @@ export function ProjectEditorFabricClient({
                 className="absolute left-6 top-6 z-30 w-[356px] animate-in fade-in-0 slide-in-from-top-2 duration-200"
                 onMouseDown={(event) => event.stopPropagation()}
               >
-                <div className="rounded-[28px] border border-white/[0.08] bg-[#161412] p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)]">
+                <div className="rounded-[28px] border border-white/[0.08] bg-[#171411] p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-white">插入图片</p>
@@ -2125,24 +2142,46 @@ export function ProjectEditorFabricClient({
         hasActiveInspector ? (
           <div className="h-full overflow-y-auto">
             <EditorRailSection title="属性编辑">
-              <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+              <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-[#1a1714] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div className="flex items-center justify-between rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                  <div>
+                    <p className="text-[11px] tracking-[0.16em] text-white/34">选中对象</p>
+                    <p className="mt-1 text-sm text-white/64">
+                      {activeMeta.kind === "text"
+                        ? "文本"
+                        : activeMeta.kind === "image"
+                          ? "图片"
+                          : activeMeta.kind === "shape"
+                            ? "形状"
+                            : activeMeta.kind === "multi"
+                              ? "多选"
+                              : "对象"}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/[0.08] bg-[#14110f] px-2.5 py-1 text-[11px] text-white/52">
+                    {activeMeta.kind === "multi" ? `${activeMeta.count} items` : "single"}
+                  </span>
+                </div>
                 {activeMeta.kind === "multi" ? (
-                  <div className="text-sm text-white/52">
+                  <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/52">
                     已选 {activeMeta.count} 个对象，可先调整层级或重新选择单个对象编辑属性。
                   </div>
                 ) : null}
 
                 {activeMeta.kind === "text" ? (
                   <div className="space-y-3">
-                    <div>
+                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
                       <label className="text-xs text-white/50">文本内容</label>
                       <Textarea
                         value={activeMeta.text}
                         onChange={(event) => updateActiveObject({ text: event.target.value })}
-                        className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                        className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
+                      <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-white/50">字号</label>
                         <Input
@@ -2151,7 +2190,7 @@ export function ProjectEditorFabricClient({
                           onChange={(event) =>
                             updateActiveObject({ fontSize: Number(event.target.value) || 16 })
                           }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                         />
                       </div>
                       <div>
@@ -2162,18 +2201,18 @@ export function ProjectEditorFabricClient({
                           onChange={(event) =>
                             updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
                           }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                         />
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-white/50">颜色</label>
                         <Input
                           type="color"
                           value={activeMeta.color}
                           onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
                         />
                       </div>
                       <div>
@@ -2190,6 +2229,7 @@ export function ProjectEditorFabricClient({
                           className="mt-3"
                         />
                       </div>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -2198,7 +2238,8 @@ export function ProjectEditorFabricClient({
                   <div className="space-y-3">
                     {selectedImageAsset ? (
                       <>
-                        <div>
+                        <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                          <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">素材语义</p>
                           <label className="text-xs text-white/50">图片名称</label>
                           <Input
                             value={imageDetailsDraft.title}
@@ -2209,11 +2250,9 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="给这张图片一个更清晰的名称"
-                            className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                            className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                           />
-                        </div>
-                        <div>
-                          <label className="text-xs text-white/50">图片描述</label>
+                          <label className="mt-3 block text-xs text-white/50">图片描述</label>
                           <Textarea
                             value={imageDetailsDraft.note}
                             onChange={(event) =>
@@ -2223,25 +2262,26 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
-                            className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                            className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                           />
+                          <Button
+                            type="button"
+                            onClick={() => void saveSelectedImageDetails()}
+                            disabled={assetDetailsSaving}
+                            className="mt-3 h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                          >
+                            {assetDetailsSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <PencilLine className="h-4 w-4" />
+                            )}
+                            保存图片信息
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          onClick={() => void saveSelectedImageDetails()}
-                          disabled={assetDetailsSaving}
-                          className="h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
-                        >
-                          {assetDetailsSaving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <PencilLine className="h-4 w-4" />
-                          )}
-                          保存图片信息
-                        </Button>
                       </>
                     ) : null}
-                    <div>
+                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
                       <label className="text-xs text-white/50">透明度</label>
                       <Input
                         type="range"
@@ -2260,25 +2300,23 @@ export function ProjectEditorFabricClient({
 
                 {activeMeta.kind === "shape" ? (
                   <div className="space-y-3">
-                    <div>
+                    <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
                       <label className="text-xs text-white/50">填充色</label>
                       <Input
                         type="color"
                         value={activeMeta.fill}
                         onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
                       />
-                    </div>
-                    <div>
-                      <label className="text-xs text-white/50">描边色</label>
+                      <label className="mt-3 block text-xs text-white/50">描边色</label>
                       <Input
                         type="color"
                         value={activeMeta.stroke ?? "#000000"}
                         onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] p-1"
+                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-white/50">描边宽度</label>
                         <Input
@@ -2287,7 +2325,7 @@ export function ProjectEditorFabricClient({
                           onChange={(event) =>
                             updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
                           }
-                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white"
+                          className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                         />
                       </div>
                       <div>
@@ -2303,6 +2341,7 @@ export function ProjectEditorFabricClient({
                           }
                           className="mt-3"
                         />
+                      </div>
                       </div>
                     </div>
                   </div>
@@ -2346,8 +2385,8 @@ export function ProjectEditorFabricClient({
         ) : null
       }
       bottomStrip={
-        <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/[0.06] bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
-          <div className="shrink-0 px-3 text-sm font-medium text-white/56">
+        <div className="mx-auto flex max-w-[1220px] items-center gap-1.5 overflow-x-auto rounded-[28px] border border-white/[0.06] bg-[#14110f] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+          <div className="shrink-0 px-3 text-sm font-medium text-white/44">
             {scene.boards.length} 张画板
           </div>
           {scene.boardOrder.map((boardId) => {
@@ -2358,7 +2397,7 @@ export function ProjectEditorFabricClient({
               <EditorStripButton
                 key={board.id}
                 active={scene.activeBoardId === board.id}
-                className="w-[104px] p-1.5"
+                className="w-[96px] p-1.5"
                 onClick={() =>
                   setScene((current) =>
                     normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
@@ -2413,17 +2452,17 @@ function SortableLayerRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-2 rounded-2xl border px-2 py-2 transition-colors",
+        "flex items-center gap-2 rounded-2xl border px-2 py-2 transition-all duration-150",
         selected
-          ? "border-white/40 bg-white/[0.08] text-white"
+          ? "border-white/40 bg-white/[0.09] text-white shadow-[0_16px_30px_-22px_rgba(0,0,0,0.8)]"
           : "border-white/[0.08] bg-white/[0.02] text-white/72 hover:bg-white/[0.05]",
-        isDragging ? "opacity-70" : "opacity-100"
+        isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
       )}
       role="listitem"
     >
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.04] text-white/60"
+        className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
         {...attributes}
         {...listeners}
         aria-label="拖拽排序"
@@ -2440,7 +2479,7 @@ function SortableLayerRow({
         onClick={() => onSelect(item.id)}
         className="flex flex-1 items-center gap-2 text-left"
       >
-        <div className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] text-[10px] font-semibold text-white/70">
+        <div className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#14110f] text-[10px] font-semibold text-white/70">
           {item.type === "image" && item.previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -2456,6 +2495,9 @@ function SortableLayerRow({
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{item.label}</p>
+          <p className="mt-0.5 text-[11px] text-white/36">
+            {item.type === "image" ? "图片" : item.type === "text" ? "文本" : "形状"}
+          </p>
         </div>
       </button>
 

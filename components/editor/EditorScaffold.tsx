@@ -18,7 +18,7 @@ import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
 
 export const editorFieldClass =
-  "rounded-2xl border-white/[0.08] bg-[#181715] text-white placeholder:text-white/24 shadow-none";
+  "rounded-2xl border-white/[0.08] bg-[#191714] text-white placeholder:text-white/24 shadow-none";
 
 type EditorScaffoldProps = {
   objectLabel: string;
@@ -39,6 +39,7 @@ type EditorScaffoldProps = {
   rightRailLabel?: string;
   leftRailWidthClass?: string;
   rightRailWidthClass?: string;
+  hideLeftRailHeader?: boolean;
 };
 
 export function EditorScaffold({
@@ -60,14 +61,15 @@ export function EditorScaffold({
   rightRailLabel = "右侧栏",
   leftRailWidthClass = "w-[332px]",
   rightRailWidthClass = "w-[332px]",
+  hideLeftRailHeader = false,
 }: EditorScaffoldProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta);
 
   return (
-    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0d0d0c] text-white">
-      <header className="border-b border-white/[0.05] bg-[#0f0f0e]/96 shadow-[0_18px_40px_-32px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
+    <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0d0c0b] text-white">
+      <header className="border-b border-white/[0.05] bg-[#0c0b0a] shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
         <div className="flex min-h-[68px] items-center gap-3 px-5 py-2.5">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
@@ -87,7 +89,7 @@ export function EditorScaffold({
               </div>
             ) : null}
             <div className={cn("flex min-w-0 items-center gap-3", hasHeaderMeta ? "mt-1" : "")}>
-              <h1 className="truncate text-[22px] font-semibold tracking-[-0.035em] text-white">
+              <h1 className="truncate text-[22px] font-semibold tracking-[-0.04em] text-white">
                 {objectName}
               </h1>
               {topNote ? (
@@ -124,32 +126,35 @@ export function EditorScaffold({
         ) : (
           <aside
             className={cn(
-              "flex shrink-0 flex-col border-r border-white/[0.05] bg-[#11100f] shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
+                "flex shrink-0 flex-col border-r border-white/[0.05] bg-[#120f0d] shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
               leftRailWidthClass
             )}
           >
-            <RailHeader
-              label={leftRailLabel}
-              side="left"
-              onCollapse={() => setLeftCollapsed(true)}
-            />
+            {hideLeftRailHeader ? null : (
+              <RailHeader
+                label={leftRailLabel}
+                side="left"
+                onCollapse={() => setLeftCollapsed(true)}
+              />
+            )}
             <div className="min-h-0 flex-1 overflow-y-auto">{leftRail}</div>
           </aside>
         )}
 
-        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#171513]">
+        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#1a1714]">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 18% 20%, rgba(255,255,255,0.05), transparent 18%), radial-gradient(circle at 78% 74%, rgba(255,255,255,0.035), transparent 22%), radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1.5px)",
-              backgroundSize: "auto, auto, 34px 34px",
+                "radial-gradient(circle at 20% 18%, rgba(255,255,255,0.045), transparent 18%), radial-gradient(circle at 80% 78%, rgba(255,255,255,0.03), transparent 22%), radial-gradient(circle, rgba(255,255,255,0.038) 1px, transparent 1.55px)",
+              backgroundSize: "auto, auto, 30px 30px",
               maskImage:
                 "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
               WebkitMaskImage:
                 "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
             }}
           />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/16 to-transparent" />
           <div className="relative h-full overflow-hidden">{center}</div>
         </main>
 
@@ -163,7 +168,7 @@ export function EditorScaffold({
           ) : (
             <aside
               className={cn(
-                "flex shrink-0 flex-col border-l border-white/[0.05] bg-[#151311] shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
+                "flex shrink-0 flex-col border-l border-white/[0.05] bg-[#171411] shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
                 rightRailWidthClass
               )}
             >
@@ -179,7 +184,7 @@ export function EditorScaffold({
       </div>
 
       {bottomStrip ? (
-        <div className="border-t border-white/[0.05] bg-[#0f0f0e]/96 px-4 py-3 shadow-[0_-20px_48px_-36px_rgba(0,0,0,0.82)] backdrop-blur-2xl">
+        <div className="border-t border-white/[0.05] bg-[#100e0c] px-4 py-3 shadow-[0_-20px_48px_-36px_rgba(0,0,0,0.82)]">
           {bottomStrip}
         </div>
       ) : null}
@@ -197,7 +202,7 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.02] px-4">
+    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.025] px-4">
       <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
@@ -225,7 +230,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#100f0e] text-white/44 transition-colors hover:bg-[#1a1817] hover:text-white"
+      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-[#100e0c] text-white/44 transition-colors hover:bg-[#1a1714] hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (
@@ -425,7 +430,7 @@ export function EditorChromeButton({
     <Button
       variant={variant}
       className={cn(
-        "rounded-full border-white/[0.08] bg-white/[0.025] text-white hover:bg-white/[0.08] hover:text-white",
+        "rounded-full border-white/[0.08] bg-white/[0.025] text-white transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.985]",
         className
       )}
       {...props}
@@ -459,7 +464,7 @@ export function EditorChromeLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex h-10 items-center rounded-full border border-white/[0.08] bg-white/[0.025] text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white",
+        "inline-flex h-10 items-center rounded-full border border-white/[0.08] bg-white/[0.025] text-white/72 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.985]",
         className
       )}
     >
