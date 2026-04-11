@@ -216,12 +216,60 @@ function clamp(value: number, min: number, max: number) {
 }
 
 const STAGE_PADDING = 88;
+const STAGE_TOP_INSET = 108;
+const STAGE_SIDE_INSET = 28;
+const STAGE_BOTTOM_INSET = 136;
+const editorPanelCardClass =
+  "rounded-[20px] border border-white/[0.08] bg-[#171411] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+const editorPanelMutedCardClass =
+  "rounded-[18px] border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
+const editorFloatingSurfaceClass =
+  "rounded-[22px] border border-[#d8cfc4] bg-[#f4efe7] text-neutral-950 shadow-[0_18px_36px_-26px_rgba(0,0,0,0.32)]";
+const editorPopupSurfaceClass =
+  "rounded-[20px] border border-[#ddd3c8] bg-[#f4efe7] text-neutral-950 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.28)]";
+const editorPopupItemClass =
+  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-neutral-700 transition-colors hover:bg-[#ebe4da] hover:text-neutral-950";
 
 function packageModeLabel(mode: string | null) {
   if (mode === "DEEP") return "深讲";
   if (mode === "LIGHT") return "浅讲";
   if (mode === "SUPPORTIVE") return "补充展示";
   return "待判断";
+}
+
+function syncCanvasDomSizing(canvas: FabricCanvas) {
+  const runtimeCanvas = canvas as unknown as {
+    wrapperEl?: HTMLDivElement;
+    lowerCanvasEl?: HTMLCanvasElement;
+    upperCanvasEl?: HTMLCanvasElement;
+  };
+
+  if (runtimeCanvas.wrapperEl) {
+    runtimeCanvas.wrapperEl.style.position = "absolute";
+    runtimeCanvas.wrapperEl.style.inset = "0";
+    runtimeCanvas.wrapperEl.style.width = "100%";
+    runtimeCanvas.wrapperEl.style.height = "100%";
+    runtimeCanvas.wrapperEl.style.display = "block";
+  }
+
+  if (runtimeCanvas.lowerCanvasEl) {
+    runtimeCanvas.lowerCanvasEl.style.width = "100%";
+    runtimeCanvas.lowerCanvasEl.style.height = "100%";
+    runtimeCanvas.lowerCanvasEl.style.display = "block";
+  }
+
+  if (runtimeCanvas.upperCanvasEl) {
+    runtimeCanvas.upperCanvasEl.style.width = "100%";
+    runtimeCanvas.upperCanvasEl.style.height = "100%";
+    runtimeCanvas.upperCanvasEl.style.display = "block";
+  }
+}
+
+function isEditableCanvasTarget(target: FabricObject | null | undefined) {
+  if (!target) return false;
+  if (target.type === "activeSelection") return true;
+  const typed = target as FabricSceneObject;
+  return Boolean(typed.data?.nodeType) || target.type === "textbox";
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
@@ -1545,18 +1593,25 @@ export function ProjectEditorFabricClient({
   }
 
   function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
-    const width = canvas.getWidth();
-    const height = canvas.getHeight();
+    const width = workspaceRef.current?.clientWidth || canvas.getWidth();
+    const height = workspaceRef.current?.clientHeight || canvas.getHeight();
+
+    if (canvas.getWidth() !== width || canvas.getHeight() !== height) {
+      canvas.setDimensions({ width, height });
+      syncCanvasDomSizing(canvas);
+    }
+
     const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
     const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
     canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
+    canvas.calcOffset();
     setZoom(nextZoom);
     canvas.requestRenderAll();
   }
 
   function fitBoard(canvas: FabricCanvas) {
-    const width = canvas.getWidth();
-    const height = canvas.getHeight();
+    const width = workspaceRef.current?.clientWidth || canvas.getWidth();
+    const height = workspaceRef.current?.clientHeight || canvas.getHeight();
     const availableWidth = Math.max(width - STAGE_PADDING * 2, 240);
     const availableHeight = Math.max(height - STAGE_PADDING * 2, 240);
     const zoomToFit = Math.min(
@@ -1568,13 +1623,15 @@ export function ProjectEditorFabricClient({
 
   function applyObjectChrome(target: FabricSceneObject) {
     target.set({
-      borderColor: "#111111",
-      cornerColor: "#ffffff",
-      cornerStrokeColor: "#111111",
+      borderColor: "rgba(244, 239, 232, 0.92)",
+      borderScaleFactor: 1.2,
+      borderOpacityWhenMoving: 0.95,
+      cornerColor: "#f7f2eb",
+      cornerStrokeColor: "#1a1714",
       transparentCorners: false,
       cornerStyle: "circle",
-      cornerSize: 12,
-      padding: 4,
+      cornerSize: 11,
+      padding: 3,
       lockRotation: true,
     });
   }
@@ -1806,6 +1863,11 @@ export function ProjectEditorFabricClient({
 
     canvas.discardActiveObject();
     fitBoard(canvas);
+    requestAnimationFrame(() => {
+      if (canvasRef.current === canvas) {
+        fitBoard(canvas);
+      }
+    });
     updateSelectionSummary(canvas);
     hydratingRef.current = false;
   }
@@ -1827,6 +1889,7 @@ export function ProjectEditorFabricClient({
         selection: true,
       });
       canvasRef.current = canvas;
+      syncCanvasDomSizing(canvas);
 
       const resize = () => {
         if (!workspaceRef.current || !canvasRef.current) return;
@@ -1834,7 +1897,11 @@ export function ProjectEditorFabricClient({
           width: workspaceRef.current.clientWidth,
           height: workspaceRef.current.clientHeight,
         });
+        syncCanvasDomSizing(canvasRef.current);
         fitBoard(canvasRef.current);
+        requestAnimationFrame(() => {
+          if (canvasRef.current) fitBoard(canvasRef.current);
+        });
       };
 
       canvas.on("selection:created", () => updateSelectionSummary(canvas));
@@ -1861,10 +1928,12 @@ export function ProjectEditorFabricClient({
         if (nativeEvent.button !== 2) return;
         nativeEvent.preventDefault();
         nativeEvent.stopPropagation();
-        if (event.target) {
-          canvas.setActiveObject(event.target as FabricObject);
-          updateSelectionSummary(canvas);
+        if (!isEditableCanvasTarget(event.target as FabricObject | undefined)) {
+          closeContextMenu();
+          return;
         }
+        canvas.setActiveObject(event.target as FabricObject);
+        updateSelectionSummary(canvas);
         openContextMenuAt(nativeEvent.clientX, nativeEvent.clientY);
       });
 
@@ -2313,11 +2382,11 @@ export function ProjectEditorFabricClient({
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
       rightRailLabel="属性"
-      leftRailWidthClass={leftPanel ? "w-[368px]" : "w-[92px]"}
+      leftRailWidthClass={leftPanel ? "w-[448px]" : "w-[88px]"}
       hideLeftRailHeader
       leftRail={
         <div className="flex h-full min-h-0">
-          <div className="flex w-[92px] shrink-0 flex-col items-center gap-3 border-r border-white/[0.05] bg-[#110f0d] px-3 py-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
+          <div className="flex w-[88px] shrink-0 flex-col items-center gap-2.5 border-r border-white/[0.05] bg-[#110f0d] px-2.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {LEFT_PANEL_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = leftPanel === item.key;
@@ -2328,7 +2397,7 @@ export function ProjectEditorFabricClient({
                   onClick={() => toggleLeftPanel(item.key)}
                   title={item.label}
                   className={cn(
-                    "group relative flex w-full flex-col items-center gap-2 rounded-[24px] border px-2 py-4 text-[11px] font-medium transition-all duration-200",
+                    "group relative flex w-full flex-col items-center gap-1.5 rounded-[22px] border px-2 py-3.5 text-[11px] font-medium transition-all duration-200",
                     active
                       ? "translate-x-[1px] border-white/[0.14] bg-white/[0.09] text-white shadow-[0_18px_30px_-22px_rgba(0,0,0,0.9)]"
                       : "border-white/[0.06] bg-white/[0.02] text-white/52 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
@@ -2342,7 +2411,7 @@ export function ProjectEditorFabricClient({
                   />
                   <div
                     className={cn(
-                      "flex h-11 w-11 items-center justify-center rounded-[18px] border transition-all duration-200",
+                      "flex h-10 w-10 items-center justify-center rounded-[16px] border transition-all duration-200",
                       active
                         ? "border-white/[0.12] bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                         : "border-white/[0.05] bg-transparent group-hover:border-white/[0.08] group-hover:bg-white/[0.04]"
@@ -2358,17 +2427,17 @@ export function ProjectEditorFabricClient({
 
           {leftPanel ? (
             <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.85)]">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-[#15120f] px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
                 <div className="min-w-0">
-                  <p className="text-[11px] tracking-[0.18em] text-white/34">
+                  <p className="text-[10px] tracking-[0.18em] text-white/30">
                     {currentLeftPanelMeta?.label ?? "面板"}
                   </p>
                   {currentLeftPanelMeta ? (
-                    <p className="mt-1 truncate text-xs text-white/42">{currentLeftPanelMeta.hint}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-white/36">{currentLeftPanelMeta.hint}</p>
                   ) : null}
                 </div>
                 <EditorChromeIconButton
-                  className="h-9 w-9 border-white/[0.08] bg-white/[0.04] text-white/62 hover:bg-white/[0.08] hover:text-white"
+                  className="h-8 w-8 border-white/[0.08] bg-white/[0.035] text-white/56 hover:bg-white/[0.08] hover:text-white"
                   onClick={() => setLeftPanel(null)}
                   aria-label="收起左侧面板"
                 >
@@ -2378,12 +2447,12 @@ export function ProjectEditorFabricClient({
               {leftPanel === "project" ? (
                 <>
                   <EditorRailSection title="项目背景与上下文">
-                    <div className="space-y-2.5">
-                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <div className="space-y-2">
+                      <div className={cn(editorPanelCardClass, "px-3.5 py-2.5")}>
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium text-white">输入项目背景</p>
-                            <p className="mt-1 text-xs text-white/42">
+                            <p className="mt-0.5 text-[11px] text-white/38">
                               这里的内容会直接作为诊断和排版生成的上下文。
                             </p>
                           </div>
@@ -2399,9 +2468,9 @@ export function ProjectEditorFabricClient({
                           </span>
                         </div>
                       </div>
-                      <div className="space-y-2.5 rounded-[22px] border border-white/[0.06] bg-[#14110f] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className={cn(editorPanelCardClass, "space-y-1.5 p-3")}>
                         <div>
-                          <label className="text-xs text-white/44">项目类型</label>
+                          <label className="text-[11px] text-white/42">项目类型</label>
                           <Input
                             value={projectFactsDraft.projectType}
                             onChange={(event) =>
@@ -2411,11 +2480,11 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 SaaS 后台、品牌官网、移动端应用"
-                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-white/44">所属行业</label>
+                          <label className="text-[11px] text-white/42">所属行业</label>
                           <Input
                             value={projectFactsDraft.industry}
                             onChange={(event) =>
@@ -2425,11 +2494,11 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-white/44">我的角色</label>
+                          <label className="text-[11px] text-white/42">我的角色</label>
                           <Input
                             value={projectFactsDraft.roleTitle}
                             onChange={(event) =>
@@ -2439,11 +2508,11 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 产品设计负责人、全栈开发、独立设计师"
-                            className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-white/44">背景摘要</label>
+                          <label className="text-[11px] text-white/42">背景摘要</label>
                           <Textarea
                             value={projectFactsDraft.background}
                             onChange={(event) =>
@@ -2453,11 +2522,11 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
-                            className="mt-1.5 min-h-[108px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-white/44">结果摘要</label>
+                          <label className="text-[11px] text-white/42">结果摘要</label>
                           <Textarea
                             value={projectFactsDraft.resultSummary}
                             onChange={(event) =>
@@ -2467,7 +2536,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="补充最终结果、影响、亮点与可量化成果。"
-                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
                           />
                         </div>
                       </div>
@@ -2480,7 +2549,7 @@ export function ProjectEditorFabricClient({
                 <>
                   <EditorRailSection title="导入素材">
                     <div className="space-y-3">
-                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className={cn(editorPanelCardClass, "px-4 py-4")}>
                         <p className="text-sm font-medium text-white">先导入设计图</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
                           这里上传的设计图会进入当前项目素材库，后续可直接插入画板，也会作为 AI 生成结构建议的重要上下文。
@@ -2511,7 +2580,7 @@ export function ProjectEditorFabricClient({
                         className="h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white placeholder:text-white/28"
                       />
                       {pendingRecognitionAssets.length > 0 ? (
-                        <div className="rounded-[20px] border border-white/[0.08] bg-[#171411] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <div className={cn(editorPanelCardClass, "px-4 py-4")}>
                           <p className="text-sm font-medium text-white">有新增素材还没纳入识别</p>
                           <p className="mt-1.5 text-xs leading-6 text-white/42">
                             当前有 {pendingRecognitionAssets.length} 张新图还没被系统理解。建议先做增量识别，再决定是否刷新结构。
@@ -2557,18 +2626,18 @@ export function ProjectEditorFabricClient({
                             key={asset.id}
                             type="button"
                             onClick={() => void addAssetToCanvas(asset.id)}
-                            className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                            className="group overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.03] text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
                           >
                             <div className="aspect-[4/3] overflow-hidden bg-black/30">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={buildPrivateBlobProxyUrl(asset.imageUrl)}
                                 alt={asset.title ?? "素材"}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                               />
                             </div>
                             <div className="px-3 py-2.5">
-                              <p className="truncate text-xs font-medium text-white/84">
+                              <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
                                 {asset.title ?? "未命名素材"}
                               </p>
                             </div>
@@ -2585,18 +2654,18 @@ export function ProjectEditorFabricClient({
                           key={asset.id}
                           type="button"
                           onClick={() => void addAssetToCanvas(asset.id)}
-                          className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                          className="group overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.03] text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
                         >
                           <div className="aspect-[4/3] overflow-hidden bg-black/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={buildPrivateBlobProxyUrl(asset.imageUrl)}
                               alt={asset.title ?? "素材"}
-                              className="h-full w-full object-cover"
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                             />
                           </div>
                           <div className="px-3 py-2.5">
-                            <p className="truncate text-xs font-medium text-white/84">
+                            <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
                               {asset.title ?? "未命名素材"}
                             </p>
                           </div>
@@ -2616,7 +2685,7 @@ export function ProjectEditorFabricClient({
                 <>
                   <EditorRailSection title="导入后轻识别">
                     <div className="space-y-3">
-                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className={cn(editorPanelCardClass, "px-4 py-4")}>
                         <p className="text-sm font-medium text-white">先让系统说它看到了什么</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
                           导入首批设计图后，先做一轮轻识别，判断这批素材更像什么、哪些更适合作为主讲位，以及当前最明显还缺什么。
@@ -2664,7 +2733,7 @@ export function ProjectEditorFabricClient({
                       ) : null}
 
                       {materialRecognition ? (
-                        <div className="space-y-3 rounded-[20px] border border-white/[0.08] bg-[#171411] p-4">
+                        <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
                           <div>
                             <p className="text-sm font-medium text-white">{materialRecognition.summary}</p>
                             <p className="mt-2 text-[11px] text-white/34">
@@ -2732,7 +2801,7 @@ export function ProjectEditorFabricClient({
 
                   <EditorRailSection title="结构建议">
                     <div className="space-y-3">
-                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className={cn(editorPanelCardClass, "px-4 py-4")}>
                         <p className="text-sm font-medium text-white">先确认结构，再进入排版</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
                           轻识别后，AI 会结合项目背景、导入的设计图、当前画板上下文和诊断结果，给出这个项目在作品集里的结构分组建议。
@@ -2772,7 +2841,7 @@ export function ProjectEditorFabricClient({
                   {structureDraft ? (
                     <>
                       <EditorRailSection title="结构摘要">
-                        <div className="space-y-3 rounded-[20px] border border-white/[0.08] bg-[#171411] p-4">
+                        <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-medium text-white">先把结构草稿收成你认可的版本</p>
@@ -3111,7 +3180,7 @@ export function ProjectEditorFabricClient({
                       <EditorChromeButton className="h-10 w-full justify-center" onClick={createBoard}>
                         新建画板
                       </EditorChromeButton>
-                      <div className="rounded-[18px] border border-white/[0.08] bg-[#171411] px-3 py-2 text-xs text-white/52">
+                      <div className={cn(editorPanelCardClass, "px-3 py-2 text-xs text-white/52")}>
                         当前共有 {scene.boards.length} 张画板，底部缩略图负责快速切换。
                       </div>
                     </div>
@@ -3128,19 +3197,26 @@ export function ProjectEditorFabricClient({
                             type="button"
                             onClick={() => selectBoard(board.id)}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors",
+                              "group flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition-all duration-200",
                               scene.activeBoardId === board.id
-                                ? "border-white/[0.14] bg-white/[0.08] text-white"
-                                : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:bg-white/[0.05]"
+                                ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
+                                : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/84"
                             )}
                           >
-                            <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-white/[0.08] bg-[#0b0b0a]">
+                            <div
+                              className={cn(
+                                "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+                                scene.activeBoardId === board.id
+                                  ? "border-white/[0.16] shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
+                                  : "border-white/[0.08] group-hover:border-white/[0.12]"
+                              )}
+                            >
                               {thumbnailUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={buildPrivateBlobProxyUrl(thumbnailUrl)}
                                   alt={board.name}
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                 />
                               ) : (
                                 <div className="h-full w-full bg-white" />
@@ -3167,10 +3243,10 @@ export function ProjectEditorFabricClient({
       }
       center={
         <div className="flex h-full min-h-0 flex-col">
-          <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-[26px] border border-[#d8cfc4] bg-[#f4efe7] px-2.5 py-2 text-neutral-950 shadow-[0_24px_54px_-30px_rgba(0,0,0,0.4)]">
+          <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2">
+            <div className={cn("pointer-events-auto flex items-center gap-1 px-1.5 py-1.5", editorFloatingSurfaceClass)}>
               {activeMeta.kind === "text" ? (
-                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
+                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     文本
                   </span>
@@ -3180,17 +3256,17 @@ export function ProjectEditorFabricClient({
                     onChange={(event) =>
                       updateActiveObject({ fontSize: Number(event.target.value) || 16 })
                     }
-                    className="h-9 w-[84px] rounded-full border-black/10 bg-white text-sm text-neutral-800"
+                    className="h-8 w-[76px] rounded-full border-black/10 bg-white text-sm text-neutral-800"
                   />
                   <Input
                     type="color"
                     value={activeMeta.color}
                     onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
                   />
                 </div>
               ) : activeMeta.kind === "image" ? (
-                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
+                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     图片
                   </span>
@@ -3207,7 +3283,7 @@ export function ProjectEditorFabricClient({
                   />
                 </div>
               ) : activeMeta.kind === "shape" ? (
-                <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/70 px-2 py-1">
+                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
                   <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
                     形状
                   </span>
@@ -3215,20 +3291,20 @@ export function ProjectEditorFabricClient({
                     type="color"
                     value={activeMeta.fill}
                     onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
                   />
                   <Input
                     type="color"
                     value={activeMeta.stroke ?? "#000000"}
                     onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                    className="h-9 w-12 rounded-full border-black/10 bg-white p-1"
+                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
                   />
                 </div>
               ) : null}
-              {hasFloatingContext ? <div className="h-8 w-px bg-black/10" /> : null}
-              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              {hasFloatingContext ? <div className="h-7 w-px bg-black/10" /> : null}
+              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
-                  className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => {
                     setLeftPanel("assets");
                     setShapeMenuOpen(false);
@@ -3238,7 +3314,7 @@ export function ProjectEditorFabricClient({
                   插入图片
                 </EditorChromeButton>
                 <Button
-                  className="h-10 gap-2 rounded-full border border-black/8 bg-white px-4 text-neutral-950 shadow-none hover:bg-neutral-100"
+                  className="h-8 gap-1.5 rounded-full border border-black/8 bg-white px-3 text-neutral-950 shadow-none hover:bg-neutral-100"
                   onClick={addTextObject}
                 >
                   <Type className="h-4 w-4" />
@@ -3246,7 +3322,7 @@ export function ProjectEditorFabricClient({
                 </Button>
                 <div className="relative">
                   <EditorChromeButton
-                    className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                    className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                     onClick={() => setShapeMenuOpen((prev) => !prev)}
                   >
                     <Square className="h-4 w-4" />
@@ -3255,7 +3331,7 @@ export function ProjectEditorFabricClient({
                   </EditorChromeButton>
                   {shapeMenuOpen ? (
                     <div
-                      className="absolute left-0 top-12 z-30 w-48 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]"
+                      className={cn("absolute left-0 top-11 z-30 w-48 p-2", editorPopupSurfaceClass)}
                       onMouseDown={(event) => event.stopPropagation()}
                     >
                       {PROJECT_SHAPE_TYPES.map((shape) => (
@@ -3266,7 +3342,7 @@ export function ProjectEditorFabricClient({
                             void addShapeObject(shape);
                             setShapeMenuOpen(false);
                           }}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                          className={cn(editorPopupItemClass, "items-center gap-2 text-sm")}
                         >
                           {shape === "circle" ? (
                             <Circle className="h-4 w-4" />
@@ -3284,10 +3360,10 @@ export function ProjectEditorFabricClient({
                   ) : null}
                 </div>
               </div>
-              <div className="h-8 w-px bg-black/10" />
-              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              <div className="h-7 w-px bg-black/10" />
+              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
-                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => {
                     setLeftPanel("layers");
                   }}
@@ -3296,16 +3372,16 @@ export function ProjectEditorFabricClient({
                   调整图层
                 </EditorChromeButton>
                 <EditorChromeButton
-                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
                 >
                   适应画板
                 </EditorChromeButton>
               </div>
-              <div className="h-8 w-px bg-black/10" />
-              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              <div className="h-7 w-px bg-black/10" />
+              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
-                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 w-8 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
@@ -3315,11 +3391,11 @@ export function ProjectEditorFabricClient({
                 >
                   <ZoomOut className="h-4 w-4" />
                 </EditorChromeButton>
-                <span className="inline-flex h-10 items-center rounded-full border border-black/8 bg-white px-3 text-sm font-medium text-neutral-700">
+                <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-white px-3 text-sm font-medium text-neutral-700">
                   {Math.round(zoom * 100)}%
                 </span>
                 <EditorChromeButton
-                  className="h-10 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 w-8 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
@@ -3333,11 +3409,7 @@ export function ProjectEditorFabricClient({
             </div>
           </div>
 
-          <div
-            ref={workspaceRef}
-            className="relative flex-1 overflow-hidden"
-            onContextMenu={(event) => event.preventDefault()}
-          >
+          <div className="relative flex-1 overflow-hidden">
             <input
               ref={assetUploadRef}
               type="file"
@@ -3346,6 +3418,19 @@ export function ProjectEditorFabricClient({
               className="hidden"
               onChange={(event) => void handleAssetFilesPicked(event.target.files)}
             />
+            <div
+              ref={workspaceRef}
+              className="absolute overflow-hidden rounded-[28px]"
+              style={{
+                top: STAGE_TOP_INSET,
+                left: STAGE_SIDE_INSET,
+                right: STAGE_SIDE_INSET,
+                bottom: STAGE_BOTTOM_INSET,
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <canvas ref={hostRef} className="absolute inset-0 block h-full w-full" />
+            </div>
             {!canvasReady ? (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
                 <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
@@ -3354,21 +3439,20 @@ export function ProjectEditorFabricClient({
                 </div>
               </div>
             ) : null}
-            <canvas ref={hostRef} />
             {contextMenu.open ? (
               <div
-                className="fixed z-50 w-56 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 text-sm text-white/88 shadow-[0_20px_48px_-24px_rgba(0,0,0,0.7)]"
+                className={cn("fixed z-50 w-56 p-2 text-sm", editorPopupSurfaceClass)}
                 style={{ left: contextMenu.x, top: contextMenu.y }}
                 onMouseDown={(event) => event.stopPropagation()}
               >
                 {contextMenuItems.map((item) =>
                   "type" in item && item.type === "sep" ? (
-                    <div key={item.id} className="my-2 h-px bg-white/[0.06]" />
+                    <div key={item.id} className="my-2 h-px bg-black/[0.08]" />
                   ) : (
                     <button
                       key={item.id}
                       type="button"
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      className={editorPopupItemClass}
                       onClick={() => {
                         closeContextMenu();
                         void handleContextAction(item.id);
@@ -3376,7 +3460,7 @@ export function ProjectEditorFabricClient({
                     >
                       <span>{item.label}</span>
                       {"shortcut" in item ? (
-                        <span className="text-xs text-white/40">{item.shortcut}</span>
+                        <span className="text-xs text-neutral-400">{item.shortcut}</span>
                       ) : null}
                     </button>
                   )
@@ -3771,8 +3855,8 @@ export function ProjectEditorFabricClient({
         ) : null
       }
       bottomStrip={
-        <div className="mx-auto flex max-w-[1220px] items-center gap-1.5 overflow-x-auto rounded-[28px] border border-white/[0.06] bg-[#14110f] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
-          <div className="shrink-0 px-3">
+        <div className="mx-auto flex w-[calc(100%-56px)] items-center gap-1.5 overflow-x-auto rounded-[24px] border border-white/[0.06] bg-[#14110f] p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+          <div className="shrink-0 px-2.5">
             <p className="text-sm font-medium text-white/44">{scene.boards.length} 张画板</p>
             <p className="mt-1 text-[11px] text-white/26">
               范围：{scene.generationScope.mode === "all" ? "全部" : scene.generationScope.mode === "selected" ? "已选" : "当前"}
@@ -3796,7 +3880,7 @@ export function ProjectEditorFabricClient({
                     toggleBoardInSelection(board.id);
                   }}
                   className={cn(
-                    "absolute right-2 top-2 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] transition-colors",
+                    "absolute right-1.5 top-1.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] transition-colors",
                     selectedForScope
                       ? "border-white/[0.18] bg-[#0f0f0e] text-white"
                       : "border-white/[0.08] bg-[#14110f]/90 text-white/42 hover:text-white/72"
@@ -3808,7 +3892,8 @@ export function ProjectEditorFabricClient({
                 <EditorStripButton
                   active={scene.activeBoardId === board.id}
                   className={cn(
-                    "w-[96px] p-1.5",
+                    "group relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
+                    scene.activeBoardId === board.id && "translate-y-[-1px] shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]",
                     selectedForScope && "border-white/[0.16] ring-1 ring-white/[0.08]"
                   )}
                   onClick={() =>
@@ -3817,22 +3902,32 @@ export function ProjectEditorFabricClient({
                     )
                   }
                 >
-                  <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0b0a]">
+                  <div
+                    className={cn(
+                      "overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+                      scene.activeBoardId === board.id
+                        ? "border-white/[0.18] shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
+                        : "border-white/[0.08] group-hover:border-white/[0.12]"
+                    )}
+                  >
                     {thumbnailUrl ? (
                       <div className="aspect-video">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={buildPrivateBlobProxyUrl(thumbnailUrl)}
                           alt={board.name}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                         />
                       </div>
                     ) : (
-                      <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-3">
-                        <div className="h-full w-full rounded-[12px] border border-black/6 bg-white" />
+                      <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-2.5">
+                        <div className="h-full w-full rounded-[8px] border border-black/6 bg-white" />
                       </div>
                     )}
                   </div>
+                  {scene.activeBoardId === board.id ? (
+                    <div className="pointer-events-none absolute inset-x-5 bottom-0.5 h-[2px] rounded-full bg-white/70" />
+                  ) : null}
                 </EditorStripButton>
               </div>
             );
@@ -4054,24 +4149,32 @@ function SortableLayerRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-2 rounded-2xl border px-2 py-2 transition-all duration-150",
+        "group flex items-center gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
         selected
-          ? "border-white/40 bg-white/[0.09] text-white shadow-[0_16px_30px_-22px_rgba(0,0,0,0.8)]"
-          : "border-white/[0.08] bg-white/[0.02] text-white/72 hover:bg-white/[0.05]",
+          ? "border-white/40 bg-white/[0.09] text-white shadow-[0_16px_30px_-22px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.06]"
+          : "border-white/[0.08] bg-white/[0.02] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/82",
         isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
       )}
       role="listitem"
     >
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
+          selected
+            ? "border-white/[0.12] bg-white/[0.09] text-white"
+            : "border-white/[0.06] bg-white/[0.04] text-white/60 hover:bg-white/[0.08] hover:text-white"
+        )}
         {...attributes}
         {...listeners}
         aria-label="拖拽排序"
       >
         <div className="grid grid-cols-2 gap-[3px]">
           {Array.from({ length: 6 }).map((_, index) => (
-            <span key={index} className="h-1 w-1 rounded-full bg-white/40" />
+            <span
+              key={index}
+              className={cn("h-1 w-1 rounded-full transition-colors", selected ? "bg-white/70" : "bg-white/40")}
+            />
           ))}
         </div>
       </button>
@@ -4081,7 +4184,14 @@ function SortableLayerRow({
         onClick={() => onSelect(item.id)}
         className="flex flex-1 items-center gap-2 text-left"
       >
-        <div className="flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#14110f] text-[10px] font-semibold text-white/70">
+        <div
+          className={cn(
+            "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-[#14110f] text-[10px] font-semibold transition-all",
+            selected
+              ? "border-white/[0.18] text-white shadow-[0_10px_16px_-14px_rgba(255,255,255,0.18)]"
+              : "border-white/[0.08] text-white/70 group-hover:border-white/[0.12]"
+          )}
+        >
           {item.type === "image" && item.previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -4106,7 +4216,12 @@ function SortableLayerRow({
       <button
         type="button"
         onClick={onOpenMenu}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
+        className={cn(
+          "inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
+          selected
+            ? "border-white/[0.12] bg-white/[0.08] text-white"
+            : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:text-white"
+        )}
         aria-label="更多操作"
       >
         <MoreHorizontal className="h-4 w-4" />

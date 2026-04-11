@@ -70,7 +70,7 @@ export function EditorScaffold({
   return (
     <div className="flex h-full min-h-screen flex-col overflow-hidden bg-[#0d0c0b] text-white">
       <header className="border-b border-white/[0.05] bg-[#0c0b0a] shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
-        <div className="flex min-h-[68px] items-center gap-3 px-5 py-2.5">
+        <div className="flex min-h-[64px] items-center gap-3 px-5 py-2">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
             {backLabel}
@@ -89,11 +89,11 @@ export function EditorScaffold({
               </div>
             ) : null}
             <div className={cn("flex min-w-0 items-center gap-3", hasHeaderMeta ? "mt-1" : "")}>
-              <h1 className="truncate text-[22px] font-semibold tracking-[-0.04em] text-white">
+              <h1 className="truncate text-[21px] font-semibold tracking-[-0.04em] text-white">
                 {objectName}
               </h1>
               {topNote ? (
-                <div className="hidden min-w-0 max-w-xl truncate text-sm text-white/36 xl:block">
+                <div className="hidden min-w-0 max-w-xl truncate text-[13px] text-white/34 xl:block">
                   {topNote}
                 </div>
               ) : null}
@@ -141,7 +141,7 @@ export function EditorScaffold({
           </aside>
         )}
 
-        <main className="relative min-w-0 flex-1 overflow-hidden bg-[#1a1714]">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[#1a1714]">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{
@@ -155,7 +155,14 @@ export function EditorScaffold({
             }}
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/16 to-transparent" />
-          <div className="relative h-full overflow-hidden">{center}</div>
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            {center}
+            {bottomStrip ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-0 pb-3">
+                <div className="pointer-events-auto">{bottomStrip}</div>
+              </div>
+            ) : null}
+          </div>
         </main>
 
         {rightRail ? (
@@ -183,11 +190,6 @@ export function EditorScaffold({
         ) : null}
       </div>
 
-      {bottomStrip ? (
-        <div className="border-t border-white/[0.05] bg-[#100e0c] px-4 py-3 shadow-[0_-20px_48px_-36px_rgba(0,0,0,0.82)]">
-          {bottomStrip}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -255,11 +257,11 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-white/[0.05] px-4 py-4", className)}>
-      <p className="text-[11px] text-white/40">
+    <section className={cn("border-b border-white/[0.05] px-5 py-3.5", className)}>
+      <p className="text-[11px] text-white/38">
         {title}
       </p>
-      <div className="mt-3">{children}</div>
+      <div className="mt-2.5">{children}</div>
     </section>
   );
 }
