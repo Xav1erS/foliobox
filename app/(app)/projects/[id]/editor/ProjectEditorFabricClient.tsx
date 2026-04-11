@@ -215,10 +215,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-const STAGE_PADDING = 88;
-const STAGE_TOP_INSET = 108;
-const STAGE_SIDE_INSET = 28;
-const STAGE_BOTTOM_INSET = 136;
+const STAGE_PADDING = 18;
+const STAGE_TOP_INSET = 80;
+const STAGE_SIDE_INSET = 20;
+const STAGE_BOTTOM_INSET = 76;
 const editorPanelCardClass =
   "rounded-[20px] border border-white/[0.08] bg-[#171411] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
@@ -545,12 +545,22 @@ export function ProjectEditorFabricClient({
     [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
   );
   const hasActiveInspector = activeMeta.kind !== "none";
-  const hasFloatingContext =
-    activeMeta.kind === "text" || activeMeta.kind === "image" || activeMeta.kind === "shape";
   const showRightRail = hasActiveInspector || rightPanel === "ai";
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
   const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
+  const currentRightPanelMeta =
+    rightPanel === "inspector"
+      ? {
+          label: "属性",
+          hint: hasActiveInspector
+            ? "选中对象后，在这里编辑内容、样式和层级。"
+            : "先选中画板里的文本、图片或形状，再编辑属性。",
+        }
+      : {
+          label: "AI",
+          hint: "查看诊断结论、结构建议和下一步生成判断。",
+        };
   const selectedImageAsset =
     activeMeta.kind === "image" && activeMeta.assetId
       ? assetMap.get(activeMeta.assetId) ?? null
@@ -587,9 +597,17 @@ export function ProjectEditorFabricClient({
         ? "结构保存失败"
         : structureSaveState === "dirty"
           ? "结构待保存"
-          : structureDraft?.status === "confirmed"
+        : structureDraft?.status === "confirmed"
             ? "结构已确认"
             : "结构已保存";
+  const topStatusLabel =
+    saveState === "saved" && factsSaveState === "saved"
+      ? "已保存"
+      : saveState === "error" || factsSaveState === "error"
+        ? "保存失败"
+        : saveState === "saving" || factsSaveState === "saving"
+          ? "保存中"
+          : "待保存";
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
@@ -2358,7 +2376,7 @@ export function ProjectEditorFabricClient({
       backLabel="全部项目"
       statusLabel=""
       statusMeta=""
-      topNote={`${sceneSaveLabel} · ${factsSaveLabel}`}
+      topNote={topStatusLabel}
       primaryAction={
         <Button
           className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed]"
@@ -2432,9 +2450,6 @@ export function ProjectEditorFabricClient({
                   <p className="text-[10px] tracking-[0.18em] text-white/30">
                     {currentLeftPanelMeta?.label ?? "面板"}
                   </p>
-                  {currentLeftPanelMeta ? (
-                    <p className="mt-0.5 truncate text-[11px] text-white/36">{currentLeftPanelMeta.hint}</p>
-                  ) : null}
                 </div>
                 <EditorChromeIconButton
                   className="h-8 w-8 border-white/[0.08] bg-white/[0.035] text-white/56 hover:bg-white/[0.08] hover:text-white"
@@ -2550,9 +2565,9 @@ export function ProjectEditorFabricClient({
                   <EditorRailSection title="导入素材">
                     <div className="space-y-3">
                       <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                        <p className="text-sm font-medium text-white">先导入设计图</p>
+                        <p className="text-sm font-medium text-white">上传设计图</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
-                          这里上传的设计图会进入当前项目素材库，后续可直接插入画板，也会作为 AI 生成结构建议的重要上下文。
+                          上传后可直接插入画板，也会进入结构识别。
                         </p>
                         <Button
                           type="button"
@@ -2581,20 +2596,12 @@ export function ProjectEditorFabricClient({
                       />
                       {pendingRecognitionAssets.length > 0 ? (
                         <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                          <p className="text-sm font-medium text-white">有新增素材还没纳入识别</p>
-                          <p className="mt-1.5 text-xs leading-6 text-white/42">
-                            当前有 {pendingRecognitionAssets.length} 张新图还没被系统理解。建议先做增量识别，再决定是否刷新结构。
+                          <p className="text-sm font-medium text-white">
+                            {pendingRecognitionAssets.length} 张新素材待识别
                           </p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {pendingRecognitionAssets.slice(0, 4).map((asset) => (
-                              <span
-                                key={asset.id}
-                                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58"
-                              >
-                                {asset.title ?? asset.id}
-                              </span>
-                            ))}
-                          </div>
+                          <p className="mt-1.5 text-xs leading-6 text-white/42">
+                            先做增量识别，再决定是否刷新结构。
+                          </p>
                           <Button
                             type="button"
                             onClick={() => void handleRecognizeIncrementalMaterials()}
@@ -2686,21 +2693,10 @@ export function ProjectEditorFabricClient({
                   <EditorRailSection title="导入后轻识别">
                     <div className="space-y-3">
                       <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                        <p className="text-sm font-medium text-white">先让系统说它看到了什么</p>
+                        <p className="text-sm font-medium text-white">识别素材</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
-                          导入首批设计图后，先做一轮轻识别，判断这批素材更像什么、哪些更适合作为主讲位，以及当前最明显还缺什么。
+                          先判断这批图更像什么、哪些适合主讲、还缺什么。
                         </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-white/40">
-                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
-                            背景 {projectFactsDraft.background.trim() ? "已填写" : "待补充"}
-                          </span>
-                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
-                            素材 {assets.length} 张
-                          </span>
-                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
-                            诊断 {boundaryAnalysis || completenessAnalysis || packageRecommendation ? "已运行" : "未运行"}
-                          </span>
-                        </div>
                         <Button
                           type="button"
                           onClick={() => void handleRecognizeMaterials()}
@@ -2770,11 +2766,11 @@ export function ProjectEditorFabricClient({
                                 ? materialRecognition.missingInfo.join("、")
                                 : " 当前没有明显缺口"}
                             </p>
-                            <p>建议下一步：{materialRecognition.suggestedNextStep}</p>
+                            <p>下一步：{materialRecognition.suggestedNextStep}</p>
                           </div>
                           {materialRecognition.lastIncrementalDiff ? (
                             <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
-                              <p className="text-xs font-medium text-white">最近一次增量变化</p>
+                              <p className="text-xs font-medium text-white">最近一次变化</p>
                               <p className="mt-1.5 text-xs leading-6 text-white/48">
                                 {materialRecognition.lastIncrementalDiff.summary}
                               </p>
@@ -2802,9 +2798,9 @@ export function ProjectEditorFabricClient({
                   <EditorRailSection title="结构建议">
                     <div className="space-y-3">
                       <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                        <p className="text-sm font-medium text-white">先确认结构，再进入排版</p>
+                        <p className="text-sm font-medium text-white">生成结构建议</p>
                         <p className="mt-1.5 text-xs leading-6 text-white/42">
-                          轻识别后，AI 会结合项目背景、导入的设计图、当前画板上下文和诊断结果，给出这个项目在作品集里的结构分组建议。
+                          先起一版结构草稿，再决定怎么落成画板。
                         </p>
                         <Button
                           type="button"
@@ -2831,7 +2827,7 @@ export function ProjectEditorFabricClient({
                         </Button>
                         {!materialRecognition ? (
                           <p className="mt-3 text-[11px] leading-5 text-white/34">
-                            建议先完成一轮“识别这批素材”，再让 AI 起结构草稿。
+                            先识别素材，再起结构草稿。
                           </p>
                         ) : null}
                       </div>
@@ -2844,10 +2840,7 @@ export function ProjectEditorFabricClient({
                         <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-medium text-white">先把结构草稿收成你认可的版本</p>
-                              <p className="mt-1 text-xs leading-6 text-white/42">
-                                这里可以删改分组、小节和叙事说明。确认后，后续落板和生成都优先参考当前结构。
-                              </p>
+                              <p className="text-sm font-medium text-white">确认当前结构</p>
                             </div>
                             <Badge
                               variant="outline"
@@ -2941,10 +2934,6 @@ export function ProjectEditorFabricClient({
                             </Button>
                             <span className="text-[11px] text-white/34">{structureSaveLabel}</span>
                           </div>
-
-                          <p className="text-[11px] leading-5 text-white/30">
-                            结构确认后，系统会按分组和小节生成画板列表，并自动把建议素材放进对应画板。
-                          </p>
 
                           <p className="text-[11px] text-white/30">
                             更新于{" "}
@@ -3181,7 +3170,7 @@ export function ProjectEditorFabricClient({
                         新建画板
                       </EditorChromeButton>
                       <div className={cn(editorPanelCardClass, "px-3 py-2 text-xs text-white/52")}>
-                        当前共有 {scene.boards.length} 张画板，底部缩略图负责快速切换。
+                        当前共 {scene.boards.length} 张。
                       </div>
                     </div>
                   </EditorRailSection>
@@ -3243,65 +3232,13 @@ export function ProjectEditorFabricClient({
       }
       center={
         <div className="flex h-full min-h-0 flex-col">
-          <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2">
-            <div className={cn("pointer-events-auto flex items-center gap-1 px-1.5 py-1.5", editorFloatingSurfaceClass)}>
-              {activeMeta.kind === "text" ? (
-                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
-                    文本
-                  </span>
-                  <Input
-                    type="number"
-                    value={activeMeta.fontSize}
-                    onChange={(event) =>
-                      updateActiveObject({ fontSize: Number(event.target.value) || 16 })
-                    }
-                    className="h-8 w-[76px] rounded-full border-black/10 bg-white text-sm text-neutral-800"
-                  />
-                  <Input
-                    type="color"
-                    value={activeMeta.color}
-                    onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
-                  />
-                </div>
-              ) : activeMeta.kind === "image" ? (
-                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
-                    图片
-                  </span>
-                  <span className="text-xs text-neutral-500">透明度</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={activeMeta.opacity}
-                    onChange={(event) =>
-                      updateActiveObject({ opacity: Number(event.target.value) })
-                    }
-                  />
-                </div>
-              ) : activeMeta.kind === "shape" ? (
-                <div className="flex items-center gap-1.5 rounded-full border border-black/8 bg-white/70 px-2 py-1">
-                  <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold">
-                    形状
-                  </span>
-                  <Input
-                    type="color"
-                    value={activeMeta.fill}
-                    onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
-                  />
-                  <Input
-                    type="color"
-                    value={activeMeta.stroke ?? "#000000"}
-                    onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                    className="h-8 w-11 rounded-full border-black/10 bg-white p-1"
-                  />
-                </div>
-              ) : null}
-              {hasFloatingContext ? <div className="h-7 w-px bg-black/10" /> : null}
+          <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+            <div
+              className={cn(
+                "pointer-events-auto flex items-center gap-1 px-1.5 py-1.5",
+                editorFloatingSurfaceClass
+              )}
+            >
               <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
                   className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
@@ -3313,13 +3250,13 @@ export function ProjectEditorFabricClient({
                   <ImageIcon className="h-4 w-4" />
                   插入图片
                 </EditorChromeButton>
-                <Button
-                  className="h-8 gap-1.5 rounded-full border border-black/8 bg-white px-3 text-neutral-950 shadow-none hover:bg-neutral-100"
+                <EditorChromeButton
+                  className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-950 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={addTextObject}
                 >
                   <Type className="h-4 w-4" />
                   添加文本
-                </Button>
+                </EditorChromeButton>
                 <div className="relative">
                   <EditorChromeButton
                     className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
@@ -3420,7 +3357,7 @@ export function ProjectEditorFabricClient({
             />
             <div
               ref={workspaceRef}
-              className="absolute overflow-hidden rounded-[28px]"
+              className="absolute overflow-hidden rounded-[30px] border border-white/[0.05] bg-[#15120f] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_28px_80px_-52px_rgba(0,0,0,0.9)]"
               style={{
                 top: STAGE_TOP_INSET,
                 left: STAGE_SIDE_INSET,
@@ -3486,15 +3423,26 @@ export function ProjectEditorFabricClient({
       }
       rightRail={
         showRightRail ? (
-          <div className="flex h-full flex-col">
+          <div className="flex h-full min-h-0 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
             <Tabs
               value={rightPanel}
               onValueChange={(value) => setRightPanel(value as RightRailPanel)}
               className="flex h-full min-h-0 flex-col"
             >
-              <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#171411] px-4 py-3 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.85)]">
+              <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
+                <div className="min-w-0">
+                  <p className="text-[10px] tracking-[0.18em] text-white/30">
+                    {currentRightPanelMeta.label}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-white/36">
+                    {currentRightPanelMeta.hint}
+                  </p>
+                </div>
+              </div>
+
+              <div className="sticky top-[57px] z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_14px_24px_-24px_rgba(0,0,0,0.8)]">
                 <EditorTabsList className="grid h-11 grid-cols-2 rounded-[18px] bg-white/[0.03]">
-                  <EditorTabsTrigger value="inspector">Inspector</EditorTabsTrigger>
+                  <EditorTabsTrigger value="inspector">属性</EditorTabsTrigger>
                   <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
                 </EditorTabsList>
               </div>
@@ -3503,12 +3451,11 @@ export function ProjectEditorFabricClient({
                 <TabsContent value="inspector" className="mt-0">
                   {hasActiveInspector ? (
                     <div className="h-full overflow-y-auto">
-                      <EditorRailSection title="属性编辑">
-                        <div className="space-y-4 rounded-[22px] border border-white/[0.08] bg-[#1a1714] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                          <div className="flex items-center justify-between rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                      <EditorRailSection title="编辑">
+                        <div className={cn(editorPanelCardClass, "space-y-4 p-4")}>
+                          <div className={cn(editorPanelMutedCardClass, "flex items-center justify-between px-3 py-2.5")}>
                             <div>
-                              <p className="text-[11px] tracking-[0.16em] text-white/34">选中对象</p>
-                              <p className="mt-1 text-sm text-white/64">
+                              <p className="text-sm text-white/78">
                                 {activeMeta.kind === "text"
                                   ? "文本"
                                   : activeMeta.kind === "image"
@@ -3521,18 +3468,18 @@ export function ProjectEditorFabricClient({
                               </p>
                             </div>
                             <span className="rounded-full border border-white/[0.08] bg-[#14110f] px-2.5 py-1 text-[11px] text-white/52">
-                              {activeMeta.kind === "multi" ? `${activeMeta.count} items` : "single"}
+                              {activeMeta.kind === "multi" ? `${activeMeta.count} 项` : "单个"}
                             </span>
                           </div>
                           {activeMeta.kind === "multi" ? (
-                            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white/52">
+                            <div className={cn(editorPanelMutedCardClass, "px-4 py-3 text-sm text-white/52")}>
                               已选 {activeMeta.count} 个对象，可先调整层级或重新选择单个对象编辑属性。
                             </div>
                           ) : null}
 
                           {activeMeta.kind === "text" ? (
                             <div className="space-y-3">
-                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
                                 <label className="text-xs text-white/50">文本内容</label>
                                 <Textarea
@@ -3541,7 +3488,7 @@ export function ProjectEditorFabricClient({
                                   className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                                 />
                               </div>
-                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
@@ -3599,7 +3546,7 @@ export function ProjectEditorFabricClient({
                           {activeMeta.kind === "image" ? (
                             <div className="space-y-3">
                               {selectedImageAsset ? (
-                                <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                                <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                   <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">素材语义</p>
                                   <label className="text-xs text-white/50">图片名称</label>
                                   <Input
@@ -3640,7 +3587,7 @@ export function ProjectEditorFabricClient({
                                   </Button>
                                 </div>
                               ) : null}
-                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
                                 <label className="text-xs text-white/50">透明度</label>
                                 <Input
@@ -3660,7 +3607,7 @@ export function ProjectEditorFabricClient({
 
                           {activeMeta.kind === "shape" ? (
                             <div className="space-y-3">
-                              <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-3">
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
                                 <label className="text-xs text-white/50">填充色</label>
                                 <Input
@@ -3710,7 +3657,7 @@ export function ProjectEditorFabricClient({
                       </EditorRailSection>
 
                       <EditorRailSection title="图层排布">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={cn(editorPanelCardClass, "grid grid-cols-2 gap-2 p-3")}>
                           <EditorChromeButton
                             className="h-10 justify-center"
                             onClick={() => arrangeActiveObject("forward")}
@@ -3744,16 +3691,16 @@ export function ProjectEditorFabricClient({
                     </div>
                   ) : (
                     <div className="p-4">
-                      <EditorEmptyState>选中画板中的元素后，这里会显示可编辑属性。</EditorEmptyState>
+                      <EditorEmptyState>先选中画板里的元素，再在这里编辑内容、样式和层级。</EditorEmptyState>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="ai" className="mt-0">
                   <div className="h-full overflow-y-auto">
-                    <EditorRailSection title="看到了什么">
-                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
-                        <CardContent className="p-4 text-sm leading-7 text-white/74">
+                    <EditorRailSection title="现状">
+                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                        <CardContent className="p-4 text-sm leading-7 text-white/84">
                           {currentConclusion}
                         </CardContent>
                       </Card>
@@ -3763,8 +3710,8 @@ export function ProjectEditorFabricClient({
                       <div className="space-y-2">
                         {aiHighlights.length > 0 ? (
                           aiHighlights.map((point) => (
-                            <Card key={point} className="border-white/[0.08] bg-white/[0.03] shadow-none">
-                              <CardContent className="p-4 text-sm leading-7 text-white/74">
+                            <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                              <CardContent className="p-4 text-sm leading-7 text-white/84">
                                 {point}
                               </CardContent>
                             </Card>
@@ -3779,8 +3726,8 @@ export function ProjectEditorFabricClient({
                       <div className="space-y-2">
                         {aiIssues.length > 0 ? (
                           aiIssues.map((point) => (
-                            <Card key={point} className="border-white/[0.08] bg-white/[0.03] shadow-none">
-                              <CardContent className="p-4 text-sm leading-7 text-white/74">
+                            <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                              <CardContent className="p-4 text-sm leading-7 text-white/84">
                                 {point}
                               </CardContent>
                             </Card>
@@ -3792,18 +3739,18 @@ export function ProjectEditorFabricClient({
                     </EditorRailSection>
 
                     <EditorRailSection title="下一步">
-                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
-                        <CardContent className="p-4 text-sm leading-7 text-white/74">
+                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                        <CardContent className="p-4 text-sm leading-7 text-white/84">
                           {nextStepConclusion}
                         </CardContent>
                       </Card>
                     </EditorRailSection>
 
-                    <EditorRailSection title="和上次相比">
+                    <EditorRailSection title="历史">
                       {aiHistory.length > 1 ? (
-                        <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
-                          <CardContent className="p-4 text-sm leading-7 text-white/74">
-                            已累计 {aiHistory.length} 条 AI 结果。当前最新结论会优先参考你正在编辑的画板范围。
+                        <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                          <CardContent className="p-4 text-sm leading-7 text-white/84">
+                            已累计 {aiHistory.length} 条结果，默认优先参考当前画板范围。
                           </CardContent>
                         </Card>
                       ) : (
@@ -3811,8 +3758,8 @@ export function ProjectEditorFabricClient({
                       )}
                     </EditorRailSection>
 
-                    <EditorRailSection title="是否可继续排版">
-                      <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+                    <EditorRailSection title="生成判断">
+                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
                         <CardContent className="flex items-center justify-between gap-3 p-4">
                           <div>
                             <p className="text-sm font-medium text-white">
@@ -3839,10 +3786,10 @@ export function ProjectEditorFabricClient({
                             )}
                           >
                             {layout?.pages?.length
-                              ? "Ready"
+                              ? "可继续"
                               : completenessAnalysis?.canProceed
-                                ? "Proceed"
-                                : "Needs work"}
+                                ? "可生成"
+                                : "待补强"}
                           </Badge>
                         </CardContent>
                       </Card>
@@ -3855,11 +3802,11 @@ export function ProjectEditorFabricClient({
         ) : null
       }
       bottomStrip={
-        <div className="mx-auto flex w-[calc(100%-56px)] items-center gap-1.5 overflow-x-auto rounded-[24px] border border-white/[0.06] bg-[#14110f] p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/[0.06] bg-[#14110f] p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
           <div className="shrink-0 px-2.5">
             <p className="text-sm font-medium text-white/44">{scene.boards.length} 张画板</p>
             <p className="mt-1 text-[11px] text-white/26">
-              范围：{scene.generationScope.mode === "all" ? "全部" : scene.generationScope.mode === "selected" ? "已选" : "当前"}
+              {scene.generationScope.mode === "all" ? "全部" : scene.generationScope.mode === "selected" ? "已选" : "当前"}
             </p>
           </div>
           {scene.boardOrder.map((boardId) => {

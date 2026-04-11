@@ -40,6 +40,7 @@ type EditorScaffoldProps = {
   leftRailWidthClass?: string;
   rightRailWidthClass?: string;
   hideLeftRailHeader?: boolean;
+  hideRightRailHeader?: boolean;
 };
 
 export function EditorScaffold({
@@ -62,6 +63,7 @@ export function EditorScaffold({
   leftRailWidthClass = "w-[332px]",
   rightRailWidthClass = "w-[332px]",
   hideLeftRailHeader = false,
+  hideRightRailHeader = false,
 }: EditorScaffoldProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -179,11 +181,13 @@ export function EditorScaffold({
                 rightRailWidthClass
               )}
             >
-              <RailHeader
-                label={rightRailLabel}
-                side="right"
-                onCollapse={() => setRightCollapsed(true)}
-              />
+              {hideRightRailHeader ? null : (
+                <RailHeader
+                  label={rightRailLabel}
+                  side="right"
+                  onCollapse={() => setRightCollapsed(true)}
+                />
+              )}
               <div className="min-h-0 flex-1 overflow-y-auto">{rightRail}</div>
             </aside>
           )
