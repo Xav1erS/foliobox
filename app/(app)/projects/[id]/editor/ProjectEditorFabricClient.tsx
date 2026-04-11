@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Circle,
   Copy,
+  GripVertical,
   FolderOpen,
   ImageIcon,
   LayoutTemplate,
@@ -35,6 +36,8 @@ import {
   Triangle,
   Type,
   Layers,
+  Check,
+  Plus,
   MoreHorizontal,
   ZoomIn,
   ZoomOut,
@@ -71,6 +74,7 @@ import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/
 import type { PackageRecommendation } from "@/app/api/projects/[id]/package/recommend/route";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
+  buildProjectSceneFromStructureSuggestion,
   createProjectBoard,
   createProjectImageNode,
   markBoardsAfterGeneration,
@@ -89,7 +93,11 @@ import {
   type GenerationScope,
   type ProjectBoard,
   type ProjectBoardImageNode,
+  type ProjectMaterialRecognition,
   type ProjectBoardNode,
+  type ProjectStructureGroup,
+  type ProjectStructureSection,
+  type ProjectStructureSuggestion,
   type ProjectBoardTextNode,
   type ProjectEditorScene,
   type ProjectShapeType,
@@ -148,7 +156,7 @@ type ContextMenuState = {
   y: number;
 };
 
-type LeftPanelKey = "project" | "layers" | "boards";
+type LeftPanelKey = "project" | "assets" | "structure" | "layers" | "boards";
 type RightRailPanel = "inspector" | "ai";
 
 type GeneratePrecheck = {
@@ -179,6 +187,8 @@ const LEFT_PANEL_ITEMS: Array<{
   hint: string;
 }> = [
   { key: "project", label: "项目", icon: FolderOpen, hint: "项目背景与上下文" },
+  { key: "assets", label: "素材", icon: ImageIcon, hint: "上传设计图并插入当前画板" },
+  { key: "structure", label: "结构", icon: Sparkles, hint: "基于背景和素材生成结构建议" },
   { key: "layers", label: "图层", icon: Layers, hint: "对象层级与管理" },
   { key: "boards", label: "画板", icon: LayoutTemplate, hint: "新增与切换画板" },
 ];
@@ -194,6 +204,10 @@ type FabricSceneObject = FabricObject & {
 };
 
 function newNodeId(prefix: "text" | "image" | "shape") {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function newStructureId(prefix: "group" | "section") {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -288,18 +302,32 @@ export function ProjectEditorFabricClient({
     initialData.packageRecommendation
   );
   const [layout, setLayout] = useState<LayoutJson | null>(initialData.layout);
+  const [materialRecognition, setMaterialRecognition] =
+    useState<ProjectMaterialRecognition | null>(initialData.layout?.materialRecognition ?? null);
+  const [structureSuggestion, setStructureSuggestion] = useState<ProjectStructureSuggestion | null>(
+    initialData.layout?.structureSuggestion ?? null
+  );
+  const [structureDraft, setStructureDraft] = useState<ProjectStructureSuggestion | null>(
+    initialData.layout?.structureSuggestion ?? null
+  );
   const [canvasReady, setCanvasReady] = useState(false);
   const [assets, setAssets] = useState(initialData.assets);
   const [activeMeta, setActiveMeta] = useState<ActiveObjectMeta>({ kind: "none" });
   const [assetSearch, setAssetSearch] = useState("");
-  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [uploadingAssets, setUploadingAssets] = useState(false);
+  const [recognizingMaterials, setRecognizingMaterials] = useState(false);
+  const [recognizingIncremental, setRecognizingIncremental] = useState(false);
+  const [suggestingStructure, setSuggestingStructure] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [projectFactsDraft, setProjectFactsDraft] = useState(initialData.facts);
   const [factsSaveState, setFactsSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
     "saved"
   );
+  const [structureSaveState, setStructureSaveState] = useState<
+    "saved" | "saving" | "dirty" | "error"
+  >("saved");
+  const [applyingStructure, setApplyingStructure] = useState(false);
   const [rightPanel, setRightPanel] = useState<RightRailPanel>("inspector");
   const [diagnosing, setDiagnosing] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -393,6 +421,14 @@ export function ProjectEditorFabricClient({
   }, [assetMap, scene.boards]);
   const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
   const selectedAssets = useMemo(() => assets.filter((asset) => asset.selected), [assets]);
+  const recognizedAssetIdSet = useMemo(
+    () => new Set(materialRecognition?.recognizedAssetIds ?? []),
+    [materialRecognition]
+  );
+  const pendingRecognitionAssets = useMemo(
+    () => selectedAssets.filter((asset) => !recognizedAssetIdSet.has(asset.id)),
+    [recognizedAssetIdSet, selectedAssets]
+  );
   const aiHistory = useMemo(
     () =>
       [
@@ -471,6 +507,15 @@ export function ProjectEditorFabricClient({
     activeMeta.kind === "image" && activeMeta.assetId
       ? assetMap.get(activeMeta.assetId) ?? null
       : null;
+  const hasStructureInputs =
+    assets.length > 0 ||
+    Boolean(projectFactsDraft.projectType.trim()) ||
+    Boolean(projectFactsDraft.industry.trim()) ||
+    Boolean(projectFactsDraft.roleTitle.trim()) ||
+    Boolean(projectFactsDraft.background.trim()) ||
+    Boolean(projectFactsDraft.resultSummary.trim());
+  const canSuggestStructure =
+    hasStructureInputs && Boolean(materialRecognition || structureSuggestion);
   const factsSaveLabel =
     factsSaveState === "saving"
       ? "正在保存"
@@ -487,6 +532,16 @@ export function ProjectEditorFabricClient({
         : saveState === "dirty"
           ? "画板待保存"
           : "画板已保存";
+  const structureSaveLabel =
+    structureSaveState === "saving"
+      ? "结构保存中"
+      : structureSaveState === "error"
+        ? "结构保存失败"
+        : structureSaveState === "dirty"
+          ? "结构待保存"
+          : structureDraft?.status === "confirmed"
+            ? "结构已确认"
+            : "结构已保存";
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
@@ -881,6 +936,9 @@ export function ProjectEditorFabricClient({
   async function persistCurrentSceneForAction() {
     try {
       await persistProjectFacts(projectFactsDraft, true);
+      if (structureDraft && structureSaveState !== "saved") {
+        await saveStructureDraft();
+      }
       await persistScene(scene, true);
     } catch (error) {
       setActionMessage({
@@ -982,6 +1040,334 @@ export function ProjectEditorFabricClient({
     }
   }
 
+  async function handleSuggestStructure() {
+    if (suggestingStructure) return;
+
+    setSuggestingStructure(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const data = await parseJsonResponse<{ suggestion: ProjectStructureSuggestion }>(
+        await fetch(`/api/projects/${initialData.id}/structure/suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      setStructureSuggestion(data.suggestion);
+      setStructureDraft(data.suggestion);
+      setStructureSaveState("saved");
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, {
+          structureSuggestion: data.suggestion,
+        }) as LayoutJson
+      );
+      setActionMessage({ tone: "info", text: "结构建议已更新" });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "结构建议生成失败，请稍后重试");
+    } finally {
+      setSuggestingStructure(false);
+    }
+  }
+
+  async function handleRecognizeMaterials() {
+    if (recognizingMaterials) return;
+
+    setRecognizingMaterials(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const data = await parseJsonResponse<{ recognition: ProjectMaterialRecognition }>(
+        await fetch(`/api/projects/${initialData.id}/recognition/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+      setMaterialRecognition(data.recognition);
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, {
+          materialRecognition: data.recognition,
+        }) as LayoutJson
+      );
+      setActionMessage({ tone: "info", text: "轻识别已更新" });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "轻识别失败，请稍后重试");
+    } finally {
+      setRecognizingMaterials(false);
+    }
+  }
+
+  async function handleRecognizeIncrementalMaterials() {
+    if (recognizingIncremental || pendingRecognitionAssets.length === 0) return;
+
+    setRecognizingIncremental(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const data = await parseJsonResponse<{ recognition: ProjectMaterialRecognition }>(
+        await fetch(`/api/projects/${initialData.id}/recognition/incremental`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assetIds: pendingRecognitionAssets.map((asset) => asset.id),
+          }),
+        })
+      );
+
+      setMaterialRecognition(data.recognition);
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, {
+          materialRecognition: data.recognition,
+        }) as LayoutJson
+      );
+      setActionMessage({
+        tone: "info",
+        text:
+          data.recognition.lastIncrementalDiff?.summary ??
+          "新增素材已纳入当前项目理解。",
+      });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "增量识别失败，请稍后重试");
+    } finally {
+      setRecognizingIncremental(false);
+    }
+  }
+
+  function mutateStructureDraft(
+    updater: (current: ProjectStructureSuggestion) => ProjectStructureSuggestion
+  ) {
+    setStructureDraft((current) => {
+      if (!current) return current;
+      const next = updater(current);
+      return {
+        ...next,
+        status: "draft",
+        confirmedAt: null,
+      };
+    });
+    setStructureSaveState("dirty");
+  }
+
+  function updateStructureGroup(
+    groupId: string,
+    patch: Partial<ProjectStructureGroup>
+  ) {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: current.groups.map((group) =>
+        group.id === groupId ? { ...group, ...patch } : group
+      ),
+    }));
+  }
+
+  function updateStructureSection(
+    groupId: string,
+    sectionId: string,
+    patch: Partial<ProjectStructureSection>
+  ) {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: current.groups.map((group) =>
+        group.id !== groupId
+          ? group
+          : {
+              ...group,
+              sections: group.sections.map((section) =>
+                section.id === sectionId ? { ...section, ...patch } : section
+              ),
+            }
+      ),
+    }));
+  }
+
+  function deleteStructureGroup(groupId: string) {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: current.groups.filter((group) => group.id !== groupId),
+    }));
+  }
+
+  function mergeStructureGroupIntoPrevious(groupId: string) {
+    mutateStructureDraft((current) => {
+      const groupIndex = current.groups.findIndex((group) => group.id === groupId);
+      if (groupIndex <= 0) return current;
+      const previous = current.groups[groupIndex - 1];
+      const target = current.groups[groupIndex];
+      return {
+        ...current,
+        groups: current.groups.flatMap((group, index) => {
+          if (index === groupIndex - 1) {
+            return [
+              {
+                ...previous,
+                sections: [...previous.sections, ...target.sections],
+              },
+            ];
+          }
+          if (index === groupIndex) return [];
+          return [group];
+        }),
+      };
+    });
+  }
+
+  function addStructureGroup() {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: [
+        ...current.groups,
+        {
+          id: newStructureId("group"),
+          label: `新分组 ${current.groups.length + 1}`,
+          rationale: "补充这一组要讲清的主线。",
+          narrativeRole: "承接",
+          sections: [
+            {
+              id: newStructureId("section"),
+              title: "新小节",
+              purpose: "说明这个小节要承载的信息。",
+              recommendedContent: [],
+              suggestedAssets: [],
+            },
+          ],
+        },
+      ],
+    }));
+  }
+
+  function addStructureSection(groupId: string) {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: current.groups.map((group) =>
+        group.id !== groupId
+          ? group
+          : {
+              ...group,
+              sections: [
+                ...group.sections,
+                {
+                  id: newStructureId("section"),
+                  title: `小节 ${group.sections.length + 1}`,
+                  purpose: "说明这个小节要讲什么。",
+                  recommendedContent: [],
+                  suggestedAssets: [],
+                },
+              ],
+            }
+      ),
+    }));
+  }
+
+  function deleteStructureSection(groupId: string, sectionId: string) {
+    mutateStructureDraft((current) => ({
+      ...current,
+      groups: current.groups
+        .map((group) =>
+          group.id !== groupId
+            ? group
+            : {
+                ...group,
+                sections: group.sections.filter((section) => section.id !== sectionId),
+              }
+        )
+        .filter((group) => group.sections.length > 0),
+    }));
+  }
+
+  async function saveStructureDraft(nextSuggestion?: ProjectStructureSuggestion) {
+    const suggestion = nextSuggestion ?? structureDraft;
+    if (!suggestion) return;
+
+    setStructureSaveState("saving");
+    setActionError("");
+    try {
+      const data = await parseJsonResponse<{ suggestion: ProjectStructureSuggestion }>(
+        await fetch(`/api/projects/${initialData.id}/structure`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ suggestion }),
+        })
+      );
+      setStructureSuggestion(data.suggestion);
+      setStructureDraft(data.suggestion);
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, {
+          structureSuggestion: data.suggestion,
+        }) as LayoutJson
+      );
+      setStructureSaveState("saved");
+      return data.suggestion;
+    } catch (error) {
+      setStructureSaveState("error");
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "结构保存失败，请稍后重试",
+      });
+      throw error;
+    }
+  }
+
+  async function confirmStructureDraft() {
+    if (!structureDraft) return;
+    const confirmedSuggestion: ProjectStructureSuggestion = {
+      ...structureDraft,
+      status: "confirmed",
+      confirmedAt: new Date().toISOString(),
+    };
+    await saveStructureDraft(confirmedSuggestion);
+    setActionMessage({ tone: "info", text: "当前结构已确认，可继续按结构落板。" });
+  }
+
+  async function applyStructureToBoards() {
+    if (!structureDraft || structureDraft.groups.length === 0 || applyingStructure) return;
+
+    if (structureDraft.status !== "confirmed") {
+      setActionMessage({
+        tone: "error",
+        text: "请先确认当前结构，再按结构创建画板组。",
+      });
+      return;
+    }
+
+    const shouldContinue = window.confirm(
+      "这会按当前确认结构重建画板列表，并替换当前画板内容。确认继续吗？"
+    );
+    if (!shouldContinue) return;
+
+    setApplyingStructure(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      const nextScene = buildProjectSceneFromStructureSuggestion({
+        suggestion: structureDraft,
+        assets,
+        projectName: initialData.name,
+        recognition: materialRecognition ?? undefined,
+      });
+
+      setScene(nextScene);
+      setLeftPanel("boards");
+      lastSavedSceneRef.current = JSON.stringify(nextScene);
+      await persistScene(nextScene, true);
+      setActionMessage({ tone: "info", text: "已按当前结构创建画板组。" });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "结构落板失败，请稍后重试",
+      });
+    } finally {
+      setApplyingStructure(false);
+    }
+  }
+
   async function handleGenerateLayout() {
     if (!activeBoard || generating) return;
     setGenerating(true);
@@ -1031,6 +1417,7 @@ export function ProjectEditorFabricClient({
 
       const nextLayout = data.layoutJson;
       setLayout(nextLayout);
+      setStructureSuggestion(nextLayout.structureSuggestion ?? structureSuggestion);
       if (nextLayout.editorScene) {
         const nextScene = resolveProjectEditorScene(nextLayout, {
           assets,
@@ -1072,17 +1459,15 @@ export function ProjectEditorFabricClient({
   }, [shapeMenuOpen]);
 
   useEffect(() => {
-    if (!assetPickerOpen) return;
-    const handler = () => setAssetPickerOpen(false);
-    window.addEventListener("mousedown", handler);
-    return () => window.removeEventListener("mousedown", handler);
-  }, [assetPickerOpen]);
-
-  useEffect(() => {
     if (!actionMessage || actionMessage.tone === "error") return;
     const timeout = window.setTimeout(() => setActionMessage(null), 3200);
     return () => window.clearTimeout(timeout);
   }, [actionMessage]);
+
+  useEffect(() => {
+    setStructureDraft(structureSuggestion);
+    setStructureSaveState("saved");
+  }, [structureSuggestion]);
 
   useEffect(() => {
     if (!selectedImageAsset) return;
@@ -1685,7 +2070,6 @@ export function ProjectEditorFabricClient({
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
-    setAssetPickerOpen(false);
     setActionMessage({ tone: "info", text: "图片已插入当前画板" });
   }
 
@@ -1704,6 +2088,7 @@ export function ProjectEditorFabricClient({
     setActionMessage(null);
 
     try {
+      setLeftPanel("assets");
       const uploadedFiles = await uploadFilesFromBrowser({
         files,
         folder: "project-assets",
@@ -2091,6 +2476,598 @@ export function ProjectEditorFabricClient({
                 </>
               ) : null}
 
+              {leftPanel === "assets" ? (
+                <>
+                  <EditorRailSection title="导入素材">
+                    <div className="space-y-3">
+                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <p className="text-sm font-medium text-white">先导入设计图</p>
+                        <p className="mt-1.5 text-xs leading-6 text-white/42">
+                          这里上传的设计图会进入当前项目素材库，后续可直接插入画板，也会作为 AI 生成结构建议的重要上下文。
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={handleOpenAssetUpload}
+                          disabled={uploadingAssets}
+                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                        >
+                          {uploadingAssets ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              上传中
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="mr-2 h-4 w-4" />
+                              上传本地图片
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <Input
+                        value={assetSearch}
+                        onChange={(event) => setAssetSearch(event.target.value)}
+                        placeholder="搜索素材标题或 ID"
+                        className="h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white placeholder:text-white/28"
+                      />
+                      {pendingRecognitionAssets.length > 0 ? (
+                        <div className="rounded-[20px] border border-white/[0.08] bg-[#171411] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                          <p className="text-sm font-medium text-white">有新增素材还没纳入识别</p>
+                          <p className="mt-1.5 text-xs leading-6 text-white/42">
+                            当前有 {pendingRecognitionAssets.length} 张新图还没被系统理解。建议先做增量识别，再决定是否刷新结构。
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {pendingRecognitionAssets.slice(0, 4).map((asset) => (
+                              <span
+                                key={asset.id}
+                                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58"
+                              >
+                                {asset.title ?? asset.id}
+                              </span>
+                            ))}
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => void handleRecognizeIncrementalMaterials()}
+                            disabled={recognizingIncremental}
+                            className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                          >
+                            {recognizingIncremental ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                增量识别中
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                只识别新增素材
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </EditorRailSection>
+
+                  {featuredAssets.length > 0 ? (
+                    <EditorRailSection title="当前画板已用">
+                      <div className="grid grid-cols-2 gap-3">
+                        {featuredAssets.map((asset) => (
+                          <button
+                            key={asset.id}
+                            type="button"
+                            onClick={() => void addAssetToCanvas(asset.id)}
+                            className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                          >
+                            <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                                alt={asset.title ?? "素材"}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <div className="px-3 py-2.5">
+                              <p className="truncate text-xs font-medium text-white/84">
+                                {asset.title ?? "未命名素材"}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </EditorRailSection>
+                  ) : null}
+
+                  <EditorRailSection title="项目素材库">
+                    <div className="grid grid-cols-2 gap-3">
+                      {libraryAssets.map((asset) => (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          onClick={() => void addAssetToCanvas(asset.id)}
+                          className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
+                        >
+                          <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                              alt={asset.title ?? "素材"}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div className="px-3 py-2.5">
+                            <p className="truncate text-xs font-medium text-white/84">
+                              {asset.title ?? "未命名素材"}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {visibleAssets.length === 0 ? (
+                      <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                        还没有素材。先上传设计图，再把关键图插入当前画板。
+                      </div>
+                    ) : null}
+                  </EditorRailSection>
+                </>
+              ) : null}
+
+              {leftPanel === "structure" ? (
+                <>
+                  <EditorRailSection title="导入后轻识别">
+                    <div className="space-y-3">
+                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <p className="text-sm font-medium text-white">先让系统说它看到了什么</p>
+                        <p className="mt-1.5 text-xs leading-6 text-white/42">
+                          导入首批设计图后，先做一轮轻识别，判断这批素材更像什么、哪些更适合作为主讲位，以及当前最明显还缺什么。
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-white/40">
+                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
+                            背景 {projectFactsDraft.background.trim() ? "已填写" : "待补充"}
+                          </span>
+                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
+                            素材 {assets.length} 张
+                          </span>
+                          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1">
+                            诊断 {boundaryAnalysis || completenessAnalysis || packageRecommendation ? "已运行" : "未运行"}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => void handleRecognizeMaterials()}
+                          disabled={!hasStructureInputs || recognizingMaterials}
+                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                        >
+                          {recognizingMaterials ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              识别中
+                            </>
+                          ) : materialRecognition ? (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              重新识别这批素材
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              识别这批素材
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {!hasStructureInputs ? (
+                        <EditorEmptyState>
+                          先填写项目背景或上传设计图，系统才有足够上下文做轻识别。
+                        </EditorEmptyState>
+                      ) : null}
+
+                      {materialRecognition ? (
+                        <div className="space-y-3 rounded-[20px] border border-white/[0.08] bg-[#171411] p-4">
+                          <div>
+                            <p className="text-sm font-medium text-white">{materialRecognition.summary}</p>
+                            <p className="mt-2 text-[11px] text-white/34">
+                              更新于{" "}
+                              {materialRecognition.generatedAt
+                                ? new Date(materialRecognition.generatedAt).toLocaleString("zh-CN")
+                                : "刚刚"}
+                            </p>
+                          </div>
+                          {materialRecognition.recognizedTypes.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {materialRecognition.recognizedTypes.map((type) => (
+                                <span
+                                  key={type}
+                                  className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58"
+                                >
+                                  {type}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          <div className="space-y-2 text-xs leading-6 text-white/52">
+                            <p>
+                              主讲素材：
+                              {materialRecognition.heroAssetIds.length > 0
+                                ? materialRecognition.heroAssetIds
+                                    .map((id) => assetMap.get(id)?.title ?? id)
+                                    .join("、")
+                                : " 暂无明确主讲素材"}
+                            </p>
+                            <p>
+                              缺失信息：
+                              {materialRecognition.missingInfo.length > 0
+                                ? materialRecognition.missingInfo.join("、")
+                                : " 当前没有明显缺口"}
+                            </p>
+                            <p>建议下一步：{materialRecognition.suggestedNextStep}</p>
+                          </div>
+                          {materialRecognition.lastIncrementalDiff ? (
+                            <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
+                              <p className="text-xs font-medium text-white">最近一次增量变化</p>
+                              <p className="mt-1.5 text-xs leading-6 text-white/48">
+                                {materialRecognition.lastIncrementalDiff.summary}
+                              </p>
+                              {materialRecognition.lastIncrementalDiff.changes.length > 0 ? (
+                                <div className="mt-3 space-y-1.5">
+                                  {materialRecognition.lastIncrementalDiff.changes.map((change) => (
+                                    <p key={change} className="text-[11px] leading-5 text-white/38">
+                                      • {change}
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <p className="mt-3 text-[11px] text-white/34">
+                                {materialRecognition.lastIncrementalDiff.shouldRefreshStructure
+                                  ? "这次增量建议刷新结构建议。"
+                                  : "这次增量还不需要重做结构。"}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </EditorRailSection>
+
+                  <EditorRailSection title="结构建议">
+                    <div className="space-y-3">
+                      <div className="rounded-[20px] border border-white/[0.08] bg-[#191612] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <p className="text-sm font-medium text-white">先确认结构，再进入排版</p>
+                        <p className="mt-1.5 text-xs leading-6 text-white/42">
+                          轻识别后，AI 会结合项目背景、导入的设计图、当前画板上下文和诊断结果，给出这个项目在作品集里的结构分组建议。
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={() => void handleSuggestStructure()}
+                          disabled={!canSuggestStructure || suggestingStructure}
+                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100 disabled:bg-white/20 disabled:text-white/50"
+                        >
+                          {suggestingStructure ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              生成中
+                            </>
+                          ) : structureSuggestion ? (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              重新生成结构建议
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              生成结构建议
+                            </>
+                          )}
+                        </Button>
+                        {!materialRecognition ? (
+                          <p className="mt-3 text-[11px] leading-5 text-white/34">
+                            建议先完成一轮“识别这批素材”，再让 AI 起结构草稿。
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </EditorRailSection>
+
+                  {structureDraft ? (
+                    <>
+                      <EditorRailSection title="结构摘要">
+                        <div className="space-y-3 rounded-[20px] border border-white/[0.08] bg-[#171411] p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium text-white">先把结构草稿收成你认可的版本</p>
+                              <p className="mt-1 text-xs leading-6 text-white/42">
+                                这里可以删改分组、小节和叙事说明。确认后，后续落板和生成都优先参考当前结构。
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="rounded-full border-white/[0.08] bg-white/[0.03] text-white/66"
+                            >
+                              {structureDraft.status === "confirmed" ? "已确认" : "草稿"}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-3 rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-3.5">
+                            <div>
+                              <label className="text-xs text-white/44">结构总述</label>
+                              <Textarea
+                                value={structureDraft.summary}
+                                onChange={(event) =>
+                                  mutateStructureDraft((current) => ({
+                                    ...current,
+                                    summary: event.target.value,
+                                  }))
+                                }
+                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-white/44">叙事弧线</label>
+                              <Input
+                                value={structureDraft.narrativeArc}
+                                onChange={(event) =>
+                                  mutateStructureDraft((current) => ({
+                                    ...current,
+                                    narrativeArc: event.target.value,
+                                  }))
+                                }
+                                className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              onClick={() => void saveStructureDraft()}
+                              disabled={structureSaveState === "saving"}
+                              className="h-10 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                            >
+                              {structureSaveState === "saving" ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  保存中
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="mr-2 h-4 w-4" />
+                                  保存结构
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void confirmStructureDraft()}
+                              disabled={structureSaveState === "saving"}
+                              className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                            >
+                              <Check className="mr-2 h-4 w-4" />
+                              确认当前结构
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void applyStructureToBoards()}
+                              disabled={
+                                structureSaveState === "saving" ||
+                                applyingStructure ||
+                                structureDraft.status !== "confirmed" ||
+                                structureDraft.groups.length === 0
+                              }
+                              className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06] disabled:bg-white/[0.02] disabled:text-white/34"
+                            >
+                              {applyingStructure ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  落板中
+                                </>
+                              ) : (
+                                <>
+                                  <LayoutTemplate className="mr-2 h-4 w-4" />
+                                  按当前结构创建画板组
+                                </>
+                              )}
+                            </Button>
+                            <span className="text-[11px] text-white/34">{structureSaveLabel}</span>
+                          </div>
+
+                          <p className="text-[11px] leading-5 text-white/30">
+                            结构确认后，系统会按分组和小节生成画板列表，并自动把建议素材放进对应画板。
+                          </p>
+
+                          <p className="text-[11px] text-white/30">
+                            更新于{" "}
+                            {structureDraft.generatedAt
+                              ? new Date(structureDraft.generatedAt).toLocaleString("zh-CN")
+                              : "刚刚"}
+                          </p>
+                        </div>
+                      </EditorRailSection>
+
+                      <EditorRailSection title="结构分组">
+                        <div className="space-y-3">
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={addStructureGroup}
+                              className="h-9 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              新增分组
+                            </Button>
+                          </div>
+                          {structureDraft.groups.map((group, index) => (
+                            <div
+                              key={group.id}
+                              className="rounded-[22px] border border-white/[0.08] bg-[#171411] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[11px] tracking-[0.16em] text-white/30">
+                                    GROUP {index + 1}
+                                  </p>
+                                  <Input
+                                    value={group.label}
+                                    onChange={(event) =>
+                                      updateStructureGroup(group.id, {
+                                        label: event.target.value,
+                                      })
+                                    }
+                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-sm font-semibold text-white"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="rounded-full border-white/[0.08] bg-white/[0.03] text-white/66"
+                                  >
+                                    {group.narrativeRole}
+                                  </Badge>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => mergeStructureGroupIntoPrevious(group.id)}
+                                    disabled={index === 0}
+                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white disabled:text-white/20"
+                                  >
+                                    <GripVertical className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => deleteStructureGroup(group.id)}
+                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="mt-3 space-y-3">
+                                <div>
+                                  <label className="text-xs text-white/40">分组作用</label>
+                                  <Input
+                                    value={group.narrativeRole}
+                                    onChange={(event) =>
+                                      updateStructureGroup(group.id, {
+                                        narrativeRole: event.target.value,
+                                      })
+                                    }
+                                    className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-white/40">保留理由</label>
+                                  <Textarea
+                                    value={group.rationale}
+                                    onChange={(event) =>
+                                      updateStructureGroup(group.id, {
+                                        rationale: event.target.value,
+                                      })
+                                    }
+                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="mt-4 space-y-2.5">
+                                {group.sections.map((section) => (
+                                  <div
+                                    key={section.id}
+                                    className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-3"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <label className="text-[11px] text-white/34">小节标题</label>
+                                        <Input
+                                          value={section.title}
+                                          onChange={(event) =>
+                                            updateStructureSection(group.id, section.id, {
+                                              title: event.target.value,
+                                            })
+                                          }
+                                          className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => deleteStructureSection(group.id, section.id)}
+                                        className="mt-5 h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="mt-3">
+                                      <label className="text-[11px] text-white/34">这一小节要讲什么</label>
+                                      <Textarea
+                                        value={section.purpose}
+                                        onChange={(event) =>
+                                          updateStructureSection(group.id, section.id, {
+                                            purpose: event.target.value,
+                                          })
+                                        }
+                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                      />
+                                    </div>
+                                    <div className="mt-3">
+                                      <label className="text-[11px] text-white/34">建议内容点</label>
+                                      <Textarea
+                                        value={section.recommendedContent.join("\n")}
+                                        onChange={(event) =>
+                                          updateStructureSection(group.id, section.id, {
+                                            recommendedContent: event.target.value
+                                              .split("\n")
+                                              .map((item) => item.trim())
+                                              .filter(Boolean),
+                                          })
+                                        }
+                                        placeholder="每行一条建议内容点"
+                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                      />
+                                    </div>
+                                    <div className="mt-3">
+                                      <label className="text-[11px] text-white/34">建议素材</label>
+                                      <Input
+                                        value={section.suggestedAssets.join("、")}
+                                        onChange={(event) =>
+                                          updateStructureSection(group.id, section.id, {
+                                            suggestedAssets: event.target.value
+                                              .split(/[,，]/)
+                                              .map((item) => item.trim())
+                                              .filter(Boolean),
+                                          })
+                                        }
+                                        placeholder="用逗号分隔建议素材标题或类型"
+                                        className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => addStructureSection(group.id)}
+                                  className="h-9 w-full rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  在这一组里新增小节
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </EditorRailSection>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+
               {leftPanel === "layers" ? (
                 <EditorRailSection title="图层管理">
                   <DndContext
@@ -2253,7 +3230,7 @@ export function ProjectEditorFabricClient({
                 <EditorChromeButton
                   className="h-10 gap-2 border-black/8 bg-white px-4 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => {
-                    setAssetPickerOpen((prev) => !prev);
+                    setLeftPanel("assets");
                     setShapeMenuOpen(false);
                   }}
                 >
@@ -2378,125 +3355,6 @@ export function ProjectEditorFabricClient({
               </div>
             ) : null}
             <canvas ref={hostRef} />
-            {assetPickerOpen ? (
-              <div
-                className="absolute left-6 top-6 z-30 w-[356px] animate-in fade-in-0 slide-in-from-top-2 duration-200"
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <div className="rounded-[28px] border border-white/[0.08] bg-[#171411] p-4 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.85)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-white">插入图片</p>
-                      <p className="mt-1 text-xs text-white/46">先上传本地图片，也可以复用当前项目素材。</p>
-                    </div>
-                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-xs text-white/54">
-                      {visibleAssets.length} 张
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={handleOpenAssetUpload}
-                      disabled={uploadingAssets}
-                      className="h-10 flex-1 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
-                    >
-                      {uploadingAssets ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          上传中
-                        </>
-                      ) : (
-                        <>
-                          <ImageIcon className="mr-2 h-4 w-4" />
-                          上传本地图片
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <Input
-                    value={assetSearch}
-                    onChange={(event) => setAssetSearch(event.target.value)}
-                    placeholder="搜索素材标题或 ID"
-                    className="mt-4 h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white placeholder:text-white/28"
-                  />
-                  <div className="mt-4 max-h-[440px] space-y-4 overflow-y-auto pr-1">
-                    {featuredAssets.length > 0 ? (
-                      <div>
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-[11px] font-medium tracking-[0.18em] text-white/36">
-                            当前画板已用
-                          </p>
-                          <span className="text-xs text-white/34">{featuredAssets.length}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          {featuredAssets.map((asset) => (
-                            <button
-                              key={asset.id}
-                              type="button"
-                              onClick={() => void addAssetToCanvas(asset.id)}
-                              className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
-                            >
-                              <div className="aspect-square overflow-hidden bg-black/30">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                                  alt={asset.title ?? "素材"}
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-                              <div className="px-2 py-2">
-                                <p className="truncate text-xs font-medium text-white/82">
-                                  {asset.title ?? "未命名"}
-                                </p>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div>
-                      <div className="mb-2 flex items-center justify-between">
-                        <p className="text-[11px] font-medium tracking-[0.18em] text-white/36">
-                          项目素材库
-                        </p>
-                        <span className="text-xs text-white/34">{libraryAssets.length}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {libraryAssets.map((asset) => (
-                          <button
-                            key={asset.id}
-                            type="button"
-                            onClick={() => void addAssetToCanvas(asset.id)}
-                            className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:bg-white/[0.06]"
-                          >
-                            <div className="aspect-square overflow-hidden bg-black/30">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                                alt={asset.title ?? "素材"}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <div className="px-2 py-2">
-                              <p className="truncate text-xs font-medium text-white/82">
-                                {asset.title ?? "未命名"}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {visibleAssets.length === 0 ? (
-                      <div className="rounded-[20px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-8 text-center text-sm text-white/46">
-                        没有匹配的素材。
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ) : null}
             {contextMenu.open ? (
               <div
                 className="fixed z-50 w-56 rounded-2xl border border-white/[0.08] bg-[#151413] p-2 text-sm text-white/88 shadow-[0_20px_48px_-24px_rgba(0,0,0,0.7)]"

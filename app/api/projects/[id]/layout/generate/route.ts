@@ -18,7 +18,11 @@ import {
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
-import type { ProjectEditorScene } from "@/lib/project-editor-scene";
+import type {
+  ProjectEditorScene,
+  ProjectMaterialRecognition,
+  ProjectStructureSuggestion,
+} from "@/lib/project-editor-scene";
 import {
   GenerationScopeSchema,
   getGenerationScopeBoardIds,
@@ -26,6 +30,7 @@ import {
   markBoardsAfterGeneration,
   mergeProjectLayoutDocument,
   resolveProjectEditorScene,
+  resolveProjectLayoutDocument,
   serializeSceneForHash,
   summarizeProjectSceneForAI,
 } from "@/lib/project-editor-scene";
@@ -64,6 +69,8 @@ const LayoutJsonSchema = z.object({
 export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
   styleProfile?: StyleProfile;
   editorScene?: ProjectEditorScene;
+  materialRecognition?: ProjectMaterialRecognition;
+  structureSuggestion?: ProjectStructureSuggestion;
 };
 export type LayoutPage = z.infer<typeof LayoutPageSchema>;
 
@@ -76,6 +83,7 @@ function buildPrompt(project: {
   facts: Record<string, unknown> | null;
   styleSummary: string;
   sceneSummary: string;
+  structureSummary: string;
   scopeLabel: string;
 }): string {
   const modeLabel =
@@ -111,6 +119,9 @@ ${project.styleSummary}
 ## 当前编辑画板摘要
 本次生成范围：${project.scopeLabel}
 ${project.sceneSummary}
+
+## 已有结构建议
+${project.structureSummary}
 
 ## 要求
 1. 严格按照包装模式的页数范围生成页面计划
@@ -221,6 +232,7 @@ export async function POST(
     0;
 
   const styleProfile = resolveStyleProfile(styleSelection);
+  const layoutDocument = resolveProjectLayoutDocument(project.layoutJson);
   if (styleSelection.source === "reference_set" && styleSelection.referenceSetId) {
     await db.styleReferenceSet.updateMany({
       where: { id: styleSelection.referenceSetId, userId },
@@ -355,6 +367,17 @@ export async function POST(
         assets: project.assets,
         scope: generationScope,
       }),
+      structureSummary: layoutDocument.structureSuggestion
+        ? [
+            layoutDocument.structureSuggestion.summary,
+            ...layoutDocument.structureSuggestion.groups.map(
+              (group) =>
+                `${group.label}：${group.sections
+                  .map((section) => section.title)
+                  .join("、")}`
+            ),
+          ].join("\n")
+        : "（暂无结构建议，请基于项目事实和素材自行推导）",
       scopeLabel:
         generationScope.mode === "all"
           ? "全部画板"

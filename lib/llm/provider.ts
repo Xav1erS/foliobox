@@ -11,6 +11,8 @@ export type LLMTask =
   | "project_boundary_analysis"   // 项目边界判断（判断层）
   | "project_completeness_analysis" // 项目完整度分析（判断层）
   | "project_package_recommendation" // 包装模式推荐（判断层）
+  | "project_material_recognition" // 项目素材轻识别（判断层）
+  | "project_structure_suggestion" // 项目结构建议（结构层）
   | "project_layout_generation";  // 项目排版生成（包装层）
 
 export interface LLMTrackContext {
@@ -84,4 +86,6 @@ export const TASK_MODEL_TIER: Record<LLMTask, "primary" | "lite"> = {
   project_boundary_analysis: "lite",
   project_completeness_analysis: "lite",
   project_package_recommendation: "lite",
+  project_material_recognition: "lite",
+  project_structure_suggestion: "lite",
 };

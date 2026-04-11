@@ -154,6 +154,61 @@ export const ProjectEditorSceneSchema = z.object({
 
 export type ProjectEditorScene = z.infer<typeof ProjectEditorSceneSchema>;
 
+export const ProjectStructureSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  purpose: z.string(),
+  recommendedContent: z.array(z.string()),
+  suggestedAssets: z.array(z.string()),
+});
+
+export const ProjectStructureGroupSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  rationale: z.string(),
+  narrativeRole: z.string(),
+  sections: z.array(ProjectStructureSectionSchema),
+});
+
+export const ProjectStructureSuggestionSchema = z.object({
+  generatedAt: z.string().optional().default(""),
+  summary: z.string(),
+  narrativeArc: z.string(),
+  status: z.enum(["draft", "confirmed"]).optional().default("draft"),
+  confirmedAt: z.string().nullable().optional().default(null),
+  groups: z.array(ProjectStructureGroupSchema),
+});
+
+export type ProjectStructureSection = z.infer<typeof ProjectStructureSectionSchema>;
+export type ProjectStructureGroup = z.infer<typeof ProjectStructureGroupSchema>;
+export type ProjectStructureSuggestion = z.infer<typeof ProjectStructureSuggestionSchema>;
+
+export const ProjectRecognitionDiffSchema = z.object({
+  generatedAt: z.string().optional().default(""),
+  newAssetIds: z.array(z.string()),
+  summary: z.string(),
+  changes: z.array(z.string()),
+  shouldRefreshStructure: z.boolean(),
+});
+
+export type ProjectRecognitionDiff = z.infer<typeof ProjectRecognitionDiffSchema>;
+
+export const ProjectMaterialRecognitionSchema = z.object({
+  generatedAt: z.string().optional().default(""),
+  summary: z.string(),
+  recognizedTypes: z.array(z.string()),
+  heroAssetIds: z.array(z.string()),
+  supportingAssetIds: z.array(z.string()),
+  decorativeAssetIds: z.array(z.string()),
+  riskyAssetIds: z.array(z.string()),
+  missingInfo: z.array(z.string()),
+  suggestedNextStep: z.string(),
+  recognizedAssetIds: z.array(z.string()).optional().default([]),
+  lastIncrementalDiff: ProjectRecognitionDiffSchema.nullable().optional().default(null),
+});
+
+export type ProjectMaterialRecognition = z.infer<typeof ProjectMaterialRecognitionSchema>;
+
 export type GeneratedLayoutPageSeed = {
   pageNumber: number;
   type: string;
@@ -180,6 +235,8 @@ export type ProjectLayoutDocument = Record<string, unknown> & {
   pages?: GeneratedLayoutPageSeed[];
   qualityNotes?: string[];
   editorScene?: ProjectEditorScene;
+  materialRecognition?: ProjectMaterialRecognition;
+  structureSuggestion?: ProjectStructureSuggestion;
 };
 
 function createSceneId(prefix: string) {
@@ -229,10 +286,22 @@ export function resolveProjectLayoutDocument(layoutJson: unknown): ProjectLayout
 
   const raw = layoutJson as ProjectLayoutDocument;
   const parsedScene = ProjectEditorSceneSchema.safeParse(raw.editorScene);
+  const parsedMaterialRecognition = ProjectMaterialRecognitionSchema.safeParse(
+    raw.materialRecognition
+  );
+  const parsedStructureSuggestion = ProjectStructureSuggestionSchema.safeParse(
+    raw.structureSuggestion
+  );
 
   return {
     ...raw,
     editorScene: parsedScene.success ? normalizeProjectEditorScene(parsedScene.data) : undefined,
+    materialRecognition: parsedMaterialRecognition.success
+      ? parsedMaterialRecognition.data
+      : undefined,
+    structureSuggestion: parsedStructureSuggestion.success
+      ? parsedStructureSuggestion.data
+      : undefined,
   };
 }
 
@@ -347,6 +416,170 @@ export function createEmptyProjectEditorScene(projectName?: string): ProjectEdit
     generationScope: { mode: "current", boardIds: [board.id] },
     viewport: { zoom: 1, panX: 0, panY: 0 },
   };
+}
+
+function matchAssetIdForStructureSection(params: {
+  section: ProjectStructureSection;
+  assets: ProjectSceneSeedAsset[];
+  usedAssetIds: Set<string>;
+  recognition?: ProjectMaterialRecognition;
+  boardIndex: number;
+}) {
+  const { section, assets, usedAssetIds, recognition, boardIndex } = params;
+  const availableAssets = assets.filter((asset) => !usedAssetIds.has(asset.id));
+  const keywords = section.suggestedAssets
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  const matchedByKeyword = availableAssets.find((asset) => {
+    const haystack = [asset.title ?? "", asset.id].join(" ").toLowerCase();
+    return keywords.some((keyword) => haystack.includes(keyword) || keyword.includes(haystack));
+  });
+  if (matchedByKeyword) return matchedByKeyword.id;
+
+  const prioritizedIds = [
+    ...(recognition?.heroAssetIds ?? []),
+    ...(recognition?.supportingAssetIds ?? []),
+    ...(recognition?.decorativeAssetIds ?? []),
+  ];
+  const prioritizedAvailable = prioritizedIds.find(
+    (assetId) => !usedAssetIds.has(assetId) && assets.some((asset) => asset.id === assetId)
+  );
+  if (prioritizedAvailable) return prioritizedAvailable;
+
+  const coverAsset = availableAssets.find((asset) => asset.isCover);
+  if (boardIndex === 0 && coverAsset) return coverAsset.id;
+
+  return availableAssets[0]?.id ?? null;
+}
+
+export function buildProjectSceneFromStructureSuggestion(params: {
+  suggestion: ProjectStructureSuggestion;
+  assets: ProjectSceneSeedAsset[];
+  projectName?: string;
+  recognition?: ProjectMaterialRecognition;
+}): ProjectEditorScene {
+  const { suggestion, assets, projectName, recognition } = params;
+  const usedAssetIds = new Set<string>();
+  const boards: ProjectBoard[] = [];
+
+  suggestion.groups.forEach((group) => {
+    group.sections.forEach((section, sectionIndex) => {
+      const matchedAssetId = matchAssetIdForStructureSection({
+        section,
+        assets,
+        usedAssetIds,
+        recognition,
+        boardIndex: boards.length,
+      });
+
+      if (matchedAssetId) {
+        usedAssetIds.add(matchedAssetId);
+      }
+
+      const nodes: ProjectBoardNode[] = [
+        createProjectTextNode({
+          role: "caption",
+          text: group.label,
+          x: 128,
+          y: 92,
+          width: 520,
+          height: 36,
+          fontSize: 22,
+          fontWeight: 600,
+          lineHeight: 1.2,
+          color: "#6c655d",
+          zIndex: 1,
+        }),
+        createProjectTextNode({
+          role: "title",
+          text: section.title,
+          x: 128,
+          y: 148,
+          width: 880,
+          height: 120,
+          fontSize: 78,
+          fontWeight: 700,
+          lineHeight: 1.06,
+          zIndex: 2,
+        }),
+        createProjectTextNode({
+          role: "body",
+          text: section.purpose,
+          x: 128,
+          y: 294,
+          width: 720,
+          height: 210,
+          fontSize: 28,
+          fontWeight: 400,
+          lineHeight: 1.45,
+          zIndex: 3,
+        }),
+      ];
+
+      if (section.recommendedContent.length > 0) {
+        nodes.push(
+          createProjectTextNode({
+            role: "note",
+            text: section.recommendedContent.map((item) => `• ${item}`).join("\n"),
+            x: 128,
+            y: 560,
+            width: 720,
+            height: 220,
+            fontSize: 22,
+            fontWeight: 400,
+            lineHeight: 1.45,
+            color: "#3e3934",
+            zIndex: 4,
+          })
+        );
+      }
+
+      if (matchedAssetId) {
+        const meta = resolveProjectAssetMeta(
+          assets.find((asset) => asset.id === matchedAssetId)?.metaJson
+        );
+        nodes.push(
+          createProjectImageNode(matchedAssetId, {
+            x: 1040,
+            y: 148,
+            width: 720,
+            height: 540,
+            note: meta.note ?? null,
+            roleTag: meta.roleTag ?? null,
+            zIndex: 5,
+          })
+        );
+      }
+
+      boards.push(
+        createProjectBoard({
+          name:
+            suggestion.groups.length > 1
+              ? `${group.label} · ${section.title}`
+              : section.title || `${projectName ?? "项目"} · ${sectionIndex + 1}`,
+          intent: `${group.label}：${section.purpose}`,
+          status: "draft",
+          thumbnailAssetId: matchedAssetId,
+          nodes,
+          aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
+        })
+      );
+    });
+  });
+
+  if (boards.length === 0) {
+    return createEmptyProjectEditorScene(projectName);
+  }
+
+  return normalizeProjectEditorScene({
+    version: 1,
+    activeBoardId: boards[0].id,
+    boardOrder: boards.map((board) => board.id),
+    boards,
+    generationScope: { mode: "all", boardIds: boards.map((board) => board.id) },
+    viewport: { zoom: 1, panX: 0, panY: 0 },
+  });
 }
 
 export function seedProjectEditorSceneFromLayout({
@@ -644,6 +877,40 @@ export function summarizeProjectSceneForAI({
     })
     .filter(Boolean)
     .join("\n\n");
+}
+
+export function summarizeMaterialRecognitionForAI({
+  recognition,
+  assets,
+}: {
+  recognition: ProjectMaterialRecognition | null | undefined;
+  assets: ProjectSceneSeedAsset[];
+}) {
+  if (!recognition) {
+    return "（暂无轻识别结果）";
+  }
+
+  const assetMap = new Map(
+    assets.map((asset) => [asset.id, asset.title ?? asset.id])
+  );
+
+  const formatAssets = (ids: string[]) =>
+    ids.length > 0 ? ids.map((id) => assetMap.get(id) ?? id).join("、") : "无";
+
+  return [
+    `总结：${recognition.summary}`,
+    `识别类型：${recognition.recognizedTypes.join("、") || "无"}`,
+    `主讲素材：${formatAssets(recognition.heroAssetIds)}`,
+    `补充素材：${formatAssets(recognition.supportingAssetIds)}`,
+    `装饰素材：${formatAssets(recognition.decorativeAssetIds)}`,
+    `风险素材：${formatAssets(recognition.riskyAssetIds)}`,
+    `缺失信息：${recognition.missingInfo.join("、") || "无"}`,
+    `建议下一步：${recognition.suggestedNextStep}`,
+    `已识别素材：${formatAssets(recognition.recognizedAssetIds)}`,
+    recognition.lastIncrementalDiff
+      ? `最近增量变化：${recognition.lastIncrementalDiff.summary}`
+      : null,
+  ].join("\n");
 }
 
 export function markBoardsAsAnalyzed(

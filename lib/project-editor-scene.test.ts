@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildProjectSceneFromStructureSuggestion,
   createEmptyProjectEditorScene,
   hasGeneratedLayoutData,
   mergeProjectAssetMeta,
@@ -79,6 +80,154 @@ describe("project editor scene", () => {
     expect(layout.packageMode).toBe("LIGHT");
     expect(layout.totalPages).toBe(3);
     expect(layout.editorScene?.activeBoardId).toBe(scene.activeBoardId);
+  });
+
+  it("preserves structure suggestion when patching editorScene", () => {
+    const scene = createEmptyProjectEditorScene();
+    const layout = mergeProjectLayoutDocument(
+      {
+        structureSuggestion: {
+          generatedAt: "2026-04-11T00:00:00.000Z",
+          summary: "先讲背景，再讲方案分组。",
+          narrativeArc: "背景 -> 洞察 -> 方案 -> 结果",
+          status: "confirmed",
+          confirmedAt: "2026-04-11T00:05:00.000Z",
+          groups: [
+            {
+              id: "group-overview",
+              label: "项目概览",
+              rationale: "先建立项目边界。",
+              narrativeRole: "开场",
+              sections: [
+                {
+                  id: "section-cover",
+                  title: "项目封面",
+                  purpose: "一句话说明项目是什么。",
+                  recommendedContent: ["项目名称", "角色", "时间"],
+                  suggestedAssets: ["封面图"],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { editorScene: scene }
+    );
+
+    expect(layout.editorScene?.activeBoardId).toBe(scene.activeBoardId);
+    expect(layout.structureSuggestion?.groups[0]?.label).toBe("项目概览");
+    expect(layout.structureSuggestion?.status).toBe("confirmed");
+    expect(layout.structureSuggestion?.confirmedAt).toBe("2026-04-11T00:05:00.000Z");
+  });
+
+  it("preserves material recognition when patching editorScene", () => {
+    const scene = createEmptyProjectEditorScene();
+    const layout = mergeProjectLayoutDocument(
+      {
+        materialRecognition: {
+          generatedAt: "2026-04-11T00:00:00.000Z",
+          summary: "这批素材以结果页和中后台页面为主。",
+          recognizedTypes: ["结果页", "中后台页面"],
+          heroAssetIds: ["asset-1"],
+          supportingAssetIds: ["asset-2"],
+          decorativeAssetIds: [],
+          riskyAssetIds: [],
+          missingInfo: ["项目结果的量化指标"],
+          suggestedNextStep: "先确认结构，再决定是否诊断。",
+          recognizedAssetIds: ["asset-1", "asset-2"],
+          lastIncrementalDiff: {
+            generatedAt: "2026-04-11T00:05:00.000Z",
+            newAssetIds: ["asset-2"],
+            summary: "新增结果页让项目结果证据更清楚。",
+            changes: ["可把结果分组讲得更完整。"],
+            shouldRefreshStructure: true,
+          },
+        },
+      },
+      { editorScene: scene }
+    );
+
+    expect(layout.editorScene?.activeBoardId).toBe(scene.activeBoardId);
+    expect(layout.materialRecognition?.heroAssetIds).toEqual(["asset-1"]);
+    expect(layout.materialRecognition?.recognizedAssetIds).toEqual(["asset-1", "asset-2"]);
+    expect(layout.materialRecognition?.lastIncrementalDiff?.shouldRefreshStructure).toBe(true);
+  });
+
+  it("builds boards from a confirmed structure suggestion", () => {
+    const scene = buildProjectSceneFromStructureSuggestion({
+      suggestion: {
+        generatedAt: "2026-04-11T00:00:00.000Z",
+        summary: "按概览、过程、结果来组织。",
+        narrativeArc: "概览 -> 过程 -> 结果",
+        status: "confirmed",
+        confirmedAt: "2026-04-11T00:05:00.000Z",
+        groups: [
+          {
+            id: "group-overview",
+            label: "项目概览",
+            rationale: "先建立项目边界。",
+            narrativeRole: "开场",
+            sections: [
+              {
+                id: "section-cover",
+                title: "项目封面",
+                purpose: "快速说明项目是什么。",
+                recommendedContent: ["项目名称", "角色", "时间"],
+                suggestedAssets: ["封面图"],
+              },
+            ],
+          },
+          {
+            id: "group-process",
+            label: "设计过程",
+            rationale: "展开关键取舍。",
+            narrativeRole: "主体",
+            sections: [
+              {
+                id: "section-flow",
+                title: "关键流程",
+                purpose: "说明方案如何展开。",
+                recommendedContent: ["流程图", "核心页面"],
+                suggestedAssets: ["流程图"],
+              },
+            ],
+          },
+        ],
+      },
+      recognition: {
+        generatedAt: "2026-04-11T00:00:00.000Z",
+        summary: "封面图和流程图都比较明确。",
+        recognizedTypes: ["封面", "流程页"],
+        heroAssetIds: ["asset-cover"],
+        supportingAssetIds: ["asset-flow"],
+        decorativeAssetIds: [],
+        riskyAssetIds: [],
+        missingInfo: [],
+        suggestedNextStep: "确认结构并落板。",
+      },
+      assets: [
+        {
+          id: "asset-cover",
+          title: "封面图",
+          selected: true,
+          isCover: true,
+          metaJson: { roleTag: "main" },
+        },
+        {
+          id: "asset-flow",
+          title: "流程图",
+          selected: true,
+          metaJson: { roleTag: "support" },
+        },
+      ],
+      projectName: "案例 A",
+    });
+
+    expect(scene.boards).toHaveLength(2);
+    expect(scene.boardOrder).toHaveLength(2);
+    expect(scene.generationScope.mode).toBe("all");
+    expect(scene.boards[0].name).toContain("项目概览");
+    expect(scene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
   });
 
   it("seeds boards from generated layout pages", () => {
