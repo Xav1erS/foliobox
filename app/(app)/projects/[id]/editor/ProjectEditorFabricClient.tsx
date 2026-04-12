@@ -1596,10 +1596,22 @@ export function ProjectEditorFabricClient({
     setActiveMeta({ kind: "none" });
   }
 
+  function readWorkspaceSize(canvas: FabricCanvas): { width: number; height: number } {
+    const el = workspaceRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        return { width: rect.width, height: rect.height };
+      }
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        return { width: el.clientWidth, height: el.clientHeight };
+      }
+    }
+    return { width: canvas.getWidth(), height: canvas.getHeight() };
+  }
+
   function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
-    const rect = workspaceRef.current?.getBoundingClientRect();
-    const width = (rect && rect.width > 0 ? rect.width : 0) || canvas.getWidth();
-    const height = (rect && rect.height > 0 ? rect.height : 0) || canvas.getHeight();
+    const { width, height } = readWorkspaceSize(canvas);
 
     if (width <= 0 || height <= 0) return;
 
@@ -1617,8 +1629,8 @@ export function ProjectEditorFabricClient({
   }
 
   function fitBoard(canvas: FabricCanvas) {
-    const width = workspaceRef.current?.clientWidth || canvas.getWidth();
-    const height = workspaceRef.current?.clientHeight || canvas.getHeight();
+    const { width, height } = readWorkspaceSize(canvas);
+    if (width <= 0 || height <= 0) return;
     const availableWidth = Math.max(width - STAGE_PADDING * 2, 240);
     const availableHeight = Math.max(height - STAGE_PADDING * 2, 240);
     const zoomToFit = Math.min(
@@ -1904,14 +1916,7 @@ export function ProjectEditorFabricClient({
       syncCanvasDomSizing(canvas);
 
       const resize = () => {
-        if (!workspaceRef.current || !canvasRef.current) return;
-        const rect = workspaceRef.current.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        canvasRef.current.setDimensions({
-          width: rect.width,
-          height: rect.height,
-        });
-        syncCanvasDomSizing(canvasRef.current);
+        if (!canvasRef.current) return;
         fitBoard(canvasRef.current);
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
