@@ -157,14 +157,14 @@ export function EditorScaffold({
             }}
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/16 to-transparent" />
-          <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
             {center}
-            {bottomStrip ? (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-0 pb-3">
-                <div className="pointer-events-auto">{bottomStrip}</div>
-              </div>
-            ) : null}
           </div>
+          {bottomStrip ? (
+            <div className="relative z-20 shrink-0 px-0 pb-3 pt-2">
+              {bottomStrip}
+            </div>
+          ) : null}
         </main>
 
         {rightRail ? (

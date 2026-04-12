@@ -14,6 +14,7 @@ import {
 import {
   SortableContext,
   arrayMove,
+  horizontalListSortingStrategy,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -215,57 +216,24 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-const STAGE_PADDING = 18;
-const STAGE_TOP_INSET = 80;
-const STAGE_SIDE_INSET = 20;
-const STAGE_BOTTOM_INSET = 76;
+const SURFACE_FIT_PADDING = 48;
+const PROJECT_BOARD_MAX = 10;
 const editorPanelCardClass =
   "rounded-[20px] border border-white/[0.08] bg-[#171411] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
   "rounded-[18px] border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
 const editorFloatingSurfaceClass =
-  "rounded-[22px] border border-[#d8cfc4] bg-[#f4efe7] text-neutral-950 shadow-[0_18px_36px_-26px_rgba(0,0,0,0.32)]";
+  "rounded-[22px] border border-white/[0.08] bg-[#1c1916]/95 text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)] backdrop-blur-xl";
 const editorPopupSurfaceClass =
-  "rounded-[20px] border border-[#ddd3c8] bg-[#f4efe7] text-neutral-950 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.28)]";
+  "rounded-[20px] border border-white/[0.08] bg-[#1c1916]/97 text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.82)] backdrop-blur-xl";
 const editorPopupItemClass =
-  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-neutral-700 transition-colors hover:bg-[#ebe4da] hover:text-neutral-950";
+  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
 
 function packageModeLabel(mode: string | null) {
   if (mode === "DEEP") return "深讲";
   if (mode === "LIGHT") return "浅讲";
   if (mode === "SUPPORTIVE") return "补充展示";
   return "待判断";
-}
-
-function syncCanvasDomSizing(canvas: FabricCanvas) {
-  const runtimeCanvas = canvas as unknown as {
-    wrapperEl?: HTMLDivElement;
-    lowerCanvasEl?: HTMLCanvasElement;
-    upperCanvasEl?: HTMLCanvasElement;
-  };
-
-  if (runtimeCanvas.wrapperEl) {
-    runtimeCanvas.wrapperEl.style.position = "absolute";
-    runtimeCanvas.wrapperEl.style.top = "0";
-    runtimeCanvas.wrapperEl.style.left = "0";
-    runtimeCanvas.wrapperEl.style.right = "0";
-    runtimeCanvas.wrapperEl.style.bottom = "0";
-    runtimeCanvas.wrapperEl.style.width = "100%";
-    runtimeCanvas.wrapperEl.style.height = "100%";
-    runtimeCanvas.wrapperEl.style.display = "block";
-  }
-
-  if (runtimeCanvas.lowerCanvasEl) {
-    runtimeCanvas.lowerCanvasEl.style.width = "100%";
-    runtimeCanvas.lowerCanvasEl.style.height = "100%";
-    runtimeCanvas.lowerCanvasEl.style.display = "block";
-  }
-
-  if (runtimeCanvas.upperCanvasEl) {
-    runtimeCanvas.upperCanvasEl.style.width = "100%";
-    runtimeCanvas.upperCanvasEl.style.height = "100%";
-    runtimeCanvas.upperCanvasEl.style.display = "block";
-  }
 }
 
 function isEditableCanvasTarget(target: FabricObject | null | undefined) {
@@ -369,7 +337,9 @@ export function ProjectEditorFabricClient({
   const [recognizingMaterials, setRecognizingMaterials] = useState(false);
   const [recognizingIncremental, setRecognizingIncremental] = useState(false);
   const [suggestingStructure, setSuggestingStructure] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [surfaceScale, setSurfaceScale] = useState(1);
+  const [liveThumbnails, setLiveThumbnails] = useState<Record<string, string>>({});
+  const thumbnailCaptureRef = useRef<number | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty" | "error">("saved");
   const [projectFactsDraft, setProjectFactsDraft] = useState(initialData.facts);
   const [factsSaveState, setFactsSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
@@ -416,14 +386,15 @@ export function ProjectEditorFabricClient({
   });
 
   const hostRef = useRef<HTMLCanvasElement | null>(null);
-  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
   const assetUploadRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<FabricCanvas | null>(null);
   const fabricRef = useRef<FabricModule | null>(null);
-  const boardBackgroundRef = useRef<FabricObject | null>(null);
   const clipboardRef = useRef<FabricObject | ActiveSelection | null>(null);
   const hydratingRef = useRef(false);
   const boardLoadTokenRef = useRef(0);
+  const fitFrameRef = useRef<number | null>(null);
   const lastSavedSceneRef = useRef(JSON.stringify(scene));
   const lastSavedFactsRef = useRef(JSON.stringify(initialData.facts));
   const didHydrateSceneRef = useRef(false);
@@ -465,11 +436,13 @@ export function ProjectEditorFabricClient({
   const boardThumbnailMap = useMemo(() => {
     return new Map(
       scene.boards.map((board) => {
+        const live = liveThumbnails[board.id];
+        if (live) return [board.id, live] as const;
         const assetId = getBoardThumbnailAssetId(board);
         return [board.id, assetId ? assetMap.get(assetId)?.imageUrl ?? null : null] as const;
       })
     );
-  }, [assetMap, scene.boards]);
+  }, [assetMap, scene.boards, liveThumbnails]);
   const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
   const selectedAssets = useMemo(() => assets.filter((asset) => asset.selected), [assets]);
   const recognizedAssetIdSet = useMemo(
@@ -548,7 +521,39 @@ export function ProjectEditorFabricClient({
     [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
   );
   const hasActiveInspector = activeMeta.kind !== "none";
-  const showRightRail = hasActiveInspector;
+  const activeBoardNodeStats = useMemo(() => {
+    if (!activeBoard) return { text: 0, image: 0, shape: 0 };
+    return activeBoard.nodes.reduce(
+      (acc, node) => {
+        if (node.type === "text") acc.text += 1;
+        else if (node.type === "image") acc.image += 1;
+        else if (node.type === "shape") acc.shape += 1;
+        return acc;
+      },
+      { text: 0, image: 0, shape: 0 }
+    );
+  }, [activeBoard]);
+  function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent">> & {
+    frameBackground?: string;
+  }) {
+    setScene((current) =>
+      normalizeProjectEditorScene({
+        ...current,
+        boards: current.boards.map((board) =>
+          board.id === current.activeBoardId
+            ? {
+                ...board,
+                ...(patch.name !== undefined ? { name: patch.name } : {}),
+                ...(patch.intent !== undefined ? { intent: patch.intent } : {}),
+                ...(patch.frameBackground !== undefined
+                  ? { frame: { ...board.frame, background: patch.frameBackground } }
+                  : {}),
+              }
+            : board
+        ),
+      })
+    );
+  }
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
   const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
@@ -605,9 +610,10 @@ export function ProjectEditorFabricClient({
   }
 
   function createBoard() {
+    if (scene.boards.length >= PROJECT_BOARD_MAX) return;
     const board = createProjectBoard({
       name: `画板 ${scene.boards.length + 1}`,
-      intent: `${initialData.name} 的新画板`,
+      intent: "",
     });
     setScene((current) =>
       normalizeProjectEditorScene({
@@ -618,6 +624,86 @@ export function ProjectEditorFabricClient({
       })
     );
     setLeftPanel("boards");
+  }
+
+  function deleteBoard(boardId: string) {
+    setScene((current) => {
+      if (current.boards.length <= 1) return current;
+      const nextBoards = current.boards.filter((board) => board.id !== boardId);
+      const nextOrder = current.boardOrder.filter((id) => id !== boardId);
+      const wasActive = current.activeBoardId === boardId;
+      const nextActiveId = wasActive
+        ? nextOrder[0] ?? nextBoards[0]?.id ?? current.activeBoardId
+        : current.activeBoardId;
+      let nextScope = current.generationScope;
+      if (nextScope.mode === "selected") {
+        const filtered = nextScope.boardIds.filter((id) => id !== boardId);
+        nextScope =
+          filtered.length === 0
+            ? { mode: "current", boardIds: [nextActiveId] }
+            : { mode: "selected", boardIds: filtered };
+      } else if (nextScope.mode === "current" && wasActive) {
+        nextScope = { mode: "current", boardIds: [nextActiveId] };
+      } else if (nextScope.mode === "all") {
+        nextScope = { mode: "all", boardIds: nextOrder };
+      }
+      return normalizeProjectEditorScene({
+        ...current,
+        boards: nextBoards,
+        boardOrder: nextOrder,
+        activeBoardId: nextActiveId,
+        generationScope: nextScope,
+      });
+    });
+    setLiveThumbnails((prev) => {
+      if (!(boardId in prev)) return prev;
+      const next = { ...prev };
+      delete next[boardId];
+      return next;
+    });
+  }
+
+  function handleBoardDragEnd(event: DragEndEvent) {
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+    if (!overId || activeId === overId) return;
+    const oldIndex = scene.boardOrder.indexOf(activeId);
+    const newIndex = scene.boardOrder.indexOf(overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const nextOrder = arrayMove(scene.boardOrder, oldIndex, newIndex);
+    setScene((current) =>
+      normalizeProjectEditorScene({ ...current, boardOrder: nextOrder })
+    );
+  }
+
+  function captureBoardThumbnail() {
+    const canvas = canvasRef.current;
+    const boardId = activeBoard?.id;
+    if (!canvas || !boardId) return;
+    try {
+      const width = canvas.getWidth();
+      if (width <= 0) return;
+      const dataUrl = canvas.toDataURL({
+        format: "jpeg",
+        quality: 0.6,
+        multiplier: Math.min(1, 220 / width),
+      });
+      setLiveThumbnails((prev) =>
+        prev[boardId] === dataUrl ? prev : { ...prev, [boardId]: dataUrl }
+      );
+    } catch {
+      // ignore capture errors (e.g., tainted canvas)
+    }
+  }
+
+  function scheduleThumbnailCapture() {
+    if (thumbnailCaptureRef.current !== null) {
+      window.clearTimeout(thumbnailCaptureRef.current);
+    }
+    thumbnailCaptureRef.current = window.setTimeout(() => {
+      thumbnailCaptureRef.current = null;
+      captureBoardThumbnail();
+    }, 350);
   }
 
   function selectBoard(boardId: string) {
@@ -649,31 +735,6 @@ export function ProjectEditorFabricClient({
       return normalizeProjectEditorScene({
         ...current,
         generationScope: { mode: "current", boardIds: [current.activeBoardId] },
-      });
-    });
-  }
-
-  function toggleBoardInSelection(boardId: string) {
-    setScene((current) => {
-      const currentIds =
-        current.generationScope.mode === "selected"
-          ? current.generationScope.boardIds
-          : [boardId];
-      const exists = currentIds.includes(boardId);
-      const nextIds = exists
-        ? currentIds.filter((value) => value !== boardId)
-        : [...currentIds, boardId];
-
-      if (nextIds.length === 0) {
-        return normalizeProjectEditorScene({
-          ...current,
-          generationScope: { mode: "current", boardIds: [current.activeBoardId] },
-        });
-      }
-
-      return normalizeProjectEditorScene({
-        ...current,
-        generationScope: { mode: "selected", boardIds: nextIds },
       });
     });
   }
@@ -754,9 +815,7 @@ export function ProjectEditorFabricClient({
   }
 
   function getLayerItemsFromCanvas(canvas: FabricCanvas) {
-    const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
-      (object) => object !== boardBackgroundRef.current
-    );
+    const objects = canvas.getObjects() as FabricSceneObject[];
     const ordered = [...objects].reverse();
     return ordered.map((object) => {
       const data = object.data ?? {};
@@ -851,10 +910,7 @@ export function ProjectEditorFabricClient({
     if (!activeObject || activeObject.type === "activeSelection") return;
     const objects = canvas.getObjects();
     const currentIndex = objects.indexOf(activeObject);
-    const backgroundIndex = boardBackgroundRef.current
-      ? objects.indexOf(boardBackgroundRef.current)
-      : -1;
-    const bottomIndex = backgroundIndex >= 0 ? backgroundIndex + 1 : 0;
+    const bottomIndex = 0;
     const topIndex = objects.length - 1;
 
     const moveToIndex = (object: FabricObject, index: number) => {
@@ -870,9 +926,6 @@ export function ProjectEditorFabricClient({
       moveToIndex(activeObject, Math.min(currentIndex + 1, topIndex));
     } else {
       moveToIndex(activeObject, Math.max(currentIndex - 1, bottomIndex));
-    }
-    if (boardBackgroundRef.current) {
-      canvas.sendObjectToBack(boardBackgroundRef.current);
     }
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
@@ -892,9 +945,7 @@ export function ProjectEditorFabricClient({
 
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
-      (object) => object !== boardBackgroundRef.current
-    );
+    const objects = canvas.getObjects() as FabricSceneObject[];
     const objectMap = new Map(objects.map((object) => [object.data?.nodeId, object]));
     const orderedBottomToTop = [...nextItems].reverse();
     orderedBottomToTop.forEach((item, index) => {
@@ -904,9 +955,6 @@ export function ProjectEditorFabricClient({
         mover.moveTo(index);
       }
     });
-    if (boardBackgroundRef.current) {
-      canvas.sendObjectToBack(boardBackgroundRef.current);
-    }
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
   }
@@ -1535,6 +1583,18 @@ export function ProjectEditorFabricClient({
     });
   }, [selectedImageAsset]);
 
+  function scheduleFitSurface(explicitScale?: number) {
+    if (fitFrameRef.current !== null) {
+      cancelAnimationFrame(fitFrameRef.current);
+    }
+    fitFrameRef.current = requestAnimationFrame(() => {
+      fitFrameRef.current = requestAnimationFrame(() => {
+        fitFrameRef.current = null;
+        fitSurface(explicitScale);
+      });
+    });
+  }
+
 
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
@@ -1596,32 +1656,39 @@ export function ProjectEditorFabricClient({
     setActiveMeta({ kind: "none" });
   }
 
-  // applyCenteredZoom and fitBoard intentionally read only from canvas.getWidth/Height().
-  // Those values are kept in sync with the DOM exclusively by the ResizeObserver in
-  // mountCanvas — that is the single source of truth for canvas dimensions.
-  function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
-    const width = canvas.getWidth();
-    const height = canvas.getHeight();
-    if (width <= 0 || height <= 0) return;
-    const x = (width - PROJECT_BOARD_WIDTH * nextZoom) / 2;
-    const y = (height - PROJECT_BOARD_HEIGHT * nextZoom) / 2;
-    canvas.setViewportTransform([nextZoom, 0, 0, nextZoom, x, y]);
-    canvas.calcOffset();
-    setZoom(nextZoom);
-    canvas.requestRenderAll();
-  }
+  // Single fit entry point. The DOM owns layout: the surface div has explicit width/height
+  // and is centered by viewport flexbox. Fabric only sizes its drawing buffer to match
+  // and applies a pure-zoom viewport transform with origin (0, 0). No tx/ty math.
+  function fitSurface(explicitScale?: number) {
+    const canvas = canvasRef.current;
+    const viewport = viewportRef.current;
+    if (!canvas || !viewport) return;
 
-  function fitBoard(canvas: FabricCanvas) {
-    const width = canvas.getWidth();
-    const height = canvas.getHeight();
-    if (width <= 0 || height <= 0) return;
-    const availableWidth = Math.max(width - STAGE_PADDING * 2, 240);
-    const availableHeight = Math.max(height - STAGE_PADDING * 2, 240);
-    const zoomToFit = Math.min(
-      availableWidth / PROJECT_BOARD_WIDTH,
-      availableHeight / PROJECT_BOARD_HEIGHT
-    );
-    applyCenteredZoom(canvas, clamp(zoomToFit, 0.2, 1.5));
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    if (vw <= 0 || vh <= 0) return;
+
+    let scale: number;
+    if (explicitScale !== undefined) {
+      scale = clamp(explicitScale, 0.1, 4);
+    } else {
+      const availW = Math.max(vw - SURFACE_FIT_PADDING * 2, 120);
+      const availH = Math.max(vh - SURFACE_FIT_PADDING * 2, 120);
+      scale = clamp(
+        Math.min(availW / PROJECT_BOARD_WIDTH, availH / PROJECT_BOARD_HEIGHT),
+        0.1,
+        4,
+      );
+    }
+
+    const renderW = Math.round(PROJECT_BOARD_WIDTH * scale);
+    const renderH = Math.round(PROJECT_BOARD_HEIGHT * scale);
+
+    setSurfaceScale(scale);
+    canvas.setDimensions({ width: renderW, height: renderH });
+    canvas.setZoom(scale);
+    canvas.calcOffset();
+    canvas.requestRenderAll();
   }
 
   function applyObjectChrome(target: FabricSceneObject) {
@@ -1640,9 +1707,7 @@ export function ProjectEditorFabricClient({
   }
 
   function serializeBoardFromCanvas(canvas: FabricCanvas, board: ProjectBoard): ProjectBoard {
-    const objects = (canvas.getObjects() as FabricSceneObject[]).filter(
-      (object) => object !== boardBackgroundRef.current
-    );
+    const objects = canvas.getObjects() as FabricSceneObject[];
 
     const nextNodes = objects.reduce<ProjectBoardNode[]>((acc, object, index) => {
       const data = object.data;
@@ -1745,26 +1810,6 @@ export function ProjectEditorFabricClient({
     const token = boardLoadTokenRef.current;
 
     canvas.clear();
-    canvas.backgroundColor = "#141311";
-
-    const background = new fabric.Rect({
-      left: 0,
-      top: 0,
-      width: PROJECT_BOARD_WIDTH,
-      height: PROJECT_BOARD_HEIGHT,
-      fill: "#ffffff",
-      selectable: false,
-      evented: false,
-      shadow: new fabric.Shadow({
-        color: "rgba(0,0,0,0.22)",
-        blur: 26,
-        offsetX: 0,
-        offsetY: 18,
-      }),
-    });
-    boardBackgroundRef.current = background;
-    canvas.add(background);
-    canvas.sendObjectToBack(background);
 
     for (const node of board.nodes.sort((a, b) => a.zIndex - b.zIndex)) {
       if (node.type === "text") {
@@ -1865,9 +1910,10 @@ export function ProjectEditorFabricClient({
     }
 
     canvas.discardActiveObject();
-    fitBoard(canvas);
     updateSelectionSummary(canvas);
     hydratingRef.current = false;
+    scheduleFitSurface();
+    scheduleThumbnailCapture();
   }
 
   useEffect(() => {
@@ -1875,33 +1921,38 @@ export function ProjectEditorFabricClient({
     let cleanup: (() => void) | undefined;
 
     async function mountCanvas() {
-      if (!hostRef.current || !workspaceRef.current) return;
+      if (!hostRef.current || !viewportRef.current) return;
       const fabric = await import("fabric");
-      if (disposed || !hostRef.current || !workspaceRef.current) return;
+      if (disposed || !hostRef.current || !viewportRef.current) return;
 
       fabricRef.current = fabric;
-      // Initialize with 1×1 — the ResizeObserver below is the sole owner of canvas
-      // dimensions and will immediately fire with the correct size on observe().
+      const vp = viewportRef.current;
+
+      const vw = vp.clientWidth || 800;
+      const vh = vp.clientHeight || 600;
+      const initScale = clamp(
+        Math.min(
+          (vw - SURFACE_FIT_PADDING * 2) / PROJECT_BOARD_WIDTH,
+          (vh - SURFACE_FIT_PADDING * 2) / PROJECT_BOARD_HEIGHT,
+        ),
+        0.1,
+        4,
+      );
+      const initRenderW = Math.round(PROJECT_BOARD_WIDTH * initScale);
+      const initRenderH = Math.round(PROJECT_BOARD_HEIGHT * initScale);
+
       const canvas = new fabric.Canvas(hostRef.current, {
-        width: 1,
-        height: 1,
+        width: initRenderW,
+        height: initRenderH,
         preserveObjectStacking: true,
         selection: true,
       });
       canvasRef.current = canvas;
-      syncCanvasDomSizing(canvas);
+      setSurfaceScale(initScale);
+      canvas.setZoom(initScale);
 
-      const syncAndFit = () => {
-        if (!workspaceRef.current || !canvasRef.current) return;
-        const rect = workspaceRef.current.getBoundingClientRect();
-        const w = rect.width || workspaceRef.current.clientWidth;
-        const h = rect.height || workspaceRef.current.clientHeight;
-        if (w <= 0 || h <= 0) return;
-        // ResizeObserver is the only place that calls setDimensions.
-        canvasRef.current.setDimensions({ width: w, height: h });
-        syncCanvasDomSizing(canvasRef.current);
-        fitBoard(canvasRef.current);
-      };
+      const observer = new ResizeObserver(() => scheduleFitSurface());
+      observer.observe(vp);
 
       canvas.on("selection:created", () => updateSelectionSummary(canvas));
       canvas.on("selection:updated", () => updateSelectionSummary(canvas));
@@ -1909,18 +1960,22 @@ export function ProjectEditorFabricClient({
       canvas.on("object:modified", () => {
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
+        scheduleThumbnailCapture();
       });
       canvas.on("object:added", () => {
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
+        scheduleThumbnailCapture();
       });
       canvas.on("object:removed", () => {
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
+        scheduleThumbnailCapture();
       });
       canvas.on("text:changed", () => {
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
+        scheduleThumbnailCapture();
       });
       canvas.on("mouse:down", (event) => {
         const nativeEvent = event.e as globalThis.MouseEvent;
@@ -1936,14 +1991,17 @@ export function ProjectEditorFabricClient({
         openContextMenuAt(nativeEvent.clientX, nativeEvent.clientY);
       });
 
-      const observer = new ResizeObserver(syncAndFit);
-      observer.observe(workspaceRef.current);
-
       setCanvasReady(true);
-      // loadBoardIntoCanvas is handled exclusively by the [activeBoard?.id, canvasReady] effect
-      // below, which fires after the state update and ensures the workspace has finished layout.
 
       cleanup = () => {
+        if (fitFrameRef.current !== null) {
+          cancelAnimationFrame(fitFrameRef.current);
+          fitFrameRef.current = null;
+        }
+        if (thumbnailCaptureRef.current !== null) {
+          window.clearTimeout(thumbnailCaptureRef.current);
+          thumbnailCaptureRef.current = null;
+        }
         observer.disconnect();
         canvas.dispose();
       };
@@ -2317,7 +2375,7 @@ export function ProjectEditorFabricClient({
 
       if ((event.metaKey || event.ctrlKey) && event.key === "0") {
         event.preventDefault();
-        if (canvasRef.current) fitBoard(canvasRef.current);
+        fitSurface();
         return;
       }
 
@@ -2379,12 +2437,13 @@ export function ProjectEditorFabricClient({
       }
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
-      rightRailLabel="属性"
-      leftRailWidthClass={leftPanel ? "w-[448px]" : "w-[88px]"}
+      rightRailLabel={hasActiveInspector ? "对象属性" : "画板属性"}
+      leftRailWidthClass={leftPanel ? "w-[336px]" : "w-[56px]"}
+      rightRailWidthClass="w-[288px]"
       hideLeftRailHeader
       leftRail={
         <div className="flex h-full min-h-0">
-          <div className="flex w-[88px] shrink-0 flex-col items-center gap-2.5 border-r border-white/[0.05] bg-[#110f0d] px-2.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
+          <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/[0.05] bg-[#110f0d] px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {LEFT_PANEL_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = leftPanel === item.key;
@@ -2395,29 +2454,19 @@ export function ProjectEditorFabricClient({
                   onClick={() => toggleLeftPanel(item.key)}
                   title={item.label}
                   className={cn(
-                    "group relative flex w-full flex-col items-center gap-1.5 rounded-[22px] border px-2 py-3.5 text-[11px] font-medium transition-all duration-200",
+                    "group relative flex h-11 w-11 items-center justify-center rounded-[14px] transition-all duration-200",
                     active
-                      ? "translate-x-[1px] border-white/[0.14] bg-white/[0.09] text-white shadow-[0_18px_30px_-22px_rgba(0,0,0,0.9)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/52 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
+                      ? "bg-white/[0.1] text-white"
+                      : "text-white/52 hover:bg-white/[0.05] hover:text-white"
                   )}
                 >
                   <span
                     className={cn(
-                      "absolute left-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-r-full transition-opacity duration-200",
-                      active ? "bg-white/80 opacity-100" : "opacity-0 group-hover:opacity-60"
+                      "absolute left-[-6px] top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r-full transition-opacity duration-200",
+                      active ? "bg-white opacity-100" : "opacity-0"
                     )}
                   />
-                  <div
-                    className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-[16px] border transition-all duration-200",
-                      active
-                        ? "border-white/[0.12] bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                        : "border-white/[0.05] bg-transparent group-hover:border-white/[0.08] group-hover:bg-white/[0.04]"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className="tracking-[0.02em]">{item.label}</span>
+                  <Icon className="h-[18px] w-[18px]" />
                 </button>
               );
             })}
@@ -3146,63 +3195,54 @@ export function ProjectEditorFabricClient({
                 <>
                   <EditorRailSection title="画板管理">
                     <div className="space-y-3">
-                      <EditorChromeButton className="h-10 w-full justify-center" onClick={createBoard}>
+                      <EditorChromeButton
+                        className="h-10 w-full justify-center"
+                        onClick={createBoard}
+                        disabled={scene.boards.length >= PROJECT_BOARD_MAX}
+                      >
                         新建画板
                       </EditorChromeButton>
-                      <div className={cn(editorPanelCardClass, "px-3 py-2 text-xs text-white/52")}>
-                        当前共 {scene.boards.length} 张。
+                      <div className="flex items-center justify-between px-1 text-[12px] text-white/52">
+                        <span>已用画板</span>
+                        <span className="text-white/78">
+                          {scene.boards.length} / {PROJECT_BOARD_MAX}
+                        </span>
                       </div>
                     </div>
                   </EditorRailSection>
                   <EditorRailSection title="画板列表">
-                    <div className="space-y-2">
-                      {scene.boardOrder.map((boardId, index) => {
-                        const board = scene.boards.find((item) => item.id === boardId);
-                        if (!board) return null;
-                        const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
-                        return (
-                          <button
-                            key={board.id}
-                            type="button"
-                            onClick={() => selectBoard(board.id)}
-                            className={cn(
-                              "group flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition-all duration-200",
-                              scene.activeBoardId === board.id
-                                ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
-                                : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/84"
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
-                                scene.activeBoardId === board.id
-                                  ? "border-white/[0.16] shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
-                                  : "border-white/[0.08] group-hover:border-white/[0.12]"
-                              )}
-                            >
-                              {thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={buildPrivateBlobProxyUrl(thumbnailUrl)}
-                                  alt={board.name}
-                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-white" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-white">
-                                {index + 1}. {board.name}
-                              </p>
-                              <p className="mt-1 truncate text-xs text-white/44">
-                                {board.intent || "未填写意图"}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleBoardDragEnd}
+                    >
+                      <SortableContext
+                        items={scene.boardOrder}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {scene.boardOrder.map((boardId, index) => {
+                            const board = scene.boards.find((item) => item.id === boardId);
+                            if (!board) return null;
+                            const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                            const isLive = Boolean(liveThumbnails[board.id]);
+                            return (
+                              <SortableBoardRow
+                                key={board.id}
+                                board={board}
+                                index={index}
+                                thumbnailUrl={thumbnailUrl}
+                                isLive={isLive}
+                                active={scene.activeBoardId === board.id}
+                                canDelete={scene.boards.length > 1}
+                                onSelect={() => selectBoard(board.id)}
+                                onDelete={() => deleteBoard(board.id)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
                   </EditorRailSection>
                 </>
               ) : null}
@@ -3211,7 +3251,17 @@ export function ProjectEditorFabricClient({
         </div>
       }
       center={
-        <div className="absolute inset-0 flex flex-col">
+        <div
+          ref={viewportRef}
+          className="relative flex h-full w-full items-center justify-center overflow-hidden"
+          style={{
+            backgroundColor: "#15120f",
+            backgroundImage:
+              "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1.5px)",
+            backgroundSize: "20px 20px",
+          }}
+          onContextMenu={(event) => event.preventDefault()}
+        >
           <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
             <div
               className={cn(
@@ -3219,9 +3269,9 @@ export function ProjectEditorFabricClient({
                 editorFloatingSurfaceClass
               )}
             >
-              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
                   onClick={() => {
                     setLeftPanel("assets");
                     setShapeMenuOpen(false);
@@ -3231,7 +3281,7 @@ export function ProjectEditorFabricClient({
                   插入图片
                 </EditorChromeButton>
                 <EditorChromeButton
-                  className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-950 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                  className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
                   onClick={addTextObject}
                 >
                   <Type className="h-4 w-4" />
@@ -3239,7 +3289,7 @@ export function ProjectEditorFabricClient({
                 </EditorChromeButton>
                 <div className="relative">
                   <EditorChromeButton
-                    className="h-8 gap-1.5 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
+                    className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
                     onClick={() => setShapeMenuOpen((prev) => !prev)}
                   >
                     <Square className="h-4 w-4" />
@@ -3277,39 +3327,29 @@ export function ProjectEditorFabricClient({
                   ) : null}
                 </div>
               </div>
-              <div className="h-7 w-px bg-black/10" />
-              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              <div className="h-5 w-px bg-white/[0.08]" />
+              <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
-                  onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
+                  className="h-8 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  onClick={() => fitSurface()}
                 >
                   适应画板
                 </EditorChromeButton>
               </div>
-              <div className="h-7 w-px bg-black/10" />
-              <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
+              <div className="h-5 w-px bg-white/[0.08]" />
+              <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 w-8 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
-                  onClick={() => {
-                    const canvas = canvasRef.current;
-                    if (!canvas) return;
-                    const nextZoom = clamp(canvas.getZoom() - 0.1, 0.2, 3);
-                    applyCenteredZoom(canvas, nextZoom);
-                  }}
+                  className="h-8 w-8 border-white/[0.06] bg-white/[0.06] text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  onClick={() => fitSurface(clamp(surfaceScale - 0.1, 0.1, 4))}
                 >
                   <ZoomOut className="h-4 w-4" />
                 </EditorChromeButton>
-                <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-white px-3 text-sm font-medium text-neutral-700">
-                  {Math.round(zoom * 100)}%
+                <span className="inline-flex h-8 items-center rounded-full border border-white/[0.06] px-3 text-sm font-medium text-white/60">
+                  {Math.round(surfaceScale * 100)}%
                 </span>
                 <EditorChromeButton
-                  className="h-8 w-8 border-black/8 bg-white text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
-                  onClick={() => {
-                    const canvas = canvasRef.current;
-                    if (!canvas) return;
-                    const nextZoom = clamp(canvas.getZoom() + 0.1, 0.2, 3);
-                    applyCenteredZoom(canvas, nextZoom);
-                  }}
+                  className="h-8 w-8 border-white/[0.06] bg-white/[0.06] text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  onClick={() => fitSurface(clamp(surfaceScale + 0.1, 0.1, 4))}
                 >
                   <ZoomIn className="h-4 w-4" />
                 </EditorChromeButton>
@@ -3317,97 +3357,81 @@ export function ProjectEditorFabricClient({
             </div>
           </div>
 
-          <div className="relative flex-1 overflow-hidden">
-            <input
-              ref={assetUploadRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={(event) => void handleAssetFilesPicked(event.target.files)}
-            />
-            <div
-              ref={workspaceRef}
-              className="absolute overflow-hidden rounded-[30px] border border-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_28px_80px_-52px_rgba(0,0,0,0.9)]"
-              style={{
-                top: STAGE_TOP_INSET,
-                left: STAGE_SIDE_INSET,
-                right: STAGE_SIDE_INSET,
-                bottom: STAGE_BOTTOM_INSET,
-                backgroundColor: "#15120f",
-                backgroundImage:
-                  "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1.5px)",
-                backgroundSize: "20px 20px",
-              }}
-              onContextMenu={(event) => event.preventDefault()}
-            >
-              <canvas ref={hostRef} className="absolute inset-0 block h-full w-full" />
-            </div>
-            {!canvasReady ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center">
-                <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
-                  <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
-                  正在初始化 Fabric 引擎…
-                </div>
-              </div>
-            ) : null}
-            {contextMenu.open ? (
-              <div
-                className={cn("fixed z-50 w-56 p-2 text-sm", editorPopupSurfaceClass)}
-                style={{ left: contextMenu.x, top: contextMenu.y }}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                {contextMenuItems.map((item) =>
-                  "type" in item && item.type === "sep" ? (
-                    <div key={item.id} className="my-2 h-px bg-black/[0.08]" />
-                  ) : (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={editorPopupItemClass}
-                      onClick={() => {
-                        closeContextMenu();
-                        void handleContextAction(item.id);
-                      }}
-                    >
-                      <span>{item.label}</span>
-                      {"shortcut" in item ? (
-                        <span className="text-xs text-neutral-400">{item.shortcut}</span>
-                      ) : null}
-                    </button>
-                  )
-                )}
-              </div>
-            ) : null}
-            {actionMessage ? (
-              <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
-                <div
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur",
-                    actionMessage.tone === "error"
-                      ? "border-red-300/20 bg-red-400/10 text-red-100"
-                      : "border-white/[0.08] bg-[#181715]/88 text-white/82"
-                  )}
-                >
-                  {actionMessage.text}
-                </div>
-              </div>
-            ) : null}
+          <input
+            ref={assetUploadRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={(event) => void handleAssetFilesPicked(event.target.files)}
+          />
+
+          <div
+            ref={surfaceRef}
+            className="relative overflow-hidden rounded-[12px] shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
+            style={{
+              width: `${Math.round(PROJECT_BOARD_WIDTH * surfaceScale)}px`,
+              height: `${Math.round(PROJECT_BOARD_HEIGHT * surfaceScale)}px`,
+              backgroundColor: "#ffffff",
+            }}
+          >
+            <canvas ref={hostRef} className="block h-full w-full" />
           </div>
+
+          {!canvasReady ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center">
+              <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
+                <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
+                正在初始化 Fabric 引擎…
+              </div>
+            </div>
+          ) : null}
+          {contextMenu.open ? (
+            <div
+              className={cn("fixed z-50 w-56 p-2 text-sm", editorPopupSurfaceClass)}
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              {contextMenuItems.map((item) =>
+                "type" in item && item.type === "sep" ? (
+                  <div key={item.id} className="my-1.5 h-px bg-white/[0.06]" />
+                ) : (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={editorPopupItemClass}
+                    onClick={() => {
+                      closeContextMenu();
+                      void handleContextAction(item.id);
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    {"shortcut" in item ? (
+                      <span className="text-xs text-white/36">{item.shortcut}</span>
+                    ) : null}
+                  </button>
+                )
+              )}
+            </div>
+          ) : null}
+          {actionMessage ? (
+            <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
+              <div
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur",
+                  actionMessage.tone === "error"
+                    ? "border-red-300/20 bg-red-400/10 text-red-100"
+                    : "border-white/[0.08] bg-[#181715]/88 text-white/82"
+                )}
+              >
+                {actionMessage.text}
+              </div>
+            </div>
+          ) : null}
         </div>
       }
       rightRail={
-        showRightRail ? (
-          <div className="flex h-full min-h-0 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
-            <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
-              <p className="text-[10px] tracking-[0.18em] text-white/30">属性</p>
-              <p className="mt-0.5 truncate text-[11px] text-white/36">
-                {hasActiveInspector
-                  ? "选中对象后，在这里编辑内容、样式和层级。"
-                  : "先选中画板里的文本、图片或形状，再编辑属性。"}
-              </p>
-            </div>
-
+        <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mt-0">
                   {hasActiveInspector ? (
@@ -3650,98 +3674,123 @@ export function ProjectEditorFabricClient({
                         </div>
                       </EditorRailSection>
                     </div>
+                  ) : activeBoard ? (
+                    <div className="h-full space-y-5 overflow-y-auto px-5 py-4">
+                      <div className="space-y-2">
+                        <Input
+                          value={activeBoard.name}
+                          onChange={(event) => updateActiveBoard({ name: event.target.value })}
+                          className="h-10 rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white"
+                          placeholder="画板名称"
+                        />
+                        <Textarea
+                          value={activeBoard.intent}
+                          onChange={(event) => updateActiveBoard({ intent: event.target.value })}
+                          className="min-h-[72px] rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white"
+                          placeholder="画板意图（这张画板要讲什么）"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[12px] text-white/50">
+                        <span>尺寸</span>
+                        <span className="text-white/78">
+                          {activeBoard.frame.width} × {activeBoard.frame.height}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-white/50">底色</span>
+                        <Input
+                          type="color"
+                          value={activeBoard.frame.background}
+                          onChange={(event) =>
+                            updateActiveBoard({ frameBackground: event.target.value })
+                          }
+                          className="h-8 w-10 rounded-lg border-white/[0.08] bg-[#171411] p-0.5"
+                        />
+                        <Input
+                          value={activeBoard.frame.background}
+                          onChange={(event) =>
+                            updateActiveBoard({ frameBackground: event.target.value })
+                          }
+                          className="h-8 flex-1 rounded-lg border-white/[0.08] bg-[#171411] text-xs text-white"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[12px] text-white/50">
+                        <span>内容</span>
+                        <span className="text-white/78">
+                          {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
+                        </span>
+                      </div>
+
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => deleteBoard(activeBoard.id)}
+                          disabled={scene.boards.length <= 1}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.04] px-3 text-[12px] text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/[0.08] hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          删除当前画板
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="p-4">
-                      <EditorEmptyState>先选中画板里的元素，再在这里编辑内容、样式和层级。</EditorEmptyState>
+                      <EditorEmptyState>尚未选择画板。</EditorEmptyState>
                     </div>
                   )}
               </div>
             </div>
-          </div>
-        ) : null
+        </div>
       }
       bottomStrip={
         <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/[0.06] bg-[#14110f] p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
           <div className="shrink-0 px-2.5">
-            <p className="text-sm font-medium text-white/44">{scene.boards.length} 张画板</p>
-            <p className="mt-1 text-[11px] text-white/26">
-              {scene.generationScope.mode === "all" ? "全部" : scene.generationScope.mode === "selected" ? "已选" : "当前"}
+            <p className="text-sm font-medium text-white/44">
+              {scene.boards.length} / {PROJECT_BOARD_MAX}
             </p>
+            <p className="mt-1 text-[11px] text-white/26">画板</p>
           </div>
-          {scene.boardOrder.map((boardId) => {
-            const board = scene.boards.find((item) => item.id === boardId);
-            if (!board) return null;
-            const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
-            const selectedForScope =
-              scene.generationScope.mode === "all" ||
-              (scene.generationScope.mode === "selected" &&
-                scene.generationScope.boardIds.includes(board.id)) ||
-              (scene.generationScope.mode === "current" && scene.activeBoardId === board.id);
-            return (
-              <div key={board.id} className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleBoardInSelection(board.id);
-                  }}
-                  className={cn(
-                    "absolute right-1.5 top-1.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] transition-colors",
-                    selectedForScope
-                      ? "border-white/[0.18] bg-[#0f0f0e] text-white"
-                      : "border-white/[0.08] bg-[#14110f]/90 text-white/42 hover:text-white/72"
-                  )}
-                  aria-label={selectedForScope ? "取消加入生成范围" : "加入生成范围"}
-                >
-                  {selectedForScope ? "✓" : "+"}
-                </button>
-                <EditorStripButton
-                  active={scene.activeBoardId === board.id}
-                  className={cn(
-                    "group relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
-                    scene.activeBoardId === board.id && "translate-y-[-1px] shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]",
-                    selectedForScope && "border-white/[0.16] ring-1 ring-white/[0.08]"
-                  )}
-                  onClick={() =>
-                    setScene((current) =>
-                      normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
-                    )
-                  }
-                >
-                  <div
-                    className={cn(
-                      "overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
-                      scene.activeBoardId === board.id
-                        ? "border-white/[0.18] shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
-                        : "border-white/[0.08] group-hover:border-white/[0.12]"
-                    )}
-                  >
-                    {thumbnailUrl ? (
-                      <div className="aspect-video">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={buildPrivateBlobProxyUrl(thumbnailUrl)}
-                          alt={board.name}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex aspect-video items-center justify-center bg-[#f4f3ef] p-2.5">
-                        <div className="h-full w-full rounded-[8px] border border-black/6 bg-white" />
-                      </div>
-                    )}
-                  </div>
-                  {scene.activeBoardId === board.id ? (
-                    <div className="pointer-events-none absolute inset-x-5 bottom-0.5 h-[2px] rounded-full bg-white/70" />
-                  ) : null}
-                </EditorStripButton>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleBoardDragEnd}
+          >
+            <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
+              <div className="flex items-center gap-1.5">
+                {scene.boardOrder.map((boardId, index) => {
+                  const board = scene.boards.find((item) => item.id === boardId);
+                  if (!board) return null;
+                  const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                  const isLive = Boolean(liveThumbnails[board.id]);
+                  return (
+                    <SortableFilmstripCard
+                      key={board.id}
+                      board={board}
+                      index={index}
+                      thumbnailUrl={thumbnailUrl}
+                      isLive={isLive}
+                      active={scene.activeBoardId === board.id}
+                      canDelete={scene.boards.length > 1}
+                      onSelect={() =>
+                        setScene((current) =>
+                          normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
+                        )
+                      }
+                      onDelete={() => deleteBoard(board.id)}
+                    />
+                  );
+                })}
               </div>
-            );
-          })}
+            </SortableContext>
+          </DndContext>
           <button
             type="button"
             onClick={createBoard}
-            className="flex h-full shrink-0 items-center justify-center rounded-[16px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 text-white/36 transition-colors hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white/62"
+            disabled={scene.boards.length >= PROJECT_BOARD_MAX}
+            className="flex h-full shrink-0 items-center justify-center self-stretch rounded-[16px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 text-white/36 transition-colors hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white/62 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="新建画板"
           >
             <Plus className="h-4 w-4" />
@@ -4090,6 +4139,207 @@ export function ProjectEditorFabricClient({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function SortableBoardRow({
+  board,
+  index,
+  thumbnailUrl,
+  isLive,
+  active,
+  canDelete,
+  onSelect,
+  onDelete,
+}: {
+  board: ProjectBoard;
+  index: number;
+  thumbnailUrl: string | null;
+  isLive: boolean;
+  active: boolean;
+  canDelete: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: board.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const resolvedThumb = thumbnailUrl
+    ? isLive
+      ? thumbnailUrl
+      : buildPrivateBlobProxyUrl(thumbnailUrl)
+    : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group relative flex items-center gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
+        active
+          ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
+          : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/84",
+        isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
+      )}
+    >
+      <button
+        type="button"
+        className={cn(
+          "flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-lg text-white/40 transition-colors hover:text-white/80 active:cursor-grabbing",
+          active && "text-white/70"
+        )}
+        {...attributes}
+        {...listeners}
+        aria-label="拖拽排序"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <div
+          className={cn(
+            "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+            active
+              ? "border-white/[0.16] shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
+              : "border-white/[0.08] group-hover:border-white/[0.12]"
+          )}
+        >
+          {resolvedThumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={resolvedThumb}
+              alt={board.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-white" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-white">
+            {index + 1}. {board.name}
+          </p>
+          <p className="mt-1 truncate text-xs text-white/44">
+            {board.intent || "未填写意图"}
+          </p>
+        </div>
+      </button>
+
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 opacity-0 transition-all duration-150 hover:bg-white/[0.08] hover:text-red-300 group-hover:opacity-100"
+          aria-label="删除画板"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SortableFilmstripCard({
+  board,
+  index,
+  thumbnailUrl,
+  isLive,
+  active,
+  canDelete,
+  onSelect,
+  onDelete,
+}: {
+  board: ProjectBoard;
+  index: number;
+  thumbnailUrl: string | null;
+  isLive: boolean;
+  active: boolean;
+  canDelete: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: board.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const resolvedThumb = thumbnailUrl
+    ? isLive
+      ? thumbnailUrl
+      : buildPrivateBlobProxyUrl(thumbnailUrl)
+    : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "group relative shrink-0 cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-80"
+      )}
+    >
+      <EditorStripButton
+        active={active}
+        className={cn(
+          "relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
+          active && "translate-y-[-1px] shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]"
+        )}
+        onClick={onSelect}
+      >
+        <div
+          className={cn(
+            "overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+            active
+              ? "border-white/[0.18] shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
+              : "border-white/[0.08] group-hover:border-white/[0.12]"
+          )}
+        >
+          {resolvedThumb ? (
+            <div className="aspect-video">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={resolvedThumb}
+                alt={board.name}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="flex aspect-video items-center justify-center bg-white" />
+          )}
+        </div>
+        <p className="mt-1 truncate text-[10px] text-white/46">{index + 1}</p>
+        {active ? (
+          <div className="pointer-events-none absolute inset-x-5 bottom-4 h-[2px] rounded-full bg-white/70" />
+        ) : null}
+      </EditorStripButton>
+      {canDelete ? (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.12] bg-[#0f0f0e]/95 text-white/60 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
+          aria-label="删除画板"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
