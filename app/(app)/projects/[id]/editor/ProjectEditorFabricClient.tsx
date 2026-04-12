@@ -246,7 +246,10 @@ function syncCanvasDomSizing(canvas: FabricCanvas) {
 
   if (runtimeCanvas.wrapperEl) {
     runtimeCanvas.wrapperEl.style.position = "absolute";
-    runtimeCanvas.wrapperEl.style.inset = "0";
+    runtimeCanvas.wrapperEl.style.top = "0";
+    runtimeCanvas.wrapperEl.style.left = "0";
+    runtimeCanvas.wrapperEl.style.right = "0";
+    runtimeCanvas.wrapperEl.style.bottom = "0";
     runtimeCanvas.wrapperEl.style.width = "100%";
     runtimeCanvas.wrapperEl.style.height = "100%";
     runtimeCanvas.wrapperEl.style.display = "block";
@@ -1594,8 +1597,11 @@ export function ProjectEditorFabricClient({
   }
 
   function applyCenteredZoom(canvas: FabricCanvas, nextZoom: number) {
-    const width = workspaceRef.current?.clientWidth || canvas.getWidth();
-    const height = workspaceRef.current?.clientHeight || canvas.getHeight();
+    const rect = workspaceRef.current?.getBoundingClientRect();
+    const width = (rect && rect.width > 0 ? rect.width : 0) || canvas.getWidth();
+    const height = (rect && rect.height > 0 ? rect.height : 0) || canvas.getHeight();
+
+    if (width <= 0 || height <= 0) return;
 
     if (canvas.getWidth() !== width || canvas.getHeight() !== height) {
       canvas.setDimensions({ width, height });
@@ -1865,9 +1871,11 @@ export function ProjectEditorFabricClient({
     canvas.discardActiveObject();
     fitBoard(canvas);
     requestAnimationFrame(() => {
-      if (canvasRef.current === canvas) {
-        fitBoard(canvas);
-      }
+      requestAnimationFrame(() => {
+        if (canvasRef.current === canvas) {
+          fitBoard(canvas);
+        }
+      });
     });
     updateSelectionSummary(canvas);
     hydratingRef.current = false;
@@ -1883,8 +1891,9 @@ export function ProjectEditorFabricClient({
       if (disposed || !hostRef.current || !workspaceRef.current) return;
 
       fabricRef.current = fabric;
-      const initW = workspaceRef.current.clientWidth || 1200;
-      const initH = workspaceRef.current.clientHeight || 675;
+      const initRect = workspaceRef.current.getBoundingClientRect();
+      const initW = initRect.width || workspaceRef.current.clientWidth || 1200;
+      const initH = initRect.height || workspaceRef.current.clientHeight || 675;
       const canvas = new fabric.Canvas(hostRef.current, {
         width: initW,
         height: initH,
@@ -1896,14 +1905,18 @@ export function ProjectEditorFabricClient({
 
       const resize = () => {
         if (!workspaceRef.current || !canvasRef.current) return;
+        const rect = workspaceRef.current.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
         canvasRef.current.setDimensions({
-          width: workspaceRef.current.clientWidth,
-          height: workspaceRef.current.clientHeight,
+          width: rect.width,
+          height: rect.height,
         });
         syncCanvasDomSizing(canvasRef.current);
         fitBoard(canvasRef.current);
         requestAnimationFrame(() => {
-          if (canvasRef.current) fitBoard(canvasRef.current);
+          requestAnimationFrame(() => {
+            if (canvasRef.current) fitBoard(canvasRef.current);
+          });
         });
       };
 
@@ -1960,6 +1973,16 @@ export function ProjectEditorFabricClient({
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!canvasReady) return;
+    // Ensure canvas is correctly sized after React commits the DOM.
+    // loadBoardIntoCanvas also calls fitBoard, but this runs first so the
+    // board appears centered even before objects finish loading.
+    requestAnimationFrame(() => {
+      if (canvasRef.current) fitBoard(canvasRef.current);
+    });
+  }, [canvasReady]);
 
   useEffect(() => {
     if (!canvasReady || !activeBoard) return;
