@@ -1,357 +1,188 @@
 # FolioBox — 工程交接文档
 
-面向 Claude Code / Codex 的工程上下文说明。当前有效规范稳定入口见 `private-docs/CURRENT_SPEC.md`。
+面向 Claude Code / Codex 的仓库交接说明。  
+目标不是记录所有历史，而是让接手的人快速知道：
+
+- 什么规则长期有效
+- 当前代码到底以什么为准
+- `Project Editor` 现在做到哪一步
+- 继续推进时优先顺序是什么
 
 ---
 
-## 产品规范入口（v3）
+## 1. 规范入口与优先级
 
-从现在开始，产品规范以 `private-docs/CURRENT_SPEC.md` 为稳定入口，并以 `private-docs/spec-system-v3/` 下文档为唯一有效依据。
+当前产品规范稳定入口：
 
-文档权威顺序：
-- 稳定入口：`private-docs/CURRENT_SPEC.md`
-- 总入口与读取顺序：`private-docs/spec-system-v3/00_README_Document_Map_v3.md`
-- 产品范围与页面地图：`private-docs/spec-system-v3/01_FolioBox_Spec_Core_v3.md`
-- 当前版本页面归属、文案、CTA、壳层与行为冻结：`private-docs/spec-system-v3/02_Current_Freeze_v3.md`
-- 评分策略：`private-docs/spec-system-v3/03_Scoring_Strategy_v3.md`
-- 生成、配额、重试与成本控制：`private-docs/spec-system-v3/04_Generation_and_Cost_Control_v3.md`
-- 支付、套餐、权限与回跳：`private-docs/spec-system-v3/05_Billing_and_Entitlement_v3.md`
-- 工作台 IA、项目管理与状态流：`private-docs/spec-system-v3/06_Workspace_IA_v3.md`
-- 质量目标、回归、样本集与评审机制：`private-docs/spec-system-v3/07_Quality_Engineering_v3.md`
-- 整站体验基线、文案语气、CTA 与视觉达标线：`private-docs/spec-system-v3/08_Experience_Baseline_v3.md`
-- Project Editor 详细规范：`private-docs/spec-system-v3/09_Project_Editor_Detailed_Spec_v1.md`
-- Portfolio Editor 详细规范：`private-docs/spec-system-v3/10_Portfolio_Editor_Detailed_Spec_v1.md`
-- 编辑器统一交互原则：`private-docs/spec-system-v3/11_Editor_Interaction_Principles_v1.md`
-- Editor 产品质量基线：`private-docs/Editor_Product_Quality_Bar_2026-04-10.md`
-- 文档维护规则与冲突处理：`private-docs/spec-system-v3/99_Document_Maintenance_Rules_v3.md`
+- `private-docs/CURRENT_SPEC.md`
 
-使用规则：
-- 主 spec `01_FolioBox_Spec_Core_v3.md` 只用于确认产品范围、主闭环与页面地图
-- Freeze `02_Current_Freeze_v3.md` 用于当前版本页面归属、文案、CTA、壳层与行为冻结
-- 专题规则分别以对应专题文档为准，不回到主 spec 重复判断
-- 质量目标、评审机制、黄金样本集与回归规则统一以 `07_Quality_Engineering_v3.md` 为准
-- 跨页面共享的体验基线、文案语气、CTA 规则与桌面端 / 移动端达标线统一以 `08_Experience_Baseline_v3.md` 为准
-- `Project Editor` 与 `Portfolio Editor` 的对象级行为，分别以 `09` 与 `10` 为准
-- 两个 editor 的共用心智、骨架、交互与主次动作关系统一以 `11_Editor_Interaction_Principles_v1.md` 为准
-- editor 的产品级验收口径、按钮状态完整性、微交互与“产品而不是玩具”的质量要求，统一参考 `private-docs/Editor_Product_Quality_Bar_2026-04-10.md`
-- 文档归属、替换优先于追加、冲突处理统一以 `99_Document_Maintenance_Rules_v3.md` 为准
-- `private-docs/archive-legacy/` 下的旧文档仅作历史参考，不作为当前实现依据
-- 如果旧文档、旧备注或本文其他段落与 v3 文档冲突，一律以 `private-docs/spec-system-v3/` 下文档为准
-- 用户可见页面的体验判断，如无更具体规则，优先查 `08_Experience_Baseline_v3.md`，不要仅凭个人审美临场判断
+当前唯一有效的产品文档体系：
 
-执行要求：
-- 开始任何产品相关代码修改前，先阅读 `private-docs/CURRENT_SPEC.md`
-- 再阅读 `00_README_Document_Map_v3.md`
-- 再按任务命中范围读取 `01` 到 `07` 和 `99` 中对应文档；若任务涉及产品范围、当前版本 UI、评分、生成、支付、工作台 IA、质量工程或文档维护规则，必须读取对应文档
-- 若任务涉及用户可见页面的视觉、文案、CTA、桌面端 / 移动端体验判断，必须额外读取 `08_Experience_Baseline_v3.md`
-- 若任务涉及 `Project Editor` 或 `Portfolio Editor` 的布局、面板、画板、浮层、Inspector、AI 接入、底部缩略条、拖拽、对象编辑或 editor 内动作优先级，必须额外读取 `09` / `10` / `11` 中命中的文档
-- 在开始修改代码前，先输出本次任务命中的文档清单
-- 在开始修改代码前，先明确说明：
-  - 本次任务涉及哪几份文档
-  - 本次实现将以哪份文档作为主依据
-  - 是否发现文档冲突
-- 如果还没有列出命中文档清单，不要开始改代码
+- `private-docs/spec-system-v3/00_README_Document_Map_v3.md`
+- `private-docs/spec-system-v3/01_FolioBox_Spec_Core_v3.md`
+- `private-docs/spec-system-v3/02_Current_Freeze_v3.md`
+- `private-docs/spec-system-v3/03_Scoring_Strategy_v3.md`
+- `private-docs/spec-system-v3/04_Generation_and_Cost_Control_v3.md`
+- `private-docs/spec-system-v3/05_Billing_and_Entitlement_v3.md`
+- `private-docs/spec-system-v3/06_Workspace_IA_v3.md`
+- `private-docs/spec-system-v3/07_Quality_Engineering_v3.md`
+- `private-docs/spec-system-v3/08_Experience_Baseline_v3.md`
+- `private-docs/spec-system-v3/09_Project_Editor_Detailed_Spec_v1.md`
+- `private-docs/spec-system-v3/10_Portfolio_Editor_Detailed_Spec_v1.md`
+- `private-docs/spec-system-v3/11_Editor_Interaction_Principles_v1.md`
+- `private-docs/active/Editor_Product_Quality_Bar_2026-04-10.md`
+- `private-docs/spec-system-v3/99_Document_Maintenance_Rules_v3.md`
 
-### 文档同步与确认规则（长期生效）
+硬规则：
 
-后续所有具体改动，默认按以下边界执行：
+- `private-docs/spec-system-v3/` 之外的旧文档，不作为当前实现依据
+- 如果旧说明、旧注释、旧交接内容和 v3 冲突，一律以 v3 为准
+- `Project Editor` 与 `Portfolio Editor` 的行为判断，优先看 `09 / 10 / 11`
+- 用户可见页面的体验判断，优先看 `08_Experience_Baseline_v3.md`
 
-- **必须进文档的改动**：必须先同步到 v3 文档，且在用户确认后，才能继续改代码
-  - 会改变产品规则、权限边界、默认行为、主流程、信息架构、评分口径、成本/模型策略、支付与权益规则的修改
-  - 会影响系统边界或多人协作判断的修改
-  - 例如：
-    - FREE / PRO 权限边界
-    - 首页默认主路径到底是评分还是整理
-    - 结果页 CTA 规则
-    - PDF 主链路选型
+---
 
-- **不必进文档、但要在实现里处理的改动**：可以直接改代码，不要求先改 v3 文档
-  - 比较明显的产品 / 交互问题
-  - 不会改变规则，只会修正当前实现偏差
-  - 例如：
-    - 未登录首页应该有登录入口
-    - 不该出现两个同权重主 CTA
-    - 跳转过渡不能闪回上传页
+## 2. 开始任务前必须做什么
 
-- **纯视觉 / 实现层改动**：直接改即可
-  - 卡片间距、圆角、描边、留白
-  - 字号层级微调
-  - 不改变规则含义的轻微文案润色
-  - 纯视觉、纯交互、纯呈现层优化
+凡是涉及产品实现，开始改代码前至少先读：
 
-执行规则：
-- 如果判断本次修改属于“必须进文档的改动”，先暂停代码实现
-- 先指出应同步的 v3 文档位置
-- 在用户确认文档更新方案后，再执行代码修改
-- 未获得用户确认，不要擅自修改 v3 文档对应规则并同时改代码
-- 不要把明显浅显的实现判断不断上升为 v3 文档内容
-- 只有会反复被争议、会影响多人协作判断、或会影响系统边界的东西，才进文档
+1. `private-docs/CURRENT_SPEC.md`
+2. `private-docs/spec-system-v3/00_README_Document_Map_v3.md`
+3. 按任务命中范围再读对应专题文档
+
+如果任务涉及：
+
+- 生成、配额、重试、成本：读 `04`
+- 支付、套餐、权限：读 `05`
+- 工作台 IA 与流程：读 `06`
+- 回归、质量、验收：读 `07`
+- 页面体验、文案、视觉：读 `08`
+- `Project Editor`：读 `09`、`11`
+- `Portfolio Editor`：读 `10`、`11`
+
+改代码前必须先说明：
+
+- 本次命中的文档清单
+- 本次实现以哪份文档为主依据
+- 是否发现文档冲突
+
+如果还没列出命中文档，不要开始改代码。
+
+---
+
+## 3. 文档同步边界
+
+### 必须先改文档再改代码
+
+满足以下任意条件，先同步 v3 文档，再继续实现：
+
+- 会改变产品规则、默认行为、主流程、IA、权限边界
+- 会改变评分、成本、支付、套餐、回跳规则
+- 会影响多人协作时的判断边界
+
+例子：
+
+- FREE / PRO 权限边界
+- 首页默认主路径
+- 结果页 CTA 规则
+- PDF 主链路选型
+
+### 可以直接改代码
+
+以下情况默认直接修实现，不要求先改文档：
+
+- 明显的实现偏差
+- 浅显的交互问题
+- 不改变规则含义的文案或视觉优化
+
+例子：
+
+- 页面缺登录入口
+- 两个同权重主 CTA 冲突
+- 页面跳转闪回
+- 卡片间距、圆角、字号、留白、hover、边框调整
+
+### 判断原则
+
+- 会反复被争议、会影响系统边界的东西，进文档
 - 明显浅显的实现判断，不进文档，直接修
 
-记忆规则：
-- 本约定写入 `CLAUDE.md` 后，作为后续会话的仓库内长期规则
-- 但 agent 不应假设自己一定”自动记住”；每次开始涉及产品实现的任务时，仍应先读取本文件与 `private-docs/CURRENT_SPEC.md`
-- 如果上下文很长、对规则边界不确定，优先回读 `CLAUDE.md` 与 `99_Document_Maintenance_Rules_v3.md`，而不是凭印象继续实现
+---
 
-### Editor 产品标准（长期生效）
+## 4. Editor 产品标准
 
-对于 `Project Editor` 与 `Portfolio Editor`，默认按以下标准执行：
+`Project Editor` 与 `Portfolio Editor` 默认按以下标准执行：
 
-- FolioBox 要做的是一个**垂直类、AI-native 的 Canva / Figma**，目标是让用户在编辑过程中自然沉淀结构、语义与上下文，再把这些高质量上下文提供给 AI
-- 编辑器是产品主战场，不是后台页，也不是功能样机；**产品，不是玩具**
-- 不以“功能能用”作为完成标准；必须同时评估：
-  - UI 视觉质量
-  - 交互动作合理性
-  - 动效是否帮助理解状态
-  - 功能摆放在当前位置是否合理
-  - 是否真的帮助 AI 获得更多上下文
-- 面向 editor 的实现，不允许把中间主舞台退化成：
-  - 表单页
-  - 检查清单页
-  - 大段说明页
-  - 后台管理页
-- 每一个按钮都必须至少考虑：
-  - 默认
-  - hover
-  - active / pressed
-  - focus
-  - disabled
-  - loading
-- 每一个高频交互都必须有明确反馈：
-  - 选中
-  - 拖拽
-  - 放置
-  - 排序
-  - 缩放
-  - 切页
-  - 保存中
-  - 保存失败
-  - AI 处理中
-- 动效默认不追求花哨，追求“帮助理解”：
-  - 面板展开 / 收起
-  - 选中态切换
-  - 拖放命中
-  - 缩略图切换
-  - 工具条浮现
-  - 保存状态变化
-- 编辑器里的信息摆放必须先问“为什么在这里”，而不是“这里还能塞什么”
-- 配额、预算、历史解释、帮助说明等次级信息，不得压过主舞台；除非当前动作必须知道，否则不要抢占中央编辑区域
-- 对 editor 的交付验收，不以 `npm test` / `npm run build` 通过结束；还必须做至少一轮真实页面视觉与交互复核
+- FolioBox 要做的是 **垂直类、AI-native 的 Canva / Figma**
+- editor 是产品主战场，不是后台页，不是功能样机
+- 目标不是“能用”，而是“像正式产品”
 
-执行红线：
+必须同时评估：
 
-- 如果一个 editor 页面看起来更像后台，而不像创作工具，视为未达标
-- 如果一个功能虽然可用，但按钮状态、拖拽反馈、选中态或层级不完整，视为未达标
-- 如果一个 AI 能力没有明显利用当前画板、当前对象、当前素材、当前文本结构的上下文，视为未达标
-- 如果实现选择是为了省事而牺牲产品心智，必须回退并重做
+- UI 视觉质量
+- 交互动作合理性
+- 动效是否帮助理解
+- 功能摆放是否合理
+- 是否真的帮助 AI 获得更多上下文
+
+不允许把中间主舞台退化成：
+
+- 表单页
+- 检查清单页
+- 大段说明页
+- 后台管理页
+
+每个按钮至少要考虑：
+
+- 默认
+- hover
+- active
+- focus
+- disabled
+- loading
+
+每个高频交互都要有明确反馈：
+
+- 选中
+- 拖拽
+- 放置
+- 排序
+- 缩放
+- 切页
+- 保存中
+- 保存失败
+- AI 处理中
+
+验收红线：
+
+- 看起来像后台，不像创作工具：未达标
+- 功能可用但状态不完整：未达标
+- AI 没有明显利用当前画板 / 对象 / 素材 / 文本结构：未达标
+- 为了省事牺牲产品心智：必须回退重做
 
 ---
 
-## 项目简介
+## 5. 当前仓库事实
 
-FolioBox 是一个面向国内设计师求职场景的 Web 产品。用户上传设计稿与简历信息，平台通过 AI 生成并帮助整理一份可投递的作品集初稿，支持在线预览链接和 PDF 导出。
+### 产品简介
 
-**技术栈：** Next.js 15 (App Router) · TypeScript · Prisma · PostgreSQL (Supabase) · NextAuth v5 · OpenAI · Vercel Blob · Tailwind CSS · shadcn/ui
+FolioBox 是一个面向国内设计师求职场景的 Web 产品。  
+用户上传设计稿与简历信息，平台通过 AI 生成并帮助整理一份可投递的作品集初稿，支持在线预览链接和 PDF 导出。
 
----
+### 技术栈
 
-## 常用命令
+- Next.js 15 App Router
+- TypeScript
+- Prisma
+- PostgreSQL / Supabase
+- NextAuth v5
+- OpenAI
+- Vercel Blob
+- Tailwind CSS
+- shadcn/ui
+- Fabric.js（当前 `Project Editor` 主画布引擎）
 
-```bash
-npm run dev          # 本地开发
-npm run build        # 构建（交付前必跑，确保无报错）
-npm run db:push      # 同步 schema 到数据库（见下方说明）
-npm run db:studio    # 打开 Prisma Studio
-npm run db:generate  # 重新生成 Prisma Client（schema 改完后运行）
-```
-
-## Git / PR Workflow
-
-- 小范围、低风险、单文件或轻微文案类改动，可直接在当前本地分支处理
-- 涉及功能开发、多文件修改、部署相关、鉴权、支付、数据库、环境变量、路由结构或可能影响线上行为的改动，默认新建分支并走 PR
-- 当用户要求“端到端完成”时，默认包含：建分支、改代码、提交 commit、推送分支、创建 PR；除非用户明确说明只要本地修改
-- 未经用户明确要求，不要主动合并 PR、不要主动发布生产
-- 如果改动范围或风险不明显，优先建议走 PR，而不是直接改 `main`
-- 分支与 PR 说明应尽量清楚表达任务目标，便于非程序员用户理解本次改动内容
-
-### 单人协作默认策略
-
-- 本仓库按“单人开发 + AI 协作”模式处理 Git 工作流
-- agent 可以承担 Git / GitHub 执行工作，包括建分支、提交、推送、开 PR、整理 PR 说明
-- 用户主要负责确认目标、验收结果、决定是否合并；agent 负责把流程整理清楚
-- 完成代码修改后，默认进行与任务相称的验证，并向用户说明验证结果、剩余风险和未执行项
-- 面向用户可见的 UI 页面，视觉质量与功能完成度同等重要，不将“功能已通但界面粗糙”视为可交付状态
-- 当前产品面向 UI / UX 设计师用户，agent 在处理 Landing、评分入口、评分结果、价格页、Dashboard、项目工作流、案例展示等关键页面时，应同时关注视觉专业感、排版层级、留白、节奏、组件一致性与 CTA 权重，而不是只修功能逻辑
-- 面向用户的文案默认采用“设计师对设计师”的语气：有人情味、真诚、克制、不夸大承诺，不使用居高临下的专家腔或过度营销话术；应更接近“我知道这件事很难，我们先一起把第一版做出来”
-- 当前对外品牌主语默认优先使用第一人称单数“我”，而不是“我们”；尤其适用于开发者说、长期方向、创作者立场说明和带品牌判断的公开文案
-
-### 工具使用偏好
-
-- GitHub 相关操作在可行时优先使用 `gh`
-- Vercel 项目链接、环境变量拉取、部署检查等操作在可行时优先使用 `vercel` CLI
-- 代码库搜索优先使用 `rg`
-- 文件查找优先使用 `fd`
-- 读取文件内容时，可优先使用 `bat` 提升可读性
-
-### 数据库操作注意事项
-
-**必须用 `npm run db:push`，不要用 `prisma migrate dev`。**
-
-原因：数据库已有数据且无完整 migration 历史，`migrate dev` 会因 drift 报错。`db:push` 直接将 schema 同步到 DB，适合当前阶段。
-
----
-
-## 目录结构
-
-```
-app/
-  (app)/              # 需登录的应用页面（layout 含 auth 校验）
-    dashboard/        # 工作台首页
-    profile/          # 用户资料
-    projects/[id]/
-      assets/         # 素材导入
-      facts/          # 项目关键信息表单
-      outline/        # 大纲确认页（含 OutlineClient.tsx）
-      editor/         # Block 编辑器（含 EditorClient.tsx）
-  (focus)/            # 聚焦流程页面（无营销导航、无工作台侧栏）
-    login/            # 登录 / 验证
-    payment/result/   # 支付结果页
-    score/[id]/       # 评分结果页（免费简版 / 付费完整版）
-  (marketing)/        # 公开页面
-    page.tsx          # Landing Page
-    pricing/          # 价格页
-    score/            # 免费评分入口
-  (viewer)/           # 公开浏览壳
-    p/[slug]/         # 已发布作品集展示页
-  (print)/            # 打印视图（独立 layout，无导航，用于 PDF 导出）
-    projects/[id]/print/
-
-api/
-  auth/               # NextAuth 回调
-  billing/            # plans（公开）、me（需登录）
-  orders/             # create、[id]、[id]/pay、[id]/refresh
-  payments/           # wechat/notify、alipay/notify（支付回调 stub）
-  outlines/[id]/      # GET/PUT、confirm、render
-  drafts/[id]/        # GET/PUT、publish
-  projects/[id]/      # facts、outline、assets 等
-  published/[slug]/   # 已发布作品集数据
-  scores/             # 评分相关
-
-lib/
-  auth.ts             # NextAuth 配置（Magic Link 邮件登录）
-  db.ts               # Prisma Client 单例
-  entitlement.ts      # 权限校验：getUserPlan / canDo / requirePlan + PLAN_DEFINITIONS
-  storage.ts          # Vercel Blob 封装
-  utils.ts            # cn() 等工具
-  llm/
-    provider.ts       # LLMProvider 接口
-    openai.ts         # OpenAI 实现（具体模型与 task routing 以 04_Generation_and_Cost_Control_v3.md 和环境变量为准）
-    index.ts          # 导出 llm 实例
-  payment/
-    index.ts          # PaymentProvider 接口 + getProvider() 工厂
-    wechat.ts         # 微信支付 stub（待接真实 SDK）
-    alipay.ts         # 支付宝 stub（待接真实 SDK）
-
-components/
-  ui/                 # shadcn/ui 基础组件
-  app/                # 应用内通用组件
-  marketing/          # 营销页组件
-  billing/
-    PaywallModal.tsx  # 付费拦截弹窗（scene 驱动，6 种场景）
-
-hooks/
-  useEntitlement.ts   # 客户端权限状态（调用 /api/billing/me）
-```
-
----
-
-## 已完成阶段（Phase 1–4）
-
-| 阶段 | 内容 | 状态 |
-|------|------|------|
-| Phase 1 | 项目创建、素材导入（图片/PDF/Figma链接）、事实表单 | 完成 |
-| Phase 2 | AI 大纲生成 + 确认页（主题/封面图选择） | 完成 |
-| Phase 3 | AI 草稿渲染 + Block 编辑器 + PDF 打印视图 + 在线链接发布 | 完成 |
-| Phase 4 | 支付系统（Order/UserPlan/BillingEvent）+ 权限校验 + Paywall 拦截 + 价格页 | 完成 |
-
-核心闭环（评分 → 注册 → 导入 → 事实表单 → 生成大纲 → 渲染草稿 → 编辑 → 发布/PDF）已完整打通。
-
-另已完成当前版本一致性收口的基础结构：
-
-- 新增 `(focus)` route group，用于评分结果、登录解锁、支付结果等聚焦页面
-- 新增公开浏览壳，公开作品集不再复用营销壳
-- Dashboard 改为工作台首页，不再跳转到不存在的 `/projects/[id]`
-- 导入页改为三步向导，但继续沿用现有 `POST /api/projects` 与 `POST /api/projects/import/images`
-- 评分结果页支持“免费简版结果 / 付费完整版结果”两态
-- 共享页面骨架组件已冻结：`PageHeader`、`SectionCard`、`EmptyState`、`StepHeader`、`StickyActionBar`、`InlineTip`、`ProgressHint`、`PermissionGate`、`ResumeContextBanner`
-
-`npm run build` 当前无报错。
-
----
-
-## 未完成 / 待实现（对照 Spec）
-
-以下缺口均已在代码库中有骨架或占位，尚未真实实现：
-
-### P0 优先（影响商业化或付费墙完整性）
-
-**1. 支付真实接入**
-`lib/payment/wechat.ts` / `lib/payment/alipay.ts` 为 stub，`createOrder` 返回占位数据，`queryOrder` 始终返回 `pending`，无法真实收款。回调路由验签逻辑同为 stub。真实 SDK 接入需商户证书，替换对应文件中 `TODO` 标注部分即可。
-
-### P0 但可延后
-
-**2. 简历上传与解析**
-`app/api/resumes/route.ts` 为 stub（仅返回 `TODO` 字符串），Vercel Blob 上传、解析逻辑、`POST /api/profiles/from-resume/:id` 均未实现。设计师档案页有入口但上传后无实际效果。
-
-**3. 案例详情页（`/cases/[slug]`）**
-Landing Page 案例卡片可点击，但 `app/(marketing)/cases/[slug]/page.tsx` 仅为占位文字。Spec §A2 要求完整 Before/After 对比，覆盖 B2B / C 端各一个。
-
-### P1 级别
-
-**4. Figma 自动拉帧**
-导入页保存了 Figma URL 并有提示"MVP 阶段暂不自动拉取"，但无 Figma API 集成，用户仍需手动上传截图。
-
----
-
-## Stub 说明（生产前需替换）
-
-### 支付 Provider（`lib/payment/wechat.ts` / `lib/payment/alipay.ts`）
-
-当前为 stub 实现，`createOrder` 返回占位数据，`queryOrder` 始终返回 `pending`。
-真实 SDK 接入需要商户证书，接入点已预留，替换对应文件中标注 `TODO` 的部分即可。
-
-支付回调路由（`/api/payments/wechat/notify`、`/api/payments/alipay/notify`）也是 stub，验签逻辑需替换。
-
-### LLM 调用（`lib/llm/openai.ts`）
-
-真实调用，需要有效的 `OPENAI_API_KEY`。本地开发如无 key，AI 生成大纲和渲染草稿会报错（属预期行为）。
-
----
-
-## 支付系统关键设计
-
-**三层模型：**
-- `Order` — 每次支付意图，含来源上下文（`sourceScene` / `projectId` / `draftId`）
-- `UserPlan` — 权益状态唯一来源，`requirePlan()` 直接查此表
-- `BillingEvent` — 审计日志，不参与业务逻辑
-
-**权限校验：**
-- 服务端：`requirePlan(userId, action)` → 403 `{ error: "upgrade_required" }`
-- 客户端：`useEntitlement()` hook → `planType` → 触发 `<PaywallModal>`
-
-**支付流程（两步）：**
-1. `POST /api/orders/create` — 仅创建 DB 记录，返回 `{ orderId }`
-2. `POST /api/orders/:id/pay` — 调用 provider，返回 `{ paymentParams }`
-3. 前端轮询 `POST /api/orders/:id/refresh` → status === "PAID" 后刷新权益
-
-**返回上下文（7.15C）：**
-支付结果页从 `Order` 记录读取 `sourceScene/projectId/draftId` 还原流程，不信任 URL 参数。
-
----
-
-## 当前 IA / Shell 约定
-
-当前版本必须按以下页面壳层组织：
+### 当前壳层
 
 - `MarketingShell`
   - `/`
@@ -367,112 +198,270 @@ Landing Page 案例卡片可点击，但 `app/(marketing)/cases/[slug]/page.tsx`
   - `/dashboard`
   - `/profile`
   - `/projects/*`
+  - `/portfolios/*`
 - `PublicViewerShell`
   - `/p/[slug]`
 - `Print`
   - `/projects/[id]/print`
+  - `/portfolios/[id]/print`
 
 硬规则：
 
-- `MarketingShell` 可以出现营销导航和营销 CTA
-- `FocusShell` 不允许出现营销导航，不允许出现与当前任务无关的 CTA
+- `MarketingShell` 可有营销导航和营销 CTA
+- `FocusShell` 不允许出现无关 CTA
 - `AppShell` 只放工作台相关入口
-- `PublicViewerShell` 不出现营销导航，也不出现工作台 UI
+- `PublicViewerShell` 不出现工作台 UI
+
+### 当前关键主文件
+
+- `app/(app)/projects/[id]/editor/ProjectEditorFabricClient.tsx`
+- `components/editor/EditorScaffold.tsx`
+- `lib/project-editor-scene.ts`
+- `app/api/projects/[id]/recognition/analyze/route.ts`
+- `app/api/projects/[id]/recognition/incremental/route.ts`
+- `app/api/projects/[id]/structure/suggest/route.ts`
+- `app/api/projects/[id]/structure/route.ts`
+- `app/api/projects/[id]/layout/precheck/route.ts`
+- `app/api/projects/[id]/layout/generate/route.ts`
 
 ---
 
-## 当前一致性改造目标
+## 6. 当前 Project Editor 进展（截至 2026-04-11）
 
-后续开发默认遵循以下当前版本基线：
+### 当前主实现
 
-- Dashboard 是工作台首页，不是项目纯列表页
-- 项目卡必须跳转到真实可继续步骤，不允许链接到不存在的 `/projects/[id]`
-- 项目继续路径优先级固定为：`editor > outline > facts > assets`
-- 评分结果页必须区分：
-  - 免费简版结果
-  - 付费完整版结果
-- 导入页必须维持三步向导：
-  - 选择导入方式
-  - 填写最小项目信息
-  - 确认并进入素材确认
-- 设计师档案页要明确说明各字段“会影响什么生成结果”
-- 设计系统收口以共享 token 为目标：
-  - 官网深色，工作台浅色
-  - 共享字体、转角策略、描边、主按钮、辅助插图与 icon 风格
-  - 不要为 Marketing / Focus / App 再各造一套 UI 语言
+- `/projects/[id]/editor` 默认走 **Fabric 版 Project Editor**
+- 旧 DOM editor 仅作为兼容实现保留，可通过 `?engine=legacy` 访问
+- 后续新功能默认不要再加到 legacy 里
 
-### 当前设计语言基线（交接重点）
+### 当前编辑器结构
 
-从现在开始，用户可见页面的实现默认延续以下设计语言；如果没有明确理由，不要退回旧的圆角 SaaS 风格：
+- 顶部：文件级导航与项目级动作
+  - 返回
+  - 项目标题
+  - 保存状态
+  - `项目诊断`
+  - `生成排版`
+- 左侧：窄 icon rail + 展开面板
+  - `项目`
+  - `素材`
+  - `结构`
+  - `图层`
+  - `画板`
+- 中间：深色舞台 + 白色 16:9 主画板 + 浮动工具条 + 底部缩略条
+- 右侧：`属性 / AI`
 
-- 公开页主壳采用黑色品牌底，工作台采用浅色效率壳，但两者共享同一套几何语言
-- 默认优先使用直角体系，不使用大圆角、胶囊感、软卡片感
-- 页面骨架优先依赖：分割线、网格、边框、编号、小节点，而不是靠大片圆角卡片组织信息
-- 点阵已作为辅助视觉元素进入正式语言，但只能作为辅助层，不应盖过标题、正文和主要交互
-- 插图优先使用黑白灰、有语义的等距线稿 / 结构图；主题应围绕结构、整理、模块、表达，不要用无语义炫技图形
-- icon 需要和页面语言保持一致；如主体壳层已进入直角体系，图标和局部装饰应去圆角化，避免同时出现两套几何性格
-- 中文大标题默认优先手动控行，不允许出现单字悬挂、断句僵硬或浏览器随意拆分造成的视觉事故
-- 高密度正文区、表单区、数据列表区、关键 CTA 周围，谨慎使用重网格和重角标，避免噪声压过内容
+### 当前已完成的 P0 主流程
 
-### 当前壳层迁移进度（交接重点）
+`Project Editor` 当前已经打通：
 
-截至当前版本，设计语言迁移状态如下：
+- 填写项目背景
+- 上传项目设计图
+- 执行素材轻识别
+- 生成结构建议
+- 手工编辑 / 确认结构建议
+- 按确认后的结构一键落成画板组
+- 新增素材后执行增量识别，并给出 diff / 是否建议刷新结构
 
-- `MarketingShell`
-  - 已完成第一轮统一
-  - 首页、`/pricing`、`/score`、`/editorial/developers-note`、`/vision` 已基本进入同一套黑底直角品牌语言
-- `AppShell`
-  - 已完成第一轮统一
-  - `dashboard`
-  - `projects`
-  - `projects/new`
-  - `projects/[id]/assets`
-  - `projects/[id]/facts`
-  - `projects/[id]/outline`
-  - `projects/[id]/editor`
-  - 上述页面已从旧圆角白卡片系统迁移到浅色直角工作台变体
-- `FocusShell`
-  - 仍有残留旧风格，需要后续继续收口
-  - 重点页：`/login`、`/login/verify`、`/score/[id]`、`/payment/result`
-- `PublicViewerShell`
-  - 暂未正式按新语言做一轮统一，后续需要单独判断它应该更偏“作品集成品展示”还是更偏“品牌系统延续”
+### 当前已具备的编辑能力
 
-### 当前工作方式约定（交接重点）
+- 文本、图片、基础形状
+  - 矩形
+  - 正方形
+  - 圆形
+  - 三角形
+  - 线段
+- 选中、拖拽、缩放
+- 复制 / 粘贴 / 创建副本 / 删除
+- 图层列表与图层拖拽排序
+- 右键菜单、图层更多菜单、对象菜单已基本统一
+- 右侧 Inspector 可编辑文本、图片、形状基础属性
+- 右侧 AI 面板可承接诊断和生成结果
+- `生成排版` 已接入 precheck / style reference / generation scope 基础链路
 
-如果后续继续做 UI / 壳层延展，默认按这个顺序推进：
+### 当前已经明确变更、不要回退的执行方案
 
-- 先延展共享语言，不要先做局部装饰
-- 先统一高曝光壳层、主按钮、卡片、标题、导航、空状态、操作条
-- 再处理插图、点阵、局部图标与细节修饰
-- 优先保证 `MarketingShell` 与 `AppShell` 是“同品牌的两种变体”，而不是两套不相关的产品
-- 若需要复用组件，优先复用“视觉语法”而不是整页模板；可以复用 section/frame/eyebrow/CTA/list 这类中层模块，但不要让每页长成同一个结构
+- 左侧常驻结构是 `项目 / 素材 / 结构 / 图层 / 画板`
+- `素材` 是常驻主面板，不再仅是临时浮层
+- `插入图片` 是素材体系快捷入口，不替代素材面板
+- `结构` 面板是正式主流程面板，不是附属说明区
+- `结构建议` 不是只读结果，而应允许编辑、确认，并进一步落成画板
+- 底部缩略条属于中间舞台系统的一部分，不应被当成整页独立 footer
+- 当前方向是：悬浮工具条只保留画布级动作，对象级编辑交给右侧 Inspector
+
+### 当前仍在持续打磨、尚未稳定的部分
+
+- 舞台与主画板适配
+  - 白色主画板的 16:9 适配
+  - 舞台居中
+  - 侧栏展开/收起联动
+  - 底部缩略条与舞台同步重排
+- 左右 rail 的统一性
+  - 结构、密度、层级、文案仍在持续统一
+- 编辑器文案减重
+  - 原则是操作优先、说明退后
+- 画布级 vs 对象级动作边界
+  - 不要再把对象编辑能力塞回悬浮工具条
+
+### 当前继续开发顺序
+
+后续推进 `Project Editor` 时，默认按这个顺序：
+
+1. 先保证舞台 / 主画板 / 底部缩略条的几何关系正确
+2. 再统一左右 rail 的结构、文案、层级和卡片语法
+3. 再补对象级交互 polish
+   - 选中态
+   - 控制点
+   - 右键菜单
+   - 图层拖拽反馈
+4. 最后再继续深挖 AI 面板、结构面板和生成链路细节
+
+### 当前交接必读文档
+
+- `private-docs/audits/Project_Editor_Gap_Audit_2026-04-11.md`
+- `private-docs/spec-system-v3/09_Project_Editor_Detailed_Spec_v1.md`
+- `private-docs/spec-system-v3/11_Editor_Interaction_Principles_v1.md`
+- `private-docs/active/Editor_Product_Quality_Bar_2026-04-10.md`
+
+如果要继续补 `导入素材 -> 轻识别 -> 结构 -> 落板 -> 增量识别` 这条主流程，还要补读：
+
+- `private-docs/spec-system-v3/04_Generation_and_Cost_Control_v3.md`
+- `private-docs/spec-system-v3/07_Quality_Engineering_v3.md`
 
 ---
 
-## 环境变量
+## 7. 当前已知未完成项
 
+### P0
+
+- 支付真实接入仍是 stub
+  - `lib/payment/wechat.ts`
+  - `lib/payment/alipay.ts`
+  - `/api/payments/wechat/notify`
+  - `/api/payments/alipay/notify`
+
+### P0 但可延后
+
+- 简历上传与解析未落地
+  - `app/api/resumes/route.ts` 仍是 stub
+- `/cases/[slug]` 仍不是完整案例详情页
+
+### P1
+
+- Figma 自动拉帧未接
+
+---
+
+## 8. 支付与权限的稳定事实
+
+### 支付三层模型
+
+- `Order`
+  - 每次支付意图
+  - 含来源上下文：`sourceScene / projectId / draftId`
+- `UserPlan`
+  - 权益状态唯一来源
+  - `requirePlan()` 直接查此表
+- `BillingEvent`
+  - 审计日志
+  - 不参与业务判断
+
+### 权限校验
+
+- 服务端：`requirePlan(userId, action)` → 403 `{ error: "upgrade_required" }`
+- 客户端：`useEntitlement()` → 结合 `<PaywallModal>`
+
+### 支付流程
+
+1. `POST /api/orders/create`
+2. `POST /api/orders/:id/pay`
+3. 前端轮询 `POST /api/orders/:id/refresh`
+
+支付结果页从 `Order` 中读取 `sourceScene / projectId / draftId` 还原流程，不信任 URL 参数。
+
+---
+
+## 9. 常用命令与工程约定
+
+### 常用命令
+
+```bash
+npm run dev
+npm run build
+npm run db:push
+npm run db:studio
+npm run db:generate
 ```
-DATABASE_URL          # Supabase Transaction Pooler（pgbouncer=true，端口 6543）
-DIRECT_URL            # Supabase Direct Connection（端口 5432，供 Prisma migrate 使用）
-NEXTAUTH_URL          # 本地: http://localhost:3000
-AUTH_SECRET           # openssl rand -base64 32 生成
-EMAIL_SERVER_HOST     # SMTP host
-EMAIL_SERVER_PORT     # SMTP port
-EMAIL_SERVER_USER     # SMTP user
-EMAIL_SERVER_PASSWORD # SMTP password
-EMAIL_FROM            # 发件人地址
-OPENAI_API_KEY        # OpenAI API key
-BLOB_READ_WRITE_TOKEN # Vercel Blob token
-LLM_PROVIDER          # 固定填 "openai"
+
+### 数据库注意事项
+
+必须用：
+
+```bash
+npm run db:push
 ```
+
+不要用：
+
+```bash
+prisma migrate dev
+```
+
+原因：当前数据库已有数据且无完整 migration 历史，`migrate dev` 会因 drift 报错。
+
+### 代码约定
+
+- Server Components 优先
+- 交互逻辑放对应 `*Client.tsx`
+- Route Handler 只导出 HTTP 方法
+- 业务常量放 `lib/`
+- LLM 调用只在服务端
+- UI 优先复用 `components/ui/`
+- Tailwind 用 `cn()` 合并 class
+
+### 工具偏好
+
+- GitHub 操作优先用 `gh`
+- Vercel 操作优先用 `vercel`
+- 搜索优先用 `rg`
+- 文件查找优先用 `fd`
 
 ---
 
-## 代码约定
+## 10. Git / PR 工作方式
 
-- **Server Components 优先**，数据拉取在 Server Component，交互逻辑在对应 `*Client.tsx`
-- **Route Handler 只导出 HTTP 方法**（GET/POST/PUT/DELETE），不导出其他 named export（Next.js 限制）
-- **业务常量放 `lib/`**，不放 route 文件（如 `PLAN_AMOUNTS` 在 `lib/entitlement.ts`）
-- **LLM 调用只在服务端**（API route），不在客户端
-- **shadcn/ui** 组件已安装，新增 UI 优先复用，路径 `components/ui/`
-- **Tailwind** 用 `cn()` 合并 class（来自 `lib/utils.ts`）
+- 小范围、低风险、轻文案改动，可直接在当前分支处理
+- 功能开发、多文件修改、部署、鉴权、支付、数据库、环境变量、路由结构变化，默认新建分支走 PR
+- 如果用户要求“端到端完成”，默认包含：
+  - 建分支
+  - 改代码
+  - 提交 commit
+  - 推送分支
+  - 创建 PR
+- 未经用户明确要求，不主动合并 PR，不主动发生产
+
+单人协作默认策略：
+
+- 仓库按“单人开发 + AI 协作”模式处理
+- agent 负责把 Git / GitHub 流程整理清楚
+- 用户负责确认目标、验收结果、决定是否合并
+- UI 页面默认同时关注功能完成度与视觉质量
+
+---
+
+## 11. 环境变量
+
+```bash
+DATABASE_URL
+DIRECT_URL
+NEXTAUTH_URL
+AUTH_SECRET
+EMAIL_SERVER_HOST
+EMAIL_SERVER_PORT
+EMAIL_SERVER_USER
+EMAIL_SERVER_PASSWORD
+EMAIL_FROM
+OPENAI_API_KEY
+BLOB_READ_WRITE_TOKEN
+LLM_PROVIDER
+```

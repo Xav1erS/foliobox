@@ -41,6 +41,7 @@ import {
   MoreHorizontal,
   ZoomIn,
   ZoomOut,
+  X,
 } from "lucide-react";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +158,6 @@ type ContextMenuState = {
 };
 
 type LeftPanelKey = "project" | "assets" | "structure" | "layers" | "boards";
-type RightRailPanel = "inspector" | "ai";
 
 type GeneratePrecheck = {
   actionType: string;
@@ -376,7 +376,7 @@ export function ProjectEditorFabricClient({
     "saved" | "saving" | "dirty" | "error"
   >("saved");
   const [applyingStructure, setApplyingStructure] = useState(false);
-  const [rightPanel, setRightPanel] = useState<RightRailPanel>("inspector");
+  const [diagnosisDrawerOpen, setDiagnosisDrawerOpen] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -545,22 +545,10 @@ export function ProjectEditorFabricClient({
     [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
   );
   const hasActiveInspector = activeMeta.kind !== "none";
-  const showRightRail = hasActiveInspector || rightPanel === "ai";
+  const showRightRail = hasActiveInspector;
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
   const currentLeftPanelMeta = LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel) ?? null;
-  const currentRightPanelMeta =
-    rightPanel === "inspector"
-      ? {
-          label: "属性",
-          hint: hasActiveInspector
-            ? "选中对象后，在这里编辑内容、样式和层级。"
-            : "先选中画板里的文本、图片或形状，再编辑属性。",
-        }
-      : {
-          label: "AI",
-          hint: "查看诊断结论、结构建议和下一步生成判断。",
-        };
   const selectedImageAsset =
     activeMeta.kind === "image" && activeMeta.assetId
       ? assetMap.get(activeMeta.assetId) ?? null
@@ -1018,7 +1006,7 @@ export function ProjectEditorFabricClient({
   async function handleRunDiagnosis() {
     if (!activeBoard || diagnosing) return;
     setDiagnosing(true);
-    setRightPanel("ai");
+    setDiagnosisDrawerOpen(true);
     setActionError("");
     setActionMessage(null);
 
@@ -1501,7 +1489,7 @@ export function ProjectEditorFabricClient({
         setActionMessage({ tone: "info", text: "排版建议已生成，可继续结合单画板细调。" });
       }
       setGenerateOpen(false);
-      setRightPanel("ai");
+      setDiagnosisDrawerOpen(true);
       router.refresh();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "生成排版失败，请稍后重试");
@@ -1544,11 +1532,6 @@ export function ProjectEditorFabricClient({
     });
   }, [selectedImageAsset]);
 
-  useEffect(() => {
-    if (hasActiveInspector) {
-      setRightPanel("inspector");
-    }
-  }, [hasActiveInspector]);
 
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
@@ -1900,9 +1883,11 @@ export function ProjectEditorFabricClient({
       if (disposed || !hostRef.current || !workspaceRef.current) return;
 
       fabricRef.current = fabric;
+      const initW = workspaceRef.current.clientWidth || 1200;
+      const initH = workspaceRef.current.clientHeight || 675;
       const canvas = new fabric.Canvas(hostRef.current, {
-        width: workspaceRef.current.clientWidth,
-        height: workspaceRef.current.clientHeight,
+        width: initW,
+        height: initH,
         preserveObjectStacking: true,
         selection: true,
       });
@@ -1959,9 +1944,8 @@ export function ProjectEditorFabricClient({
       observer.observe(workspaceRef.current);
 
       setCanvasReady(true);
-      if (activeBoard) {
-        await loadBoardIntoCanvas(activeBoard);
-      }
+      // loadBoardIntoCanvas is handled exclusively by the [activeBoard?.id, canvasReady] effect
+      // below, which fires after the state update and ensures the workspace has finished layout.
 
       cleanup = () => {
         observer.disconnect();
@@ -3231,7 +3215,7 @@ export function ProjectEditorFabricClient({
         </div>
       }
       center={
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="absolute inset-0 flex flex-col">
           <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
             <div
               className={cn(
@@ -3301,15 +3285,6 @@ export function ProjectEditorFabricClient({
               <div className="flex items-center gap-1 rounded-full border border-black/8 bg-white/60 px-1.5 py-1">
                 <EditorChromeButton
                   className="h-8 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
-                  onClick={() => {
-                    setLeftPanel("layers");
-                  }}
-                >
-                  <Layers className="h-4 w-4" />
-                  调整图层
-                </EditorChromeButton>
-                <EditorChromeButton
-                  className="h-8 border-black/8 bg-white px-3 text-neutral-700 shadow-none hover:bg-neutral-100 hover:text-neutral-950"
                   onClick={() => canvasRef.current && fitBoard(canvasRef.current)}
                 >
                   适应画板
@@ -3357,12 +3332,16 @@ export function ProjectEditorFabricClient({
             />
             <div
               ref={workspaceRef}
-              className="absolute overflow-hidden rounded-[30px] border border-white/[0.05] bg-[#15120f] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_28px_80px_-52px_rgba(0,0,0,0.9)]"
+              className="absolute overflow-hidden rounded-[30px] border border-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_28px_80px_-52px_rgba(0,0,0,0.9)]"
               style={{
                 top: STAGE_TOP_INSET,
                 left: STAGE_SIDE_INSET,
                 right: STAGE_SIDE_INSET,
                 bottom: STAGE_BOTTOM_INSET,
+                backgroundColor: "#15120f",
+                backgroundImage:
+                  "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1.5px)",
+                backgroundSize: "20px 20px",
               }}
               onContextMenu={(event) => event.preventDefault()}
             >
@@ -3424,31 +3403,17 @@ export function ProjectEditorFabricClient({
       rightRail={
         showRightRail ? (
           <div className="flex h-full min-h-0 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
-            <Tabs
-              value={rightPanel}
-              onValueChange={(value) => setRightPanel(value as RightRailPanel)}
-              className="flex h-full min-h-0 flex-col"
-            >
-              <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
-                <div className="min-w-0">
-                  <p className="text-[10px] tracking-[0.18em] text-white/30">
-                    {currentRightPanelMeta.label}
-                  </p>
-                  <p className="mt-0.5 truncate text-[11px] text-white/36">
-                    {currentRightPanelMeta.hint}
-                  </p>
-                </div>
-              </div>
+            <div className="sticky top-0 z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
+              <p className="text-[10px] tracking-[0.18em] text-white/30">属性</p>
+              <p className="mt-0.5 truncate text-[11px] text-white/36">
+                {hasActiveInspector
+                  ? "选中对象后，在这里编辑内容、样式和层级。"
+                  : "先选中画板里的文本、图片或形状，再编辑属性。"}
+              </p>
+            </div>
 
-              <div className="sticky top-[57px] z-10 border-b border-white/[0.05] bg-[#15120f] px-5 py-3 shadow-[0_14px_24px_-24px_rgba(0,0,0,0.8)]">
-                <EditorTabsList className="grid h-11 grid-cols-2 rounded-[18px] bg-white/[0.03]">
-                  <EditorTabsTrigger value="inspector">属性</EditorTabsTrigger>
-                  <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
-                </EditorTabsList>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <TabsContent value="inspector" className="mt-0">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mt-0">
                   {hasActiveInspector ? (
                     <div className="h-full overflow-y-auto">
                       <EditorRailSection title="编辑">
@@ -3694,110 +3659,8 @@ export function ProjectEditorFabricClient({
                       <EditorEmptyState>先选中画板里的元素，再在这里编辑内容、样式和层级。</EditorEmptyState>
                     </div>
                   )}
-                </TabsContent>
-
-                <TabsContent value="ai" className="mt-0">
-                  <div className="h-full overflow-y-auto">
-                    <EditorRailSection title="现状">
-                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                        <CardContent className="p-4 text-sm leading-7 text-white/84">
-                          {currentConclusion}
-                        </CardContent>
-                      </Card>
-                    </EditorRailSection>
-
-                    <EditorRailSection title="亮点">
-                      <div className="space-y-2">
-                        {aiHighlights.length > 0 ? (
-                          aiHighlights.map((point) => (
-                            <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                              <CardContent className="p-4 text-sm leading-7 text-white/84">
-                                {point}
-                              </CardContent>
-                            </Card>
-                          ))
-                        ) : (
-                          <EditorEmptyState>先运行项目诊断，系统会返回当前亮点和可讲的重点。</EditorEmptyState>
-                        )}
-                      </div>
-                    </EditorRailSection>
-
-                    <EditorRailSection title="问题">
-                      <div className="space-y-2">
-                        {aiIssues.length > 0 ? (
-                          aiIssues.map((point) => (
-                            <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                              <CardContent className="p-4 text-sm leading-7 text-white/84">
-                                {point}
-                              </CardContent>
-                            </Card>
-                          ))
-                        ) : (
-                          <EditorEmptyState>当前还没有明确问题项，或者你还没跑过诊断。</EditorEmptyState>
-                        )}
-                      </div>
-                    </EditorRailSection>
-
-                    <EditorRailSection title="下一步">
-                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                        <CardContent className="p-4 text-sm leading-7 text-white/84">
-                          {nextStepConclusion}
-                        </CardContent>
-                      </Card>
-                    </EditorRailSection>
-
-                    <EditorRailSection title="历史">
-                      {aiHistory.length > 1 ? (
-                        <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                          <CardContent className="p-4 text-sm leading-7 text-white/84">
-                            已累计 {aiHistory.length} 条结果，默认优先参考当前画板范围。
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        <EditorEmptyState>还没有形成可比较的历史版本。</EditorEmptyState>
-                      )}
-                    </EditorRailSection>
-
-                    <EditorRailSection title="生成判断">
-                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                        <CardContent className="flex items-center justify-between gap-3 p-4">
-                          <div>
-                            <p className="text-sm font-medium text-white">
-                              {layout?.pages?.length
-                                ? "已有排版建议"
-                                : completenessAnalysis?.canProceed
-                                  ? "可以继续"
-                                  : "建议先补强"}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-white/56">
-                              {layout?.pages?.length
-                                ? `当前已有 ${layout.totalPages} 页排版建议，可继续结合单画板细调。`
-                                : completenessAnalysis?.canProceed
-                                  ? "当前材料和事实已经够用，可以继续生成。"
-                                  : "先补足问题链、角色事实或结果证据，再发起下一轮生成更稳。"}
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "rounded-full border-white/10 px-3 py-1 text-white",
-                              (layout?.pages?.length || completenessAnalysis?.canProceed) &&
-                                "border-white/[0.18] bg-white/[0.08] text-white"
-                            )}
-                          >
-                            {layout?.pages?.length
-                              ? "可继续"
-                              : completenessAnalysis?.canProceed
-                                ? "可生成"
-                                : "待补强"}
-                          </Badge>
-                        </CardContent>
-                      </Card>
-                    </EditorRailSection>
-                  </div>
-                </TabsContent>
               </div>
-            </Tabs>
+            </div>
           </div>
         ) : null
       }
@@ -3879,12 +3742,173 @@ export function ProjectEditorFabricClient({
               </div>
             );
           })}
+          <button
+            type="button"
+            onClick={createBoard}
+            className="flex h-full shrink-0 items-center justify-center rounded-[16px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 text-white/36 transition-colors hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white/62"
+            aria-label="新建画板"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
       }
       />
       {actionError ? (
         <div className="border-t border-red-300/12 bg-red-400/8 px-4 py-3 text-sm text-red-100">
           {actionError}
+        </div>
+      ) : null}
+
+      {/* 诊断结果 Drawer */}
+      {diagnosisDrawerOpen ? (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setDiagnosisDrawerOpen(false)}
+        >
+          <div
+            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/[0.06] bg-[#161210] shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 头部 */}
+            <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-white/90">项目诊断</p>
+                <p className="mt-0.5 text-[11px] text-white/36">
+                  {diagnosing ? "正在分析…" : "基于当前画板范围的诊断结论"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDiagnosisDrawerOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/44 transition-colors hover:bg-white/[0.08] hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* 内容 */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {diagnosing ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-5 w-5 animate-spin text-white/36" />
+                </div>
+              ) : (
+                <>
+                  <EditorRailSection title="现状">
+                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                      <CardContent className="p-4 text-sm leading-7 text-white/84">
+                        {currentConclusion}
+                      </CardContent>
+                    </Card>
+                  </EditorRailSection>
+
+                  <EditorRailSection title="亮点">
+                    <div className="space-y-2">
+                      {aiHighlights.length > 0 ? (
+                        aiHighlights.map((point) => (
+                          <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                            <CardContent className="p-4 text-sm leading-7 text-white/84">
+                              {point}
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        <EditorEmptyState>先运行项目诊断，系统会返回当前亮点和可讲的重点。</EditorEmptyState>
+                      )}
+                    </div>
+                  </EditorRailSection>
+
+                  <EditorRailSection title="问题">
+                    <div className="space-y-2">
+                      {aiIssues.length > 0 ? (
+                        aiIssues.map((point) => (
+                          <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                            <CardContent className="p-4 text-sm leading-7 text-white/84">
+                              {point}
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        <EditorEmptyState>当前还没有明确问题项，或者你还没跑过诊断。</EditorEmptyState>
+                      )}
+                    </div>
+                  </EditorRailSection>
+
+                  <EditorRailSection title="下一步">
+                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                      <CardContent className="p-4 text-sm leading-7 text-white/84">
+                        {nextStepConclusion}
+                      </CardContent>
+                    </Card>
+                  </EditorRailSection>
+
+                  <EditorRailSection title="生成判断">
+                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                      <CardContent className="flex items-center justify-between gap-3 p-4">
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {layout?.pages?.length
+                              ? "已有排版建议"
+                              : completenessAnalysis?.canProceed
+                                ? "可以继续"
+                                : "建议先补强"}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-white/56">
+                            {layout?.pages?.length
+                              ? `当前已有 ${layout.totalPages} 页排版建议，可继续结合单画板细调。`
+                              : completenessAnalysis?.canProceed
+                                ? "当前材料和事实已经够用，可以继续生成。"
+                                : "先补足问题链、角色事实或结果证据，再发起下一轮生成更稳。"}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 rounded-full border-white/10 px-3 py-1 text-white",
+                            (layout?.pages?.length || completenessAnalysis?.canProceed) &&
+                              "border-white/[0.18] bg-white/[0.08] text-white"
+                          )}
+                        >
+                          {layout?.pages?.length
+                            ? "可继续"
+                            : completenessAnalysis?.canProceed
+                              ? "可生成"
+                              : "待补强"}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  </EditorRailSection>
+
+                  {aiHistory.length > 1 ? (
+                    <EditorRailSection title="历史">
+                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
+                        <CardContent className="p-4 text-sm leading-7 text-white/84">
+                          已累计 {aiHistory.length} 条诊断记录，当前展示最新一次结果。
+                        </CardContent>
+                      </Card>
+                    </EditorRailSection>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            {/* 底部操作 */}
+            <div className="border-t border-white/[0.05] px-4 py-3">
+              <button
+                type="button"
+                onClick={() => void handleRunDiagnosis()}
+                disabled={diagnosing}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] text-sm text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-50"
+              >
+                {diagnosing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                重新诊断
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
