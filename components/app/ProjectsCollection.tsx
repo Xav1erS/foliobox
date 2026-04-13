@@ -62,7 +62,7 @@ export function ProjectsCollection({
         return (
           <Card
             key={project.id}
-            className="group overflow-hidden border-border/70 bg-card/95 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="group overflow-hidden border-border/70 bg-card/95 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="relative h-40 overflow-hidden border-b border-neutral-200 bg-neutral-100">
               {project.coverImageUrl ? (

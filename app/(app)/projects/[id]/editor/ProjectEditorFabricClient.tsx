@@ -287,13 +287,13 @@ const ALIBABA_PUHUITI_URL =
   "https://puhuiti.oss-cn-hangzhou.aliyuncs.com/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-55-Regular/AlibabaPuHuiTi-2-55-Regular.woff2";
 const PROJECT_BOARD_MAX = 10;
 const editorPanelCardClass =
-  "rounded-[20px] border border-white/[0.08] bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  "rounded-[20px] border border-white/8 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
-  "rounded-[18px] border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
+  "rounded-[18px] border border-white/8 bg-white/3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
 const editorFloatingSurfaceClass =
-  "rounded-[22px] border border-white/[0.08] bg-card text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
+  "rounded-[22px] border border-white/8 bg-card text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
 const editorPopupSurfaceClass =
-  "rounded-[20px] border border-white/[0.08] bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
+  "rounded-[20px] border border-white/8 bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
 const editorPopupItemClass =
   "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
 
@@ -2718,7 +2718,7 @@ export function ProjectEditorFabricClient({
       topNote={topStatusLabel}
       primaryAction={
         <Button
-          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed] disabled:opacity-40"
+          className="h-10 gap-2 rounded-full border border-white/8 bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed] disabled:opacity-40"
           onClick={() => void handleOpenGenerate()}
           disabled={generating || diagnosing || setupMode}
           title={setupMode ? "请先完成项目准备，再生成排版" : undefined}
@@ -2733,7 +2733,7 @@ export function ProjectEditorFabricClient({
           {setupMode ? (
             scene.boards.length > 0 ? (
               <EditorChromeButton
-                className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
                 onClick={() => { setSetupMode(false); setActionError(""); }}
               >
                 返回画布
@@ -2741,7 +2741,7 @@ export function ProjectEditorFabricClient({
             ) : null
           ) : (
             <EditorChromeButton
-              className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/60 hover:bg-white/[0.08] hover:text-white"
+              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
               onClick={() => {
                 setSetupMode(true);
                 setActionError("");
@@ -2753,7 +2753,7 @@ export function ProjectEditorFabricClient({
             </EditorChromeButton>
           )}
           <EditorChromeButton
-            className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/82 hover:bg-white/[0.08] hover:text-white"
+            className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/82 hover:bg-white/8 hover:text-white"
             onClick={() => void handleRunDiagnosis()}
             disabled={diagnosing || generating || setupMode}
             title={setupMode ? "请先完成项目准备，再进行诊断" : undefined}
@@ -2771,7 +2771,7 @@ export function ProjectEditorFabricClient({
       hideLeftRailHeader
       leftRail={
         <div className="flex h-full min-h-0">
-          <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/[0.05] bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
+          <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {(setupMode
               ? LEFT_PANEL_ITEMS.filter((i) => i.key === "project" || i.key === "assets")
               : LEFT_PANEL_ITEMS
@@ -2787,8 +2787,8 @@ export function ProjectEditorFabricClient({
                   className={cn(
                     "group relative flex h-11 w-11 items-center justify-center rounded-[14px] transition-all duration-200",
                     active
-                      ? "bg-white/[0.1] text-white"
-                      : "text-white/52 hover:bg-white/[0.05] hover:text-white"
+                      ? "bg-white/10 text-white"
+                      : "text-white/52 hover:bg-white/5 hover:text-white"
                   )}
                 >
                   <span
@@ -2805,14 +2805,14 @@ export function ProjectEditorFabricClient({
 
           {leftPanel ? (
             <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-card px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-card px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
                 <div className="min-w-0">
                   <p className="text-[10px] tracking-[0.18em] text-white/30">
                     {currentLeftPanelMeta?.label ?? "面板"}
                   </p>
                 </div>
                 <EditorChromeIconButton
-                  className="h-8 w-8 border-white/[0.08] bg-white/[0.035] text-white/56 hover:bg-white/[0.08] hover:text-white"
+                  className="h-8 w-8 border-white/8 bg-white/[0.035] text-white/56 hover:bg-white/8 hover:text-white"
                   onClick={() => setLeftPanel(null)}
                   aria-label="收起左侧面板"
                 >
@@ -2836,7 +2836,7 @@ export function ProjectEditorFabricClient({
                               "rounded-full border px-2.5 py-1 text-[11px]",
                               factsSaveState === "error"
                                 ? "border-red-300/20 bg-red-400/10 text-red-100"
-                                : "border-white/[0.08] bg-white/[0.04] text-white/54"
+                                : "border-white/8 bg-white/4 text-white/54"
                             )}
                           >
                             {factsSaveLabel}
@@ -2855,7 +2855,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 SaaS 后台、品牌官网、移动端应用"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2869,7 +2869,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2883,7 +2883,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 产品设计负责人、全栈开发、独立设计师"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2897,7 +2897,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
-                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-secondary text-white"
+                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2911,7 +2911,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="补充最终结果、影响、亮点与可量化成果。"
-                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/[0.08] bg-secondary text-white"
+                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/8 bg-secondary text-white"
                           />
                         </div>
                       </div>
@@ -2952,7 +2952,7 @@ export function ProjectEditorFabricClient({
                         value={assetSearch}
                         onChange={(event) => setAssetSearch(event.target.value)}
                         placeholder="搜索素材标题或 ID"
-                        className="h-10 rounded-2xl border-white/[0.08] bg-secondary text-white placeholder:text-white/28"
+                        className="h-10 rounded-2xl border-white/8 bg-secondary text-white placeholder:text-white/28"
                       />
                       {pendingRecognitionAssets.length > 0 ? (
                         <div className={cn(editorPanelCardClass, "px-4 py-4")}>
@@ -2993,9 +2993,9 @@ export function ProjectEditorFabricClient({
                             key={asset.id}
                             type="button"
                             onClick={() => void addAssetToCanvas(asset.id)}
-                            className="group overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.03] text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
+                            className="group overflow-hidden rounded-[16px] border border-white/8 bg-white/3 text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/6 hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
                           >
-                            <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                            <div className="aspect-4/3 overflow-hidden bg-black/30">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={buildPrivateBlobProxyUrl(asset.imageUrl)}
@@ -3021,9 +3021,9 @@ export function ProjectEditorFabricClient({
                           key={asset.id}
                           type="button"
                           onClick={() => void addAssetToCanvas(asset.id)}
-                          className="group overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.03] text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.06] hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
+                          className="group overflow-hidden rounded-[16px] border border-white/8 bg-white/3 text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/6 hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
                         >
-                          <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                          <div className="aspect-4/3 overflow-hidden bg-black/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={buildPrivateBlobProxyUrl(asset.imageUrl)}
@@ -3040,7 +3040,7 @@ export function ProjectEditorFabricClient({
                       ))}
                     </div>
                     {visibleAssets.length === 0 ? (
-                      <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                      <div className="rounded-[18px] border border-dashed border-white/10 bg-white/2 px-4 py-6 text-sm text-white/46">
                         还没有素材。先上传设计图，再把关键图插入当前画板。
                       </div>
                     ) : null}
@@ -3104,7 +3104,7 @@ export function ProjectEditorFabricClient({
                               {materialRecognition.recognizedTypes.map((type) => (
                                 <span
                                   key={type}
-                                  className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58"
+                                  className="rounded-full border border-white/8 bg-white/3 px-2.5 py-1 text-[11px] text-white/58"
                                 >
                                   {type}
                                 </span>
@@ -3129,7 +3129,7 @@ export function ProjectEditorFabricClient({
                             <p>下一步：{materialRecognition.suggestedNextStep}</p>
                           </div>
                           {materialRecognition.lastIncrementalDiff ? (
-                            <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
+                            <div className="rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3">
                               <p className="text-xs font-medium text-white">最近一次变化</p>
                               <p className="mt-1.5 text-xs leading-6 text-white/48">
                                 {materialRecognition.lastIncrementalDiff.summary}
@@ -3204,13 +3204,13 @@ export function ProjectEditorFabricClient({
                             </div>
                             <Badge
                               variant="outline"
-                              className="rounded-full border-white/[0.08] bg-white/[0.03] text-white/66"
+                              className="rounded-full border-white/8 bg-white/3 text-white/66"
                             >
                               {structureDraft.status === "confirmed" ? "已确认" : "草稿"}
                             </Badge>
                           </div>
 
-                          <div className="space-y-3 rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-3.5">
+                          <div className="space-y-3 rounded-[18px] border border-white/6 bg-white/2 p-3.5">
                             <div>
                               <label className="text-xs text-white/44">结构总述</label>
                               <Textarea
@@ -3221,7 +3221,7 @@ export function ProjectEditorFabricClient({
                                     summary: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
+                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
                               />
                             </div>
                             <div>
@@ -3234,7 +3234,7 @@ export function ProjectEditorFabricClient({
                                     narrativeArc: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                               />
                             </div>
                           </div>
@@ -3263,7 +3263,7 @@ export function ProjectEditorFabricClient({
                               variant="outline"
                               onClick={() => void confirmStructureDraft()}
                               disabled={structureSaveState === "saving"}
-                              className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                              className="h-10 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                             >
                               <Check className="mr-2 h-4 w-4" />
                               确认当前结构
@@ -3278,7 +3278,7 @@ export function ProjectEditorFabricClient({
                                 structureDraft.status !== "confirmed" ||
                                 structureDraft.groups.length === 0
                               }
-                              className="h-10 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06] disabled:bg-white/[0.02] disabled:text-white/34"
+                              className="h-10 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
                             >
                               {applyingStructure ? (
                                 <>
@@ -3311,7 +3311,7 @@ export function ProjectEditorFabricClient({
                               type="button"
                               variant="outline"
                               onClick={addStructureGroup}
-                              className="h-9 rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                              className="h-9 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                             >
                               <Plus className="mr-2 h-4 w-4" />
                               新增分组
@@ -3320,7 +3320,7 @@ export function ProjectEditorFabricClient({
                           {structureDraft.groups.map((group, index) => (
                             <div
                               key={group.id}
-                              className="rounded-[22px] border border-white/[0.08] bg-secondary p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                              className="rounded-[22px] border border-white/8 bg-secondary p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
@@ -3334,13 +3334,13 @@ export function ProjectEditorFabricClient({
                                         label: event.target.value,
                                       })
                                     }
-                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-sm font-semibold text-white"
+                                    className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-sm font-semibold text-white"
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge
                                     variant="outline"
-                                    className="rounded-full border-white/[0.08] bg-white/[0.03] text-white/66"
+                                    className="rounded-full border-white/8 bg-white/3 text-white/66"
                                   >
                                     {group.narrativeRole}
                                   </Badge>
@@ -3350,7 +3350,7 @@ export function ProjectEditorFabricClient({
                                     size="icon"
                                     onClick={() => mergeStructureGroupIntoPrevious(group.id)}
                                     disabled={index === 0}
-                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white disabled:text-white/20"
+                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white disabled:text-white/20"
                                   >
                                     <GripVertical className="h-4 w-4" />
                                   </Button>
@@ -3359,7 +3359,7 @@ export function ProjectEditorFabricClient({
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => deleteStructureGroup(group.id)}
-                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white"
+                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -3375,7 +3375,7 @@ export function ProjectEditorFabricClient({
                                         narrativeRole: event.target.value,
                                       })
                                     }
-                                    className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                    className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                   />
                                 </div>
                                 <div>
@@ -3387,7 +3387,7 @@ export function ProjectEditorFabricClient({
                                         rationale: event.target.value,
                                       })
                                     }
-                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
+                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
                                   />
                                 </div>
                               </div>
@@ -3396,7 +3396,7 @@ export function ProjectEditorFabricClient({
                                 {group.sections.map((section) => (
                                   <div
                                     key={section.id}
-                                    className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3.5 py-3"
+                                    className="rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0 flex-1">
@@ -3408,7 +3408,7 @@ export function ProjectEditorFabricClient({
                                               title: event.target.value,
                                             })
                                           }
-                                          className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                          className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                         />
                                       </div>
                                       <Button
@@ -3416,7 +3416,7 @@ export function ProjectEditorFabricClient({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => deleteStructureSection(group.id, section.id)}
-                                        className="mt-5 h-9 w-9 rounded-2xl text-white/56 hover:bg-white/[0.06] hover:text-white"
+                                        className="mt-5 h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
@@ -3430,7 +3430,7 @@ export function ProjectEditorFabricClient({
                                             purpose: event.target.value,
                                           })
                                         }
-                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
+                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                     <div className="mt-3">
@@ -3446,7 +3446,7 @@ export function ProjectEditorFabricClient({
                                           })
                                         }
                                         placeholder="每行一条建议内容点"
-                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
+                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                     <div className="mt-3">
@@ -3462,7 +3462,7 @@ export function ProjectEditorFabricClient({
                                           })
                                         }
                                         placeholder="用逗号分隔建议素材标题或类型"
-                                        className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                        className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                   </div>
@@ -3471,7 +3471,7 @@ export function ProjectEditorFabricClient({
                                   type="button"
                                   variant="outline"
                                   onClick={() => addStructureSection(group.id)}
-                                  className="h-9 w-full rounded-2xl border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                                  className="h-9 w-full rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                                 >
                                   <Plus className="mr-2 h-4 w-4" />
                                   在这一组里新增小节
@@ -3512,7 +3512,7 @@ export function ProjectEditorFabricClient({
                           />
                         ))}
                         {layerItems.length === 0 ? (
-                          <div className="rounded-[18px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 py-6 text-sm text-white/46">
+                          <div className="rounded-[18px] border border-dashed border-white/10 bg-white/2 px-4 py-6 text-sm text-white/46">
                             当前画板还没有图层。
                           </div>
                         ) : null}
@@ -3624,7 +3624,7 @@ export function ProjectEditorFabricClient({
             >
               <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => {
                     setLeftPanel("assets");
                     setShapeMenuOpen(false);
@@ -3634,7 +3634,7 @@ export function ProjectEditorFabricClient({
                   插入图片
                 </EditorChromeButton>
                 <EditorChromeButton
-                  className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={addTextObject}
                 >
                   <Type className="h-4 w-4" />
@@ -3642,7 +3642,7 @@ export function ProjectEditorFabricClient({
                 </EditorChromeButton>
                 <div className="relative">
                   <EditorChromeButton
-                    className="h-8 gap-1.5 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                    className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                     onClick={() => setShapeMenuOpen((prev) => !prev)}
                   >
                     <Square className="h-4 w-4" />
@@ -3680,28 +3680,28 @@ export function ProjectEditorFabricClient({
                   ) : null}
                 </div>
               </div>
-              <div className="h-5 w-px bg-white/[0.08]" />
+              <div className="h-5 w-px bg-white/8" />
               <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 border-white/[0.06] bg-white/[0.06] px-3 text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  className="h-8 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface()}
                 >
                   适应画板
                 </EditorChromeButton>
               </div>
-              <div className="h-5 w-px bg-white/[0.08]" />
+              <div className="h-5 w-px bg-white/8" />
               <div className="flex items-center gap-1 px-0.5">
                 <EditorChromeButton
-                  className="h-8 w-8 border-white/[0.06] bg-white/[0.06] text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface(clamp(surfaceScale - 0.1, 0.1, 4))}
                 >
                   <ZoomOut className="h-4 w-4" />
                 </EditorChromeButton>
-                <span className="inline-flex h-8 items-center rounded-full border border-white/[0.06] px-3 text-sm font-medium text-white/60">
+                <span className="inline-flex h-8 items-center rounded-full border border-white/6 px-3 text-sm font-medium text-white/60">
                   {Math.round(surfaceScale * 100)}%
                 </span>
                 <EditorChromeButton
-                  className="h-8 w-8 border-white/[0.06] bg-white/[0.06] text-white/78 shadow-none hover:bg-white/[0.1] hover:text-white"
+                  className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface(clamp(surfaceScale + 0.1, 0.1, 4))}
                 >
                   <ZoomIn className="h-4 w-4" />
@@ -3733,7 +3733,7 @@ export function ProjectEditorFabricClient({
 
           {!canvasReady ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center">
-              <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-white/62">
+              <div className="rounded-full border border-white/8 bg-white/4 px-4 py-2 text-sm text-white/62">
                 <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
                 正在初始化 Fabric 引擎…
               </div>
@@ -3747,7 +3747,7 @@ export function ProjectEditorFabricClient({
             >
               {contextMenuItems.map((item) =>
                 "type" in item && item.type === "sep" ? (
-                  <div key={item.id} className="my-1.5 h-px bg-white/[0.06]" />
+                  <div key={item.id} className="my-1.5 h-px bg-white/6" />
                 ) : (
                   <button
                     key={item.id}
@@ -3771,10 +3771,10 @@ export function ProjectEditorFabricClient({
             <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
               <div
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur",
+                  "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur-sm",
                   actionMessage.tone === "error"
                     ? "border-red-300/20 bg-red-400/10 text-red-100"
-                    : "border-white/[0.08] bg-card/88 text-white/82"
+                    : "border-white/8 bg-card/88 text-white/82"
                 )}
               >
                 {actionMessage.text}
@@ -3805,7 +3805,7 @@ export function ProjectEditorFabricClient({
                                         : "对象"}
                               </p>
                             </div>
-                            <span className="rounded-full border border-white/[0.08] bg-background px-2.5 py-1 text-[11px] text-white/52">
+                            <span className="rounded-full border border-white/8 bg-background px-2.5 py-1 text-[11px] text-white/52">
                               {activeMeta.kind === "multi" ? `${activeMeta.count} 项` : "单个"}
                             </span>
                           </div>
@@ -3822,7 +3822,7 @@ export function ProjectEditorFabricClient({
                                 <Textarea
                                   value={activeMeta.text}
                                   onChange={(event) => updateActiveObject({ text: event.target.value })}
-                                  className="min-h-[80px] rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                  className="min-h-[80px] rounded-2xl border-white/8 bg-secondary text-white"
                                 />
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
@@ -3831,10 +3831,10 @@ export function ProjectEditorFabricClient({
                                   value={activeMeta.fontFamily}
                                   onValueChange={(value) => updateActiveObject({ fontFamily: value })}
                                 >
-                                  <SelectTrigger className="h-10 rounded-xl border-white/[0.08] bg-secondary text-sm text-white focus:ring-white/20">
+                                  <SelectTrigger className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="border-white/[0.08] bg-card text-white">
+                                  <SelectContent className="border-white/8 bg-card text-white">
                                     <div className="px-2 pb-1 pt-2 text-[10px] font-medium tracking-[0.14em] text-white/36">
                                       正文字体
                                     </div>
@@ -3848,7 +3848,7 @@ export function ProjectEditorFabricClient({
                                         {font.label}
                                       </SelectItem>
                                     ))}
-                                    <div className="mx-2 my-1.5 h-px bg-white/[0.06]" />
+                                    <div className="mx-2 my-1.5 h-px bg-white/6" />
                                     <div className="px-2 pb-1 text-[10px] font-medium tracking-[0.14em] text-white/36">
                                       展示 / 艺术字体
                                     </div>
@@ -3902,7 +3902,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontSize: Number(event.target.value) || 16 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3913,7 +3913,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3945,7 +3945,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ lineHeight: Number(event.target.value) || 1.3 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3982,7 +3982,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3991,7 +3991,7 @@ export function ProjectEditorFabricClient({
                                       type="number"
                                       readOnly
                                       value={activeMeta.height}
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white/40"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white/40"
                                     />
                                   </div>
                                   <div>
@@ -4002,7 +4002,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4013,7 +4013,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4036,7 +4036,7 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="给这张图片一个更清晰的名称"
-                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                    className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                   />
                                   <label className="mt-3 block text-xs text-white/50">图片描述</label>
                                   <Textarea
@@ -4048,7 +4048,7 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
-                                    className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                    className="mt-2 min-h-[96px] rounded-2xl border-white/8 bg-secondary text-white"
                                   />
                                   <Button
                                     type="button"
@@ -4097,7 +4097,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4108,7 +4108,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4119,7 +4119,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4130,7 +4130,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4192,7 +4192,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   {(activeMeta.shape === "rect" || activeMeta.shape === "square") ? (
@@ -4207,7 +4207,7 @@ export function ProjectEditorFabricClient({
                                           const r = Number(event.target.value) || 0;
                                           updateActiveObject({ rx: r, ry: r } as unknown as Partial<FabricObject> & Partial<Textbox>);
                                         }}
-                                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                        className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                   ) : null}
@@ -4245,7 +4245,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4256,7 +4256,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4267,7 +4267,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4278,7 +4278,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4327,13 +4327,13 @@ export function ProjectEditorFabricClient({
                         <Input
                           value={activeBoard.name}
                           onChange={(event) => updateActiveBoard({ name: event.target.value })}
-                          className="h-10 rounded-xl border-white/[0.08] bg-secondary text-sm text-white"
+                          className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white"
                           placeholder="画板名称"
                         />
                         <Textarea
                           value={activeBoard.intent}
                           onChange={(event) => updateActiveBoard({ intent: event.target.value })}
-                          className="min-h-[72px] rounded-xl border-white/[0.08] bg-secondary text-sm text-white"
+                          className="min-h-[72px] rounded-xl border-white/8 bg-secondary text-sm text-white"
                           placeholder="画板意图（这张画板要讲什么）"
                         />
                       </div>
@@ -4371,7 +4371,7 @@ export function ProjectEditorFabricClient({
 
                       {/* AI 内容建议（来自结构建议的 purpose + recommendedContent） */}
                       {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
-                        <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                        <div className="rounded-xl border border-white/6 bg-white/2.5 p-3">
                           <p className="mb-2 text-[10px] tracking-[0.16em] text-white/30">AI 内容建议</p>
                           <ul className="space-y-1.5">
                             {activeBoard.contentSuggestions!.map((item, i) => (
@@ -4389,7 +4389,7 @@ export function ProjectEditorFabricClient({
                           type="button"
                           onClick={() => deleteBoard(activeBoard.id)}
                           disabled={scene.boards.length <= 1}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/[0.04] px-3 text-[12px] text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/[0.08] hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-[12px] text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           删除当前画板
@@ -4406,7 +4406,7 @@ export function ProjectEditorFabricClient({
         </div>
       }
       bottomStrip={setupMode ? undefined : (
-        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/[0.06] bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/6 bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
           <div className="shrink-0 px-2.5">
             <p className="text-sm font-medium text-white/44">
               {scene.boards.length} / {PROJECT_BOARD_MAX}
@@ -4450,7 +4450,7 @@ export function ProjectEditorFabricClient({
             type="button"
             onClick={createBoard}
             disabled={scene.boards.length >= PROJECT_BOARD_MAX}
-            className="flex h-full shrink-0 items-center justify-center self-stretch rounded-[16px] border border-dashed border-white/[0.1] bg-white/[0.02] px-4 text-white/36 transition-colors hover:border-white/[0.2] hover:bg-white/[0.05] hover:text-white/62 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-full shrink-0 items-center justify-center self-stretch rounded-[16px] border border-dashed border-white/10 bg-white/2 px-4 text-white/36 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white/62 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="新建画板"
           >
             <Plus className="h-4 w-4" />
@@ -4472,11 +4472,11 @@ export function ProjectEditorFabricClient({
           onClick={() => setDiagnosisDrawerOpen(false)}
         >
           <div
-            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/[0.06] bg-card shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
+            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/6 bg-card shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 头部 */}
-            <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
+            <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-white/90">项目诊断</p>
                 <p className="mt-0.5 text-[11px] text-white/36">
@@ -4486,7 +4486,7 @@ export function ProjectEditorFabricClient({
               <button
                 type="button"
                 onClick={() => setDiagnosisDrawerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/44 transition-colors hover:bg-white/[0.08] hover:text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/3 text-white/44 transition-colors hover:bg-white/8 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -4572,7 +4572,7 @@ export function ProjectEditorFabricClient({
                           className={cn(
                             "shrink-0 rounded-full border-white/10 px-3 py-1 text-white",
                             (layout?.pages?.length || completenessAnalysis?.canProceed) &&
-                              "border-white/[0.18] bg-white/[0.08] text-white"
+                              "border-white/18 bg-white/8 text-white"
                           )}
                         >
                           {layout?.pages?.length
@@ -4599,12 +4599,12 @@ export function ProjectEditorFabricClient({
             </div>
 
             {/* 底部操作 */}
-            <div className="border-t border-white/[0.05] px-4 py-3">
+            <div className="border-t border-white/5 px-4 py-3">
               <button
                 type="button"
                 onClick={() => void handleRunDiagnosis()}
                 disabled={diagnosing}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] text-sm text-white/72 transition-colors hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-50"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-white/8 bg-white/4 text-sm text-white/72 transition-colors hover:bg-white/8 hover:text-white disabled:pointer-events-none disabled:opacity-50"
               >
                 {diagnosing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -4619,7 +4619,7 @@ export function ProjectEditorFabricClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="max-w-2xl border-white/[0.08] bg-card text-white">
+        <DialogContent className="max-w-2xl border-white/8 bg-card text-white">
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription className="text-white/56">
@@ -4628,15 +4628,15 @@ export function ProjectEditorFabricClient({
           </DialogHeader>
 
           <div className="space-y-4 text-sm text-white/70">
-            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+            <Card className="border-white/8 bg-white/3 shadow-none">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                  <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
                     生成范围
                   </Badge>
                   <Button
                     variant="outline"
-                    className="h-9 rounded-full border-white/[0.08] bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                    className="h-9 rounded-full border-white/8 bg-white/4 text-white hover:bg-white/8"
                     onClick={() => void refreshGeneratePrecheck()}
                   >
                     重新检查
@@ -4661,8 +4661,8 @@ export function ProjectEditorFabricClient({
                       className={cn(
                         "rounded-2xl border px-3 py-3 text-left transition-colors",
                         scene.generationScope.mode === item.mode
-                          ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
+                          ? "border-white/16 bg-white/10 text-white"
+                          : "border-white/8 bg-background text-white/70 hover:bg-white/5"
                       )}
                       onClick={() => setGenerationMode(item.mode as GenerationScope["mode"])}
                     >
@@ -4674,14 +4674,14 @@ export function ProjectEditorFabricClient({
               </CardContent>
             </Card>
 
-            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+            <Card className="border-white/8 bg-white/3 shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                  <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
                     预检
                   </Badge>
                   {generatePrecheck?.suggestedMode === "reuse" ? (
-                    <Badge variant="outline" className="rounded-full border-white/[0.08] bg-white/[0.04] text-white">
+                    <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
                       可复用
                     </Badge>
                   ) : null}
@@ -4706,7 +4706,7 @@ export function ProjectEditorFabricClient({
               </CardContent>
             </Card>
 
-            <Card className="border-white/[0.08] bg-white/[0.03] shadow-none">
+            <Card className="border-white/8 bg-white/3 shadow-none">
               <CardContent className="p-4">
                 <div>
                   <p className="text-sm font-medium text-white">风格参考</p>
@@ -4714,7 +4714,7 @@ export function ProjectEditorFabricClient({
                     风格参考只影响标题层级、留白密度和包装样式，不改变当前画板结构。
                   </p>
                 </div>
-                <Separator className="my-4 bg-white/[0.06]" />
+                <Separator className="my-4 bg-white/6" />
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <button
@@ -4722,8 +4722,8 @@ export function ProjectEditorFabricClient({
                     className={cn(
                       "rounded-2xl border px-3 py-3 text-left transition-colors",
                       styleSelection.source === "none"
-                        ? "border-white/[0.16] bg-white/[0.1] text-white"
-                        : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
+                        ? "border-white/16 bg-white/10 text-white"
+                        : "border-white/8 bg-background text-white/70 hover:bg-white/5"
                     )}
                     onClick={() => setStyleSelection({ source: "none" })}
                   >
@@ -4737,8 +4737,8 @@ export function ProjectEditorFabricClient({
                       className={cn(
                         "rounded-2xl border px-3 py-3 text-left transition-colors",
                         styleSelection.source === "preset" && styleSelection.presetKey === preset.key
-                          ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
+                          ? "border-white/16 bg-white/10 text-white"
+                          : "border-white/8 bg-background text-white/70 hover:bg-white/5"
                       )}
                       onClick={() => setStyleSelection({ source: "preset", presetKey: preset.key })}
                     >
@@ -4753,8 +4753,8 @@ export function ProjectEditorFabricClient({
                       className={cn(
                         "rounded-2xl border px-3 py-3 text-left transition-colors md:col-span-2",
                         styleSelection.source === "reference_set" && styleSelection.referenceSetId === set.id
-                          ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
+                          ? "border-white/16 bg-white/10 text-white"
+                          : "border-white/8 bg-background text-white/70 hover:bg-white/5"
                       )}
                       onClick={() =>
                         setStyleSelection({
@@ -4778,7 +4778,7 @@ export function ProjectEditorFabricClient({
           <DialogFooter className="gap-2 sm:space-x-0">
             <Button
               variant="outline"
-              className="rounded-full border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.08]"
+              className="rounded-full border-white/8 bg-white/3 text-white hover:bg-white/8"
               onClick={() => setGenerateOpen(false)}
             >
               取消
@@ -4841,8 +4841,8 @@ function SortableBoardRow({
       className={cn(
         "group relative flex items-center gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
         active
-          ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
-          : "border-white/[0.08] bg-white/[0.03] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/84",
+          ? "border-white/16 bg-white/8 text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
+          : "border-white/8 bg-white/3 text-white/72 hover:border-white/12 hover:bg-white/5 hover:text-white/84",
         isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
       )}
     >
@@ -4868,8 +4868,8 @@ function SortableBoardRow({
           className={cn(
             "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
-              ? "border-white/[0.16] shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
-              : "border-white/[0.08] group-hover:border-white/[0.12]"
+              ? "border-white/16 shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
+              : "border-white/8 group-hover:border-white/12"
           )}
         >
           {resolvedThumb ? (
@@ -4900,7 +4900,7 @@ function SortableBoardRow({
             event.stopPropagation();
             onDelete();
           }}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 opacity-0 transition-all duration-150 hover:bg-white/[0.08] hover:text-red-300 group-hover:opacity-100"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 opacity-0 transition-all duration-150 hover:bg-white/8 hover:text-red-300 group-hover:opacity-100"
           aria-label="删除画板"
         >
           <Trash2 className="h-4 w-4" />
@@ -4956,7 +4956,7 @@ function SortableFilmstripCard({
         active={active}
         className={cn(
           "relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
-          active && "translate-y-[-1px] shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]"
+          active && "-translate-y-px shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]"
         )}
         onClick={onSelect}
       >
@@ -4964,8 +4964,8 @@ function SortableFilmstripCard({
           className={cn(
             "overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
-              ? "border-white/[0.18] shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
-              : "border-white/[0.08] group-hover:border-white/[0.12]"
+              ? "border-white/18 shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
+              : "border-white/8 group-hover:border-white/12"
           )}
         >
           {resolvedThumb ? (
@@ -4994,7 +4994,7 @@ function SortableFilmstripCard({
             event.stopPropagation();
             onDelete();
           }}
-          className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.12] bg-background/95 text-white/60 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
+          className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/12 bg-background/95 text-white/60 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
           aria-label="删除画板"
         >
           <X className="h-3 w-3" />
@@ -5029,8 +5029,8 @@ function SortableLayerRow({
       className={cn(
         "group flex items-center gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
         selected
-          ? "border-white/40 bg-white/[0.09] text-white shadow-[0_16px_30px_-22px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.06]"
-          : "border-white/[0.08] bg-white/[0.02] text-white/72 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/82",
+          ? "border-white/40 bg-white/9 text-white shadow-[0_16px_30px_-22px_rgba(0,0,0,0.8)] ring-1 ring-white/6"
+          : "border-white/8 bg-white/2 text-white/72 hover:border-white/12 hover:bg-white/5 hover:text-white/82",
         isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
       )}
       role="listitem"
@@ -5040,8 +5040,8 @@ function SortableLayerRow({
         className={cn(
           "flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
           selected
-            ? "border-white/[0.12] bg-white/[0.09] text-white"
-            : "border-white/[0.06] bg-white/[0.04] text-white/60 hover:bg-white/[0.08] hover:text-white"
+            ? "border-white/12 bg-white/9 text-white"
+            : "border-white/6 bg-white/4 text-white/60 hover:bg-white/8 hover:text-white"
         )}
         {...attributes}
         {...listeners}
@@ -5066,8 +5066,8 @@ function SortableLayerRow({
           className={cn(
             "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-background text-[10px] font-semibold transition-all",
             selected
-              ? "border-white/[0.18] text-white shadow-[0_10px_16px_-14px_rgba(255,255,255,0.18)]"
-              : "border-white/[0.08] text-white/70 group-hover:border-white/[0.12]"
+              ? "border-white/18 text-white shadow-[0_10px_16px_-14px_rgba(255,255,255,0.18)]"
+              : "border-white/8 text-white/70 group-hover:border-white/12"
           )}
         >
           {item.type === "image" && item.previewUrl ? (
@@ -5097,8 +5097,8 @@ function SortableLayerRow({
         className={cn(
           "inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors",
           selected
-            ? "border-white/[0.12] bg-white/[0.08] text-white"
-            : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:text-white"
+            ? "border-white/12 bg-white/8 text-white"
+            : "border-white/8 bg-white/3 text-white/60 hover:bg-white/8 hover:text-white"
         )}
         aria-label="更多操作"
       >

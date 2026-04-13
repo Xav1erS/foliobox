@@ -10,7 +10,7 @@ export function FocusShell({
 }) {
   return (
     <div className={cn("min-h-screen bg-neutral-950 text-white", className)}>
-      <header className="border-b border-white/10 bg-black/30 backdrop-blur">
+      <header className="border-b border-white/10 bg-black/30 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-5xl items-center px-6">
           <Link href="/" className="text-sm font-semibold tracking-tight text-white">
             集盒 FolioBox

@@ -73,7 +73,7 @@ export function Navbar({
   })();
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-black/85 backdrop-blur-md">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/6 bg-black/85 backdrop-blur-md">
       <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-5 sm:h-14 sm:px-6">
         {/* Logo */}
         <Link
@@ -123,7 +123,7 @@ export function Navbar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 rounded-xl border border-white/10 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white md:hidden"
+                className="h-12 w-12 rounded-xl border border-white/10 bg-white/4 text-white hover:bg-white/10 hover:text-white md:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>

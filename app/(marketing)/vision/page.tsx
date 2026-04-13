@@ -120,7 +120,7 @@ export default async function VisionPage() {
               </div>
             </div>
 
-            <div className="border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+            <div className="border border-white/10 bg-white/2 p-4 sm:p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
                 结构草图
               </p>
@@ -228,7 +228,7 @@ export default async function VisionPage() {
       {/* ─────────────────────────────────────────
           Section 4: 开发者动机
       ───────────────────────────────────────── */}
-      <section className="border-t border-white/10 bg-white/[0.015] px-5 py-14 sm:px-6 sm:py-20">
+      <section className="border-t border-white/10 bg-white/1.5 px-5 py-14 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
 

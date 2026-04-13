@@ -10,7 +10,7 @@ export function AuthFocusAside({
   footnote: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+    <div className="rounded-2xl border border-white/10 bg-white/2 p-6">
       <p className="text-xs uppercase tracking-[0.18em] text-white/35">{eyebrow}</p>
       <h2 className="mt-3 text-xl font-semibold text-white">{title}</h2>
       <ul className="mt-5 space-y-3 text-sm leading-6 text-white/55">

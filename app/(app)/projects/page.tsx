@@ -80,7 +80,7 @@ export default async function ProjectsPage({
           />
         ) : (
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-sm">
+            <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">

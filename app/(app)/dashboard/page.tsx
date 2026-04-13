@@ -242,7 +242,7 @@ export default async function DashboardPage({
       <Separator className="-mx-6 w-auto" />
 
       {fromScore ? (
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -318,7 +318,7 @@ export default async function DashboardPage({
 
       {!hasObjects ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <Card className="border-border/70 bg-card/95 shadow-sm">
+          <Card className="border-border/70 bg-card/95 shadow-xs">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -374,7 +374,7 @@ export default async function DashboardPage({
             </CardContent>
           </Card>
 
-          <Card className="hidden border-border/70 bg-card/95 shadow-sm lg:flex lg:flex-col lg:justify-center">
+          <Card className="hidden border-border/70 bg-card/95 shadow-xs lg:flex lg:flex-col lg:justify-center">
             <CardContent className="flex h-full flex-col items-center justify-center gap-5 p-10 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -394,7 +394,7 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,1fr)]">
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-sm">
+            <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -516,7 +516,7 @@ export default async function DashboardPage({
           </div>
 
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-sm">
+            <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -558,7 +558,7 @@ export default async function DashboardPage({
               </CardContent>
             </Card>
 
-            <Card className="border-border/70 bg-card/95 shadow-sm">
+            <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -608,7 +608,7 @@ export default async function DashboardPage({
             </Card>
 
             {latestScore && latestScoreTotal !== null ? (
-              <Card className="border-border/70 bg-card/95 shadow-sm">
+              <Card className="border-border/70 bg-card/95 shadow-xs">
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">

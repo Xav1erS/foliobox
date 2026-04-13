@@ -277,7 +277,7 @@ export default async function ScoreResultPage({
       />
 
       <div className="mt-10 space-y-6">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+        <section className="rounded-3xl border border-white/10 bg-white/3 p-8">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-white/35">结果结论</p>
@@ -341,7 +341,7 @@ export default async function ScoreResultPage({
                   ? "你现在看到的是完整评分结果，重点不是继续读报告，而是带着这次判断进入下一步整理。"
                   : "你现在看到的是简版结果，用来先判断这份作品集现在能不能投，以及最该先改什么。"}
               </p>
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/3 p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">当前开放内容</p>
                 <p className="mt-3 text-sm leading-6 text-white/55">
                   {canViewFull
@@ -355,7 +355,7 @@ export default async function ScoreResultPage({
 
         <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-6">
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <section className="rounded-3xl border border-white/10 bg-white/3 p-6">
               <div className="flex items-center justify-between gap-4">
                 <h2 className="text-sm font-semibold text-white/80">判断依据</h2>
                 {!canViewFull ? (
@@ -411,7 +411,7 @@ export default async function ScoreResultPage({
               ) : null}
             </section>
 
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <section className="rounded-3xl border border-white/10 bg-white/3 p-6">
               <h2 className="text-sm font-semibold text-white/80">
                 {canViewFull ? "问题摘要" : "核心问题摘要"}
               </h2>
@@ -427,16 +427,16 @@ export default async function ScoreResultPage({
           </div>
 
           <div className="space-y-6">
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <section className="rounded-3xl border border-white/10 bg-white/3 p-6">
             <h2 className="text-sm font-semibold text-white/80">本次评分覆盖范围</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">扫描总量</p>
                 <p className="mt-2 text-lg font-semibold text-white">
                   {coverage.totalUnits} {coverageUnitLabel(coverage.inputType)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">覆盖状态</p>
                 <p className="mt-2 text-lg font-semibold text-white">
                   {coverage.isFullCoverage
@@ -446,13 +446,13 @@ export default async function ScoreResultPage({
                     : "当前为有限覆盖"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">识别项目数</p>
                 <p className="mt-2 text-lg font-semibold text-white">
                   {coverage.detectedProjects || 0}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">视觉锚点</p>
                 <p className="mt-2 text-lg font-semibold text-white">
                   {coverage.visualAnchorUnits.length > 0
@@ -519,7 +519,7 @@ export default async function ScoreResultPage({
             ) : null}
             </section>
 
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <section className="rounded-3xl border border-white/10 bg-white/3 p-6">
               <h2 className="text-sm font-semibold text-white/80">判断状态</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-4">
@@ -530,7 +530,7 @@ export default async function ScoreResultPage({
                   <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300/70">判断有限</p>
                   <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.limited}</p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-2xl border border-white/10 bg-white/3 p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">证据不足</p>
                   <p className="mt-2 text-lg font-semibold text-white">{judgementCounts.insufficient}</p>
                 </div>
@@ -548,7 +548,7 @@ export default async function ScoreResultPage({
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+          <section className="rounded-3xl border border-white/10 bg-white/3 p-6">
             <p className="text-xs uppercase tracking-[0.18em] text-white/35">下一步动作</p>
             <h2 className="mt-4 text-2xl font-semibold text-white">{nextStepTitle}</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{nextStepDescription}</p>
@@ -588,7 +588,7 @@ export default async function ScoreResultPage({
                       : "免费版先帮助你快速判断这份作品集当前能不能投，以及最该优先修改的少数问题。完整 8 维分析、完整问题摘要和改进建议需要解锁后查看。"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold text-white/80">解锁后立刻获得什么</h3>
                     <span className="rounded-full border border-amber-500/15 bg-amber-500/5 px-2.5 py-1 text-[11px] text-amber-200/80">

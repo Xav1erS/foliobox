@@ -6,7 +6,7 @@ import {
 } from "./model-routing";
 
 describe("getModelTierForTask", () => {
-  it("routes outline generation to primary tier", () => {
+  it("routes outline-solid generation to primary tier", () => {
     expect(getModelTierForTask("outline_generation")).toBe("primary");
   });
 

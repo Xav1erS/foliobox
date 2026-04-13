@@ -3,16 +3,16 @@ import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 function UploadMock() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <div className="flex h-12 w-12 items-center justify-center border border-white/10 bg-white/[0.04]">
+      <div className="flex h-12 w-12 items-center justify-center border border-white/10 bg-white/4">
         <div className="flex flex-col items-center gap-1">
           <div className="h-3 w-px bg-white/30" />
           <div className="h-px w-3 bg-white/30" />
         </div>
       </div>
-      <div className="h-2 w-20 bg-white/[0.08]" />
-      <div className="h-1.5 w-14 bg-white/[0.06]" />
+      <div className="h-2 w-20 bg-white/8" />
+      <div className="h-1.5 w-14 bg-white/6" />
       <div className="mt-1 flex gap-1.5">
-        <div className="h-5 w-14 border border-white/[0.06] bg-white/[0.08]" />
+        <div className="h-5 w-14 border border-white/6 bg-white/8" />
         <div className="h-5 w-12 border border-white/10 bg-white/10" />
       </div>
     </div>
@@ -29,9 +29,9 @@ function FormMock() {
         { label: 24, value: 70 },
       ].map((f, i) => (
         <div key={i}>
-          <div className="mb-1 h-1.5 bg-white/[0.06]" style={{ width: f.label }} />
-          <div className="flex h-6 w-full items-center border border-white/[0.08] bg-white/[0.03] px-2">
-            <div className="h-1.5 bg-white/[0.08]" style={{ width: `${f.value}%` }} />
+          <div className="mb-1 h-1.5 bg-white/6" style={{ width: f.label }} />
+          <div className="flex h-6 w-full items-center border border-white/8 bg-white/3 px-2">
+            <div className="h-1.5 bg-white/8" style={{ width: `${f.value}%` }} />
           </div>
         </div>
       ))}
@@ -64,17 +64,17 @@ function OutlineMock() {
 function GenerateMock() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-4">
-      <div className="relative flex h-14 w-14 items-center justify-center border border-white/10 bg-white/[0.04]">
+      <div className="relative flex h-14 w-14 items-center justify-center border border-white/10 bg-white/4">
         <div className="h-3 w-3 bg-white/30" />
-        <div className="absolute inset-0 border border-white/[0.06]" style={{ transform: "scale(1.3)" }} />
-        <div className="absolute inset-0 border border-white/[0.04]" style={{ transform: "scale(1.6)" }} />
+        <div className="absolute inset-0 border border-white/6" style={{ transform: "scale(1.3)" }} />
+        <div className="absolute inset-0 border border-white/4" style={{ transform: "scale(1.6)" }} />
       </div>
       <div className="w-full space-y-2">
-        <div className="h-2 w-full overflow-hidden bg-white/[0.06]">
+        <div className="h-2 w-full overflow-hidden bg-white/6">
           <div className="h-full w-3/4 bg-emerald-500/40" />
         </div>
         <div className="flex justify-between">
-          <div className="h-1.5 w-12 bg-white/[0.06]" />
+          <div className="h-1.5 w-12 bg-white/6" />
           <div className="h-1.5 w-8 bg-white/10" />
         </div>
       </div>
@@ -85,7 +85,7 @@ function GenerateMock() {
 function ExportMock() {
   return (
     <div className="flex h-full flex-col gap-2 p-4">
-      <div className="flex-1 border border-white/[0.08] bg-white/[0.02] p-2">
+      <div className="flex-1 border border-white/8 bg-white/2 p-2">
         <div className="mb-1.5 h-2 w-2/3 bg-white/10" />
         <div className="space-y-1">
           <div className="h-1.5 w-full bg-white/[0.07]" />
@@ -94,11 +94,11 @@ function ExportMock() {
         </div>
       </div>
       <div className="flex gap-1.5">
-        <div className="flex flex-1 items-center justify-center gap-1 border border-white/10 bg-white/[0.04] py-2">
+        <div className="flex flex-1 items-center justify-center gap-1 border border-white/10 bg-white/4 py-2">
           <div className="h-1.5 w-8 bg-white/15" />
         </div>
-        <div className="flex flex-1 items-center justify-center gap-1 border border-white/[0.06] bg-white/[0.02] py-2">
-          <div className="h-1.5 w-8 bg-white/[0.08]" />
+        <div className="flex flex-1 items-center justify-center gap-1 border border-white/6 bg-white/2 py-2">
+          <div className="h-1.5 w-8 bg-white/8" />
         </div>
       </div>
     </div>
@@ -192,7 +192,7 @@ export function HowItWorks() {
                 </div>
 
                 {/* Thumbnail mock */}
-                <div className="overflow-hidden border border-white/[0.07] bg-white/[0.02]" style={{ height: 120 }}>
+                <div className="overflow-hidden border border-white/[0.07] bg-white/2" style={{ height: 120 }}>
                   <item.Mock />
                 </div>
               </div>

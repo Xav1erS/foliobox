@@ -40,7 +40,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       {/* Above-fold content */}
       <div className="relative flex min-h-[calc(100vh-72px)] flex-col items-center justify-start px-5 pb-12 pt-[72px] text-center sm:min-h-[calc(100vh-56px)] sm:px-6 sm:pt-20 md:justify-center md:pt-0">
         {/* Badge */}
-        <div className="mb-7 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/[0.06] px-4 py-2 text-xs text-white/70 sm:mb-8 sm:px-4 sm:py-1.5 sm:text-xs">
+        <div className="mb-7 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/6 px-4 py-2 text-xs text-white/70 sm:mb-8 sm:px-4 sm:py-1.5 sm:text-xs">
           <span className="h-1.5 w-1.5 bg-emerald-400" />
           <span className="whitespace-nowrap">集盒FolioBox · 从作品集整理开始</span>
         </div>
@@ -131,13 +131,13 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             }}
           >
             {/* Browser chrome */}
-            <div className="flex items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <div className="flex items-center gap-3 border-b border-white/6 bg-white/2 px-4 py-3">
               <div className="flex gap-1.5">
                 <div className="h-3 w-3 bg-white/10" />
                 <div className="h-3 w-3 bg-white/10" />
                 <div className="h-3 w-3 bg-white/10" />
               </div>
-              <div className="bg-white/[0.05] px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
+              <div className="bg-white/5 px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
                 foliobox.art/portfolio/preview
               </div>
             </div>
@@ -145,7 +145,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             {/* Portfolio content */}
             <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr]" style={{ minHeight: 400 }}>
               {/* Left sidebar: project list */}
-              <div className="border-b border-white/[0.06] bg-white/[0.015] p-5 sm:border-b-0 sm:border-r">
+              <div className="border-b border-white/6 bg-white/1.5 p-5 sm:border-b-0 sm:border-r">
                 <p className="mb-4 text-[10px] uppercase tracking-widest text-white/25">我的项目</p>
                 <div className="space-y-1">
                   {[
@@ -157,7 +157,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                       key={item.label}
                       className={`flex items-center gap-2.5 px-3 py-2.5 ${
                         item.active
-                          ? "bg-white/[0.08] border border-white/10"
+                          ? "bg-white/8 border border-white/10"
                           : "border border-transparent"
                       }`}
                     >
@@ -169,13 +169,13 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                   ))}
                 </div>
 
-                <div className="mt-6 border-t border-white/[0.06] pt-5">
+                <div className="mt-6 border-t border-white/6 pt-5">
                   <p className="mb-3 text-[10px] uppercase tracking-widest text-white/20">导出</p>
                   <div className="space-y-2">
-                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/[0.08] text-[11px] text-white/50">
+                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/8 text-[11px] text-white/50">
                       分享链接
                     </div>
-                    <div className="flex h-7 items-center justify-center border border-white/[0.06] text-[11px] text-white/30">
+                    <div className="flex h-7 items-center justify-center border border-white/6 text-[11px] text-white/30">
                       导出 PDF
                     </div>
                   </div>
@@ -185,17 +185,17 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               {/* Right: portfolio page content */}
               <div className="p-6 sm:p-8">
                 {/* Project header */}
-                <div className="mb-6 border-b border-white/[0.06] pb-6">
+                <div className="mb-6 border-b border-white/6 pb-6">
                   <div className="mb-3 flex items-center gap-2">
                     <span className="border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-400">
                       B 端 · 数据可视化
                     </span>
-                    <span className="border border-white/[0.08] px-2.5 py-0.5 text-[11px] text-white/35">
+                    <span className="border border-white/8 px-2.5 py-0.5 text-[11px] text-white/35">
                       UX 设计师
                     </span>
                   </div>
                   <div className="mb-2 h-6 w-3/5 bg-white/15" />
-                  <div className="h-2 w-2/5 bg-white/[0.08]" />
+                  <div className="h-2 w-2/5 bg-white/8" />
                 </div>
 
                 {/* Content sections */}
@@ -214,7 +214,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                         {block.lines.map((w, i) => (
                           <div
                             key={i}
-                            className="h-1.5 bg-white/[0.08]"
+                            className="h-1.5 bg-white/8"
                             style={{ width: `${w}%` }}
                           />
                         ))}
@@ -226,12 +226,12 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             </div>
 
             {/* Bottom fade */}
-            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-linear-to-t from-black/70 to-transparent" />
           </div>
 
           {/* Score overlay card — bottom right */}
           <div
-            className="absolute bottom-6 right-4 sm:right-8 overflow-hidden border border-white/10 bg-neutral-950/95 backdrop-blur-sm"
+            className="absolute bottom-6 right-4 sm:right-8 overflow-hidden border border-white/10 bg-neutral-950/95 backdrop-blur-xs"
             style={{
               width: 200,
               boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
@@ -259,7 +259,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                       <span className="text-[10px] text-white/35">{d.label}</span>
                       <span className="font-mono text-[10px] text-white/25">{d.score}</span>
                     </div>
-                    <div className="h-1 w-full overflow-hidden bg-white/[0.08]">
+                    <div className="h-1 w-full overflow-hidden bg-white/8">
                       <div
                         className="h-full bg-red-500/50"
                         style={{ width: `${d.score}%` }}
@@ -272,7 +272,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           </div>
 
           {/* Glow under mock */}
-          <div className="pointer-events-none absolute -bottom-12 left-1/2 h-28 w-3/4 -translate-x-1/2 bg-white/[0.04] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 left-1/2 h-28 w-3/4 -translate-x-1/2 bg-white/4 blur-3xl" />
         </div>
       </div>
     </section>

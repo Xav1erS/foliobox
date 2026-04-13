@@ -64,7 +64,7 @@ export function ScoreFeature() {
           {/* Right: score result mock */}
           <div className="overflow-hidden border border-white/10 bg-neutral-950">
             {/* Mock header */}
-            <div className="flex items-center gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <div className="flex items-center gap-2 border-b border-white/6 bg-white/2 px-4 py-3">
               <div className="flex gap-1.5">
                 <div className="h-2.5 w-2.5 bg-white/10" />
                 <div className="h-2.5 w-2.5 bg-white/10" />
@@ -102,7 +102,7 @@ export function ScoreFeature() {
                       </div>
                       <span className="font-mono text-xs text-white/50">{d.score}</span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden bg-white/[0.08]">
+                    <div className="h-1.5 w-full overflow-hidden bg-white/8">
                       <div
                         className={`h-full ${
                           d.score >= 85
@@ -121,7 +121,7 @@ export function ScoreFeature() {
               </div>
 
               {/* Summary issues */}
-              <div className="mt-6 border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="mt-6 border border-white/6 bg-white/2 p-4">
                 <p className="mb-3 text-xs font-medium text-white/50">主要问题</p>
                 <div className="space-y-2">
                   {["角色表达不够清晰", "缺少量化结果数据", "项目选择需要精简"].map((p) => (

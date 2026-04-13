@@ -20,7 +20,7 @@ export function PortfolioPublishedDocument({
   return (
     <main
       className={`mx-auto max-w-6xl px-4 py-10 sm:px-6 ${
-        printMode ? "bg-white" : "bg-[var(--folio-bg)]"
+        printMode ? "bg-white" : "bg-(--folio-bg)"
       }`}
       style={cssVariables}
     >
@@ -48,7 +48,7 @@ export function PortfolioPublishedDocument({
           {content.pages.map((page, index) => (
             <article
               key={page.id}
-              className="border bg-[var(--folio-surface)] px-5 py-5 sm:px-6"
+              className="border bg-(--folio-surface) px-5 py-5 sm:px-6"
               style={{ borderColor: "var(--folio-border)" }}
             >
               <p
@@ -80,7 +80,7 @@ export function PortfolioPublishedDocument({
         </div>
 
         <aside
-          className="self-start border bg-[var(--folio-surface)] px-5 py-5 sm:px-6"
+          className="self-start border bg-(--folio-surface) px-5 py-5 sm:px-6"
           style={{ borderColor: "var(--folio-border)" }}
         >
           <p

@@ -149,7 +149,7 @@ function EditorPanelCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("border-white/10 bg-white/[0.03] text-white shadow-none", className)}>
+    <Card className={cn("border-white/10 bg-white/3 text-white shadow-none", className)}>
       <CardContent className="p-4">{children}</CardContent>
     </Card>
   );
@@ -620,7 +620,7 @@ export function PortfolioEditorClient({
                         "",
                         item.done
                           ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
-                          : "border-white/10 bg-white/[0.03] text-white/72"
+                          : "border-white/10 bg-white/3 text-white/72"
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -665,7 +665,7 @@ export function PortfolioEditorClient({
                 <div className="space-y-2">
                   {selectedProjects.length > 0 ? (
                     selectedProjects.map((project) => (
-                      <EditorPanelCard key={project.id} className="bg-white/[0.02]">
+                      <EditorPanelCard key={project.id} className="bg-white/2">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-white">{project.name}</p>
@@ -765,7 +765,7 @@ export function PortfolioEditorClient({
                 {aiHistory.length > 0 ? (
                   <div className="space-y-2">
                     {aiHistory.map((item) => (
-                      <EditorPanelCard key={item.key} className="bg-white/[0.02]">
+                      <EditorPanelCard key={item.key} className="bg-white/2">
                         <p className="text-sm font-medium text-white">{item.label}</p>
                         <p className="mt-1 text-xs leading-5 text-white/46">{item.summary}</p>
                       </EditorPanelCard>
@@ -816,7 +816,7 @@ export function PortfolioEditorClient({
                 </div>
 
                 {pages.length === 0 ? (
-                  <div className="flex w-[720px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-10 py-20 text-center">
+                  <div className="flex w-[720px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/3 px-10 py-20 text-center">
                     <div className="max-w-xl">
                       <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
                         Empty Canvas
@@ -1003,7 +1003,7 @@ export function PortfolioEditorClient({
                       <p className="mt-2 text-sm leading-6 text-white/56">{diagnosis.summary}</p>
                     </EditorPanelCard>
                     {diagnosis.suggestions.map((suggestion) => (
-                      <EditorPanelCard key={suggestion} className="bg-white/[0.02]">
+                      <EditorPanelCard key={suggestion} className="bg-white/2">
                         <p className="text-sm leading-6 text-white/56">{suggestion}</p>
                       </EditorPanelCard>
                     ))}
@@ -1019,7 +1019,7 @@ export function PortfolioEditorClient({
                 {aiHistory.length > 0 ? (
                   <div className="space-y-2">
                     {aiHistory.map((item) => (
-                      <EditorPanelCard key={item.key} className="bg-white/[0.02]">
+                      <EditorPanelCard key={item.key} className="bg-white/2">
                         <p className="text-sm font-medium text-white">{item.label}</p>
                         <p className="mt-1 text-sm leading-6 text-white/56">{item.summary}</p>
                       </EditorPanelCard>
@@ -1037,7 +1037,7 @@ export function PortfolioEditorClient({
                 <div className="mt-4 space-y-2">
                   <Link
                     href={`/portfolios/${initialData.id}/publish`}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white"
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/5 hover:text-white"
                   >
                     打开发布与导出页
                     <ArrowRight className="h-3.5 w-3.5 text-white/34" />

@@ -116,7 +116,7 @@ export function LoginClient() {
       />
 
       <div className="mt-10 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="min-h-[440px] rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+        <div className="min-h-[440px] rounded-2xl border border-white/10 bg-white/3 p-6 sm:p-8">
           {checkingSession ? (
             <div className="space-y-4">
               <div className="h-4 w-24 rounded bg-white/10" />

@@ -97,7 +97,7 @@ function StepBadge({ status }: { status: "done" | "warn" | "pending" | "loading"
       </span>
     );
   return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.04]">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/4">
       <span className="text-[10px] font-semibold text-white/25">·</span>
     </span>
   );
@@ -126,12 +126,12 @@ function StepCard({
       className={cn(
         "rounded-2xl border p-4 transition-colors",
         status === "done"
-          ? "border-white/[0.06] bg-white/[0.03]"
+          ? "border-white/6 bg-white/3"
           : status === "warn"
-            ? "border-amber-500/20 bg-amber-500/[0.04]"
+            ? "border-amber-500/20 bg-amber-500/4"
             : status === "loading"
-              ? "border-white/10 bg-white/[0.05]"
-              : "border-white/[0.06] bg-white/[0.03]",
+              ? "border-white/10 bg-white/5"
+              : "border-white/6 bg-white/3",
       )}
     >
       <div className="flex items-start gap-3">
@@ -249,8 +249,8 @@ export function ProjectSetupWizard({
     <div className="relative flex h-full w-full flex-col overflow-y-auto">
       {/* ── 覆盖层：重新分析确认 ─────────────────────────── */}
       {reanalysisConfirmOpen ? (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#1e1b18] p-6 shadow-2xl">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#1e1b18] p-6 shadow-2xl">
             <div className="mb-1 flex items-center gap-2 text-amber-400">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">重新分析会覆盖当前结构</span>
@@ -263,7 +263,7 @@ export function ProjectSetupWizard({
               <button
                 type="button"
                 onClick={() => setReanalysisConfirmOpen(false)}
-                className="flex-1 rounded-xl border border-white/[0.1] py-2 text-sm text-white/60 hover:bg-white/[0.05]"
+                className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-white/60 hover:bg-white/5"
               >
                 取消
               </button>
@@ -281,8 +281,8 @@ export function ProjectSetupWizard({
 
       {/* ── 覆盖层：确认结构覆盖画板 (Fix 3) ─────────────── */}
       {boardsDestroyConfirmOpen ? (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#1e1b18] p-6 shadow-2xl">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#1e1b18] p-6 shadow-2xl">
             <div className="mb-1 flex items-center gap-2 text-red-400">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">当前画板内容将被替换</span>
@@ -295,7 +295,7 @@ export function ProjectSetupWizard({
               <button
                 type="button"
                 onClick={() => setBoardsDestroyConfirmOpen(false)}
-                className="flex-1 rounded-xl border border-white/[0.1] py-2 text-sm text-white/60 hover:bg-white/[0.05]"
+                className="flex-1 rounded-xl border border-white/10 py-2 text-sm text-white/60 hover:bg-white/5"
               >
                 取消
               </button>
@@ -395,7 +395,7 @@ export function ProjectSetupWizard({
                           className="h-12 w-16 rounded-lg object-cover"
                         />
                         {!hasNote && (
-                          <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 shadow">
+                          <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 shadow-sm">
                             <span className="text-[8px] font-bold text-white">!</span>
                           </div>
                         )}
@@ -403,13 +403,13 @@ export function ProjectSetupWizard({
                     );
                   })}
                   {assets.length > 8 && (
-                    <div className="flex h-12 w-16 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-xs text-white/30">
+                    <div className="flex h-12 w-16 items-center justify-center rounded-lg border border-white/8 bg-white/4 text-xs text-white/30">
                       +{assets.length - 8}
                     </div>
                   )}
                 </div>
                 {withoutNote > 0 && (
-                  <div className="flex items-start gap-1.5 rounded-xl bg-amber-500/[0.08] px-3 py-2">
+                  <div className="flex items-start gap-1.5 rounded-xl bg-amber-500/8 px-3 py-2">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/70" />
                     <p className="text-[12px] leading-relaxed text-amber-300/70">
                       有 {withoutNote} 张图还没有描述——写的越多，AI 分析越准确，哪怕一句话也有帮助
@@ -462,7 +462,7 @@ export function ProjectSetupWizard({
                   {materialRecognition.summary}
                 </p>
                 {materialRecognition.missingInfo.length > 0 && (
-                  <div className="rounded-xl bg-amber-500/[0.06] px-3 py-2">
+                  <div className="rounded-xl bg-amber-500/6 px-3 py-2">
                     <p className="mb-1 text-[11px] text-amber-400/60">AI 希望了解更多</p>
                     <ul className="space-y-0.5">
                       {materialRecognition.missingInfo.slice(0, 3).map((item, i) => (
@@ -541,7 +541,7 @@ export function ProjectSetupWizard({
                   {structureDraft!.groups.map((group) => (
                     <div
                       key={group.id}
-                      className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2"
+                      className="rounded-xl border border-white/6 bg-white/3 px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[12px] font-medium text-white/70">
@@ -555,7 +555,7 @@ export function ProjectSetupWizard({
                         {group.sections.map((section) => (
                           <span
                             key={section.id}
-                            className="rounded-md bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/40"
+                            className="rounded-md bg-white/6 px-2 py-0.5 text-[11px] text-white/40"
                           >
                             {section.title}
                           </span>
@@ -580,7 +580,7 @@ export function ProjectSetupWizard({
 
         {/* 错误提示 */}
         {actionError ? (
-          <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3">
+          <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/6 px-4 py-3">
             <p className="text-[13px] text-red-400/80">{actionError}</p>
           </div>
         ) : null}

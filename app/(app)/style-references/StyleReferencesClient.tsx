@@ -87,7 +87,7 @@ export function StyleReferencesClient({
   return (
     <div className="space-y-8">
       <section className="grid gap-3 md:grid-cols-3">
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             My Sets
@@ -98,7 +98,7 @@ export function StyleReferencesClient({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Presets
@@ -111,7 +111,7 @@ export function StyleReferencesClient({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-foreground text-background shadow-sm">
+        <Card className="border-border/70 bg-foreground text-background shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
             Usage
@@ -124,7 +124,7 @@ export function StyleReferencesClient({
       </section>
 
       <section>
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-xl border border-border/70 bg-muted/35 px-5 py-5">
           <div className="flex flex-wrap items-center gap-2">
@@ -202,7 +202,7 @@ export function StyleReferencesClient({
           {STYLE_PRESETS.map((preset) => (
             <Card
               key={preset.key}
-              className="overflow-hidden border-border/70 bg-card/95 shadow-sm"
+              className="overflow-hidden border-border/70 bg-card/95 shadow-xs"
             >
               <div
                 className="h-28 border-b"
@@ -235,7 +235,7 @@ export function StyleReferencesClient({
             sets.map((set) => (
               <Card
                 key={set.id}
-                className="border-border/70 bg-card/95 shadow-sm"
+                className="border-border/70 bg-card/95 shadow-xs"
               >
                 <CardHeader className="gap-3 pb-0">
                 <div className="flex items-start justify-between gap-4">
@@ -257,7 +257,7 @@ export function StyleReferencesClient({
                 <CardContent className="pt-4">
                 <div className="grid grid-cols-3 gap-3">
                   {set.imageUrls.slice(0, 6).map((url) => (
-                    <div key={url} className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-muted">
+                    <div key={url} className="relative aspect-4/3 overflow-hidden rounded-lg border border-border bg-muted">
                       <Image
                         src={buildPrivateBlobProxyUrl(url)}
                         alt={set.name}

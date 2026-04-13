@@ -201,7 +201,7 @@ export function PaywallModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
       <div className="relative w-full max-w-lg rounded-2xl border border-neutral-200 bg-white shadow-2xl">
         {allowDismiss && (
           <button

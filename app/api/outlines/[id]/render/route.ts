@@ -51,7 +51,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!outline) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const projectId = outline.projects[0]?.id;
-  if (!projectId) return NextResponse.json({ error: "No project linked to outline" }, { status: 400 });
+  if (!projectId) return NextResponse.json({ error: "No project linked to outline-solid" }, { status: 400 });
 
   const [facts, assets] = await Promise.all([
     db.projectFact.findUnique({ where: { projectId } }),

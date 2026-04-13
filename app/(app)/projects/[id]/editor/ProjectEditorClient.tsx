@@ -410,7 +410,7 @@ function EditorPanelCard({
   return (
     <Card
       className={cn(
-        "rounded-[24px] border-white/[0.08] bg-[#1b1a18] text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.68)]",
+        "rounded-[24px] border-white/8 bg-[#1b1a18] text-white shadow-[0_18px_44px_-34px_rgba(0,0,0,0.68)]",
         className
       )}
     >
@@ -437,8 +437,8 @@ function LeftRailIconButton({
       className={cn(
         "group flex w-full flex-col items-center gap-2 rounded-[18px] border px-2 py-3 text-[11px] transition-colors",
         active
-          ? "border-white/[0.14] bg-white/[0.08] text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
-          : "border-white/[0.08] bg-white/[0.018] text-white/42 hover:bg-white/[0.05] hover:text-white/78"
+          ? "border-white/[0.14] bg-white/8 text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
+          : "border-white/8 bg-white/[0.018] text-white/42 hover:bg-white/5 hover:text-white/78"
       )}
       aria-label={label}
       title={label}
@@ -481,8 +481,8 @@ function DraggableAssetCard({
       className={cn(
         "overflow-hidden rounded-[22px] border transition-all",
         active
-          ? "border-white/[0.18] bg-white/[0.08] shadow-[0_18px_36px_-26px_rgba(0,0,0,0.75)]"
-          : "border-white/[0.08] bg-[#1b1a18]",
+          ? "border-white/18 bg-white/8 shadow-[0_18px_36px_-26px_rgba(0,0,0,0.75)]"
+          : "border-white/8 bg-[#1b1a18]",
         isDragging && "opacity-70"
       )}
     >
@@ -492,7 +492,7 @@ function DraggableAssetCard({
         {...listeners}
       >
         <div className="relative">
-          <div className="aspect-[4/3] overflow-hidden bg-black/30">
+          <div className="aspect-4/3 overflow-hidden bg-black/30">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={buildPrivateBlobProxyUrl(asset.imageUrl)}
@@ -506,7 +506,7 @@ function DraggableAssetCard({
             {asset.isCover ? <Badge variant="outline" className="border-white/18 text-white/70">封面</Badge> : null}
           </div>
           {meta.roleTag ? (
-            <div className="absolute bottom-2 left-2 rounded-full border border-white/[0.08] bg-black/55 px-2 py-1 text-[10px] text-white/72 backdrop-blur">
+            <div className="absolute bottom-2 left-2 rounded-full border border-white/8 bg-black/55 px-2 py-1 text-[10px] text-white/72 backdrop-blur-sm">
               {meta.roleTag}
             </div>
           ) : null}
@@ -525,7 +525,7 @@ function DraggableAssetCard({
                 event.stopPropagation();
                 onToggleSelected(asset.id);
               }}
-              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/[0.08] hover:text-white"
+              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/8 hover:text-white"
             >
               {asset.selected ? "移出生成" : "纳入生成"}
             </button>
@@ -535,7 +535,7 @@ function DraggableAssetCard({
                 event.stopPropagation();
                 onSetCover(asset.id);
               }}
-              className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/[0.08] hover:text-white"
+              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/8 hover:text-white"
             >
               设为封面
             </button>
@@ -590,8 +590,8 @@ function SortableBoardStripItem({
             className={cn(
               "flex h-5 w-5 items-center justify-center rounded-full border",
               selectedForScope
-                ? "border-white/[0.16] bg-white text-neutral-950"
-                : "border-white/[0.08] bg-black/30 text-white/50"
+                ? "border-white/16 bg-white text-neutral-950"
+                : "border-white/8 bg-black/30 text-white/50"
             )}
             aria-label="加入批量范围"
           >
@@ -602,7 +602,7 @@ function SortableBoardStripItem({
           <button
             type="button"
             onClick={(event) => event.stopPropagation()}
-            className="rounded-full border border-white/[0.08] bg-black/30 p-1 text-white/50"
+            className="rounded-full border border-white/8 bg-black/30 p-1 text-white/50"
             aria-label="拖拽排序"
             {...attributes}
             {...listeners}
@@ -611,7 +611,7 @@ function SortableBoardStripItem({
             </button>
         </div>
         <div>
-          <div className="overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0b0b0a]">
+          <div className="overflow-hidden rounded-[18px] border border-white/8 bg-[#0b0b0a]">
             {thumbnailUrl ? (
               <div className="aspect-video">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1757,7 +1757,7 @@ export function ProjectEditorClient({
           statusMeta={`${scene.boards.length} 张画板 · ${assets.length} 张素材`}
           primaryAction={
             <Button
-              className="h-10 gap-2 rounded-full border border-white/[0.08] bg-white px-4 text-neutral-950 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.55)] hover:bg-white/90"
+              className="h-10 gap-2 rounded-full border border-white/8 bg-white px-4 text-neutral-950 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.55)] hover:bg-white/90"
               onClick={handleOpenGenerate}
             >
               <Wand2 className="h-4 w-4" />
@@ -1779,7 +1779,7 @@ export function ProjectEditorClient({
           rightRailLabel="属性与 AI"
           leftRail={
             <div className="flex h-full min-h-0">
-              <div className="flex w-[82px] shrink-0 flex-col gap-2 border-r border-white/[0.06] bg-[#121110] p-3">
+              <div className="flex w-[82px] shrink-0 flex-col gap-2 border-r border-white/6 bg-[#121110] p-3">
                 {LEFT_PANEL_ITEMS.map((item) => (
                   <LeftRailIconButton
                     key={item.key}
@@ -1808,7 +1808,7 @@ export function ProjectEditorClient({
                     <EditorRailSection title="项目事实">
                       <div className="grid gap-2">
                         {factsSnapshot.map((item) => (
-                          <EditorPanelCard key={item.label} className="bg-white/[0.02]">
+                          <EditorPanelCard key={item.label} className="bg-white/2">
                             <FieldLabel>{item.label}</FieldLabel>
                             <p className="mt-2 text-sm text-white/78">{item.value}</p>
                           </EditorPanelCard>
@@ -1860,7 +1860,7 @@ export function ProjectEditorClient({
                         />
                         <Button
                           variant="outline"
-                          className="h-11 w-full rounded-full border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
+                          className="h-11 w-full rounded-full border-white/8 bg-white text-neutral-950 hover:bg-white/90"
                           onClick={handleSaveFacts}
                           disabled={savingFacts}
                         >
@@ -1887,7 +1887,7 @@ export function ProjectEditorClient({
                         }}
                       />
                       <Button
-                        className="h-11 w-full rounded-full border border-white/[0.08] bg-white text-neutral-950 hover:bg-white/90"
+                        className="h-11 w-full rounded-full border border-white/8 bg-white text-neutral-950 hover:bg-white/90"
                         onClick={handleOpenAssetPicker}
                         disabled={uploadingAssets}
                       >
@@ -2069,7 +2069,7 @@ export function ProjectEditorClient({
           center={
             <div className="relative flex h-full min-h-0 flex-col">
               <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2">
-                <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-black/6 bg-[#f1eee8]/94 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.42)] backdrop-blur">
+                <div className="pointer-events-auto flex items-center gap-2 rounded-[22px] border border-black/6 bg-[#f1eee8]/94 px-3 py-2 text-neutral-950 shadow-[0_20px_48px_-28px_rgba(0,0,0,0.42)] backdrop-blur-sm">
                   <div className="min-w-0 pr-1">
                     <p className="max-w-[180px] truncate text-sm font-semibold">
                       {activeBoard?.name ?? "Untitled board"}
@@ -2162,7 +2162,7 @@ export function ProjectEditorClient({
           }
           rightRail={
             <Tabs value={rightPanel} onValueChange={(value) => setRightPanel(value as RightRailPanel)} className="flex h-full flex-col">
-              <div className="border-b border-white/[0.06] p-3">
+              <div className="border-b border-white/6 p-3">
                 <EditorTabsList className="grid w-full grid-cols-2">
                   <EditorTabsTrigger value="inspector">属性</EditorTabsTrigger>
                   <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
@@ -2197,7 +2197,7 @@ export function ProjectEditorClient({
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <FieldLabel>背景色</FieldLabel>
-                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3">
+                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/3 px-3">
                               <input
                                 type="color"
                                 value={activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
@@ -2225,7 +2225,7 @@ export function ProjectEditorClient({
                                 }))
                               }
                             >
-                              <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                              <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2286,7 +2286,7 @@ export function ProjectEditorClient({
                               )
                             }
                           >
-                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2318,7 +2318,7 @@ export function ProjectEditorClient({
                               );
                             }}
                           >
-                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2379,7 +2379,7 @@ export function ProjectEditorClient({
                               }));
                             }}
                           >
-                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2517,7 +2517,7 @@ export function ProjectEditorClient({
                               )
                             }
                           >
-                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/[0.03] text-white")}>
+                            <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2580,7 +2580,7 @@ export function ProjectEditorClient({
                           </div>
                           <div className="space-y-2">
                             <FieldLabel>颜色</FieldLabel>
-                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3">
+                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/3 px-3">
                               <input
                                 type="color"
                                 value={selectedNode.color}
@@ -2601,7 +2601,7 @@ export function ProjectEditorClient({
                           <FieldLabel>对齐</FieldLabel>
                           <div className="grid grid-cols-3 gap-2">
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "left" && "border-white/[0.18] bg-white/[0.1] text-white")}
+                              className={cn("h-10", selectedNode.align === "left" && "border-white/18 bg-white/10 text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "left" } : node
@@ -2611,7 +2611,7 @@ export function ProjectEditorClient({
                               <AlignLeft className="h-4 w-4" />
                             </EditorChromeButton>
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "center" && "border-white/[0.18] bg-white/[0.1] text-white")}
+                              className={cn("h-10", selectedNode.align === "center" && "border-white/18 bg-white/10 text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "center" } : node
@@ -2621,7 +2621,7 @@ export function ProjectEditorClient({
                               <AlignCenter className="h-4 w-4" />
                             </EditorChromeButton>
                             <EditorChromeButton
-                              className={cn("h-10", selectedNode.align === "right" && "border-white/[0.18] bg-white/[0.1] text-white")}
+                              className={cn("h-10", selectedNode.align === "right" && "border-white/18 bg-white/10 text-white")}
                               onClick={() =>
                                 updateSelectedNode((node) =>
                                   node.type === "text" ? { ...node, align: "right" } : node
@@ -2676,7 +2676,7 @@ export function ProjectEditorClient({
                   <div className="space-y-2">
                     {aiHighlights.length > 0 ? (
                       aiHighlights.map((point) => (
-                        <EditorPanelCard key={point} className="bg-white/[0.02]">
+                        <EditorPanelCard key={point} className="bg-white/2">
                           {point}
                         </EditorPanelCard>
                       ))
@@ -2689,7 +2689,7 @@ export function ProjectEditorClient({
                 <EditorRailSection title="问题">
                   <div className="space-y-2">
                     {aiIssues.map((point) => (
-                      <EditorPanelCard key={point} className="bg-white/[0.02]">
+                      <EditorPanelCard key={point} className="bg-white/2">
                         {point}
                       </EditorPanelCard>
                     ))}
@@ -2739,7 +2739,7 @@ export function ProjectEditorClient({
                         className={cn(
                           "rounded-full border-white/10 px-3 py-1 text-white",
                           (layout?.pages?.length || completenessAnalysis?.canProceed) &&
-                            "border-white/[0.18] bg-white/[0.08] text-white"
+                            "border-white/18 bg-white/8 text-white"
                         )}
                       >
                         {layout?.pages?.length
@@ -2755,7 +2755,7 @@ export function ProjectEditorClient({
             </Tabs>
           }
           bottomStrip={
-            <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/[0.06] bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+            <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto rounded-[30px] border border-white/6 bg-[#171614] p-2 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
               <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
                 {scene.boardOrder.map((boardId) => {
                   const board = scene.boards.find((item) => item.id === boardId);
@@ -3028,18 +3028,18 @@ const BoardDropSurface = forwardRef<
           backgroundColor: board.frame.background,
         }}
       >
-        <div className="pointer-events-none absolute left-6 top-6 z-[1] flex items-start justify-between gap-4">
-          <div className="rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/56 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur">
+        <div className="pointer-events-none absolute left-6 top-6 z-1 flex items-start justify-between gap-4">
+          <div className="rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/56 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             {board.name}
           </div>
         </div>
-        <div className="pointer-events-none absolute right-6 top-6 z-[1] rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/46 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur">
+        <div className="pointer-events-none absolute right-6 top-6 z-1 rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/46 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
           {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
         </div>
 
         {board.nodes.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center px-10">
-            <div className="max-w-lg rounded-[30px] border border-black/8 bg-[#faf8f4]/96 px-8 py-10 text-center shadow-[0_36px_80px_-54px_rgba(0,0,0,0.28)] backdrop-blur">
+            <div className="max-w-lg rounded-[30px] border border-black/8 bg-[#faf8f4]/96 px-8 py-10 text-center shadow-[0_36px_80px_-54px_rgba(0,0,0,0.28)] backdrop-blur-sm">
               <p className="text-[11px] text-black/34">Empty board</p>
               <p className="mt-4 text-[30px] font-semibold tracking-[-0.04em] text-neutral-950">
                 把第一张素材拖进来
@@ -3090,7 +3090,7 @@ const BoardDropSurface = forwardRef<
                           onCancelInlineText();
                         }
                       }}
-                      className="h-full w-full resize-none rounded-[22px] border border-black/12 bg-white/96 px-4 py-3 text-neutral-950 outline-none backdrop-blur"
+                      className="h-full w-full resize-none rounded-[22px] border border-black/12 bg-white/96 px-4 py-3 text-neutral-950 outline-hidden backdrop-blur-sm"
                       style={{
                         fontSize: `${(node.fontSize / PROJECT_BOARD_WIDTH) * render.width}px`,
                         fontWeight: node.fontWeight,
@@ -3112,7 +3112,7 @@ const BoardDropSurface = forwardRef<
                       }}
                       className={cn(
                         "flex h-full w-full items-start rounded-[22px] px-4 py-3 text-left transition-colors",
-                        selected ? "bg-black/[0.035]" : "hover:bg-black/[0.02]"
+                        selected ? "bg-black/[0.035]" : "hover:bg-black/2"
                       )}
                       style={{
                         justifyContent:

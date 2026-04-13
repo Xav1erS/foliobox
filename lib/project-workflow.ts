@@ -1,21 +1,21 @@
 export const PROJECT_STATUS_LABEL: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline-solid" }
 > = {
   DRAFT: { label: "草稿", variant: "secondary" },
-  IMPORTING: { label: "导入中", variant: "outline" },
+  IMPORTING: { label: "导入中", variant: "outline-solid" },
   IMPORTED: { label: "已导入", variant: "default" },
   FAILED: { label: "失败", variant: "destructive" },
 };
 
 export const PROJECT_STAGE_LABEL: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline-solid" }
 > = {
   DRAFT: { label: "草稿", variant: "secondary" },
-  BOUNDARY: { label: "边界确认", variant: "outline" },
-  COMPLETENESS: { label: "完整度", variant: "outline" },
-  PACKAGE: { label: "骨架定稿", variant: "outline" },
+  BOUNDARY: { label: "边界确认", variant: "outline-solid" },
+  COMPLETENESS: { label: "完整度", variant: "outline-solid" },
+  PACKAGE: { label: "骨架定稿", variant: "outline-solid" },
   LAYOUT: { label: "排版中", variant: "default" },
   READY: { label: "已就绪", variant: "default" },
 };

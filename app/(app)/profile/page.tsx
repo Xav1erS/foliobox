@@ -67,7 +67,7 @@ export default async function ProfilePage({
       <Separator className="-mx-6 w-auto" />
 
       {fromScore && (
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
           <ResumeContextBanner>
             你是从评分结果回到这里的。先补充当前职位、经验年限、擅长方向与目标岗位，再去整理项目，会让后续生成结果更贴近你的求职方向。
@@ -77,7 +77,7 @@ export default async function ProfilePage({
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Profile Readiness
@@ -90,7 +90,7 @@ export default async function ProfilePage({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Plan
@@ -103,7 +103,7 @@ export default async function ProfilePage({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-foreground text-background shadow-sm">
+        <Card className="border-border/70 bg-foreground text-background shadow-xs">
           <CardContent className="p-5">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
             Why It Matters
@@ -119,7 +119,7 @@ export default async function ProfilePage({
 
       <Separator className="-mx-6 w-auto" />
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -192,7 +192,7 @@ export default async function ProfilePage({
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${quotaStatusClass}`} />

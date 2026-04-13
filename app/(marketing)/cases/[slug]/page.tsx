@@ -24,7 +24,7 @@ export default async function CaseDetailPage({
           回到案例列表
         </Link>
 
-        <section className="mt-8 border border-white/10 bg-white/[0.03] p-8">
+        <section className="mt-8 border border-white/10 bg-white/3 p-8">
           <div className="flex flex-wrap items-center gap-2">
             {study.tags.map((tag) => (
               <span key={tag} className="border border-white/10 px-2.5 py-1 text-xs text-white/45">
@@ -48,7 +48,7 @@ export default async function CaseDetailPage({
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="border border-white/10 bg-white/[0.03] p-6">
+          <div className="border border-white/10 bg-white/3 p-6">
             <p className="text-xs uppercase tracking-[0.22em] text-white/25">项目背景</p>
             <p className="mt-4 text-sm leading-8 text-white/68">{study.context}</p>
 
@@ -65,7 +65,7 @@ export default async function CaseDetailPage({
             </ul>
           </div>
 
-          <div className="border border-white/10 bg-white/[0.03] p-6">
+          <div className="border border-white/10 bg-white/3 p-6">
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <p className="text-xs uppercase tracking-[0.22em] text-white/25">整理前</p>

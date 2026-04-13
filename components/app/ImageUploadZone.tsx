@@ -128,9 +128,9 @@ export function ImageUploadZone({
 
   // Theme tokens
   const dropzoneBorder = dark
-    ? isDragging ? "border-white/45 bg-white/[0.08]" : "border-white/15 hover:border-white/25 hover:bg-white/[0.04]"
+    ? isDragging ? "border-white/45 bg-white/8" : "border-white/15 hover:border-white/25 hover:bg-white/4"
     : isDragging ? "border-neutral-500 bg-neutral-50" : "border-neutral-300 hover:border-neutral-400 hover:bg-white";
-  const dropzoneBg = dark ? "bg-white/[0.02]" : "bg-neutral-100/85";
+  const dropzoneBg = dark ? "bg-white/2" : "bg-neutral-100/85";
   const iconColor = dark ? "text-white/30" : "text-neutral-300";
   const labelColor = dark ? "text-white/50" : "text-neutral-500";
   const hintColor = dark ? "text-white/25" : "text-neutral-400";
@@ -139,7 +139,7 @@ export function ImageUploadZone({
     ? "border-white/10 text-white/60 hover:border-white/20 hover:text-white"
     : "border-neutral-300 text-neutral-500 hover:border-neutral-400 hover:text-neutral-900";
   const cardBorder = dark ? "border-white/10" : "border-neutral-200";
-  const cardBg = dark ? "bg-white/[0.03]" : "bg-white";
+  const cardBg = dark ? "bg-white/3" : "bg-white";
   const cardFooterBorder = dark ? "border-white/10" : "border-neutral-100";
   const fileNameColor = dark ? "text-white/70" : "text-neutral-700";
   const fileSizeColor = dark ? "text-white/35" : "text-neutral-400";
@@ -207,7 +207,7 @@ export function ImageUploadZone({
                 } ${draggedIndex === i ? "opacity-60" : ""}`}
               >
                 {/* Image — object-contain, preserves natural aspect ratio */}
-                <div className={`flex h-28 items-center justify-center ${dark ? "bg-white/[0.04]" : "bg-neutral-50"}`}>
+                <div className={`flex h-28 items-center justify-center ${dark ? "bg-white/4" : "bg-neutral-50"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={url}

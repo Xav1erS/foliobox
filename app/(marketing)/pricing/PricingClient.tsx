@@ -110,7 +110,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         {STAGE_GUIDES.map((item) => (
           <div
             key={item.title}
-            className="border border-white/10 bg-white/[0.03] p-6"
+            className="border border-white/10 bg-white/3 p-6"
           >
             <h2 className="text-lg font-semibold text-white">{item.title}</h2>
             <p className="mt-3 text-sm leading-relaxed text-white/55">{item.body}</p>
@@ -143,8 +143,8 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             key={plan.planType}
             className={`relative flex flex-col border p-6 ${
               plan.isRecommended
-                ? "border-white/30 bg-white/[0.08]"
-                : "border-white/10 bg-white/[0.04]"
+                ? "border-white/30 bg-white/8"
+                : "border-white/10 bg-white/4"
             }`}
           >
             {plan.highlightTag && (
@@ -234,7 +234,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         ))}
       </div>
 
-      <div className="mb-8 border border-white/10 bg-white/[0.03] px-6 py-5">
+      <div className="mb-8 border border-white/10 bg-white/3 px-6 py-5">
         <p className="text-sm leading-relaxed text-white/55">
           如果你现在还在犹豫，其实最稳的顺序通常是：
           <span className="text-white/78"> 先评分 </span>
@@ -249,7 +249,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
       <div className="mb-14 overflow-hidden border border-white/10">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/10 bg-white/[0.03]">
+            <tr className="border-b border-white/10 bg-white/3">
               <th className="px-5 py-4 text-left text-sm font-medium text-white/50">
                 能力与额度
               </th>
@@ -264,7 +264,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             {QUOTA_COMPARISON_ROWS.map((row, i) => (
               <tr
                 key={row.label}
-                className={`border-b border-white/[0.06] ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}
+                className={`border-b border-white/6 ${i % 2 === 0 ? "" : "bg-white/2"}`}
               >
                 <td className="px-5 py-3.5 text-sm text-white/60">{row.label}</td>
                 {(["free", "pro", "sprint"] as const).map((p) => (
@@ -278,7 +278,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
             {FEATURE_COMPARISON_ROWS.map((row, i) => (
               <tr
                 key={row.label}
-                className={`border-b border-white/[0.06] ${i % 2 === 0 ? "bg-white/[0.02]" : ""}`}
+                className={`border-b border-white/6 ${i % 2 === 0 ? "bg-white/2" : ""}`}
               >
                 <td className="px-5 py-3.5 text-sm text-white/60">{row.label}</td>
                 {(["free", "pro", "sprint"] as const).map((p) => (

@@ -35,10 +35,10 @@ export function SectionFrame({
       )}
       {!noCorners && (
         <>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-white/[0.08]" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-white/[0.06]" />
-          <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-white/[0.08]" />
-          <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-white/[0.06]" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-white/8" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-white/6" />
+          <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-white/8" />
+          <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-white/6" />
           {[
             "left-0 top-0",
             "right-0 top-0",

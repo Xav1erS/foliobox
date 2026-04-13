@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 type RectActionLinkProps = {
   href: string;
   children: ReactNode;
-  variant?: "solid" | "outline";
+  variant?: "solid" | "outline-solid";
   size?: "md" | "lg";
   className?: string;
 };
@@ -13,7 +13,7 @@ type RectActionLinkProps = {
 export function RectActionLink({
   href,
   children,
-  variant = "outline",
+  variant = "outline-solid",
   size = "md",
   className,
 }: RectActionLinkProps) {

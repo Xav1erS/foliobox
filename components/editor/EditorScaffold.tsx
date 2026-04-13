@@ -18,7 +18,7 @@ import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
 
 export const editorFieldClass =
-  "rounded-2xl border-white/[0.08] bg-secondary text-white placeholder:text-white/24 shadow-none";
+  "rounded-2xl border-white/8 bg-secondary text-white placeholder:text-white/24 shadow-none";
 
 type EditorScaffoldProps = {
   objectLabel: string;
@@ -71,7 +71,7 @@ export function EditorScaffold({
 
   return (
     <div className="dark flex h-full min-h-screen flex-col overflow-hidden bg-background text-white">
-      <header className="border-b border-white/[0.05] bg-background shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
+      <header className="border-b border-white/5 bg-background shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
         <div className="flex min-h-[64px] items-center gap-3 px-5 py-2">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
@@ -83,7 +83,7 @@ export function EditorScaffold({
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/36">
                 {objectLabel ? <span>{objectLabel}</span> : null}
                 {statusLabel ? (
-                  <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-white/62">
+                  <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-white/62">
                     {statusLabel}
                   </span>
                 ) : null}
@@ -105,7 +105,7 @@ export function EditorScaffold({
           {planSummary ? (
             <Link
               href={planSummary.href}
-              className="hidden rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-white/58 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
+              className="hidden rounded-full border border-white/8 bg-white/3 px-3 py-2 text-xs text-white/58 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
             >
               {planSummary.title}
             </Link>
@@ -128,7 +128,7 @@ export function EditorScaffold({
         ) : (
           <aside
             className={cn(
-                "flex shrink-0 flex-col border-r border-white/[0.05] bg-background shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
+                "flex shrink-0 flex-col border-r border-white/5 bg-background shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
               leftRailWidthClass
             )}
           >
@@ -156,7 +156,7 @@ export function EditorScaffold({
                 "radial-gradient(circle at center, rgba(0,0,0,1) 42%, rgba(0,0,0,0.2) 100%)",
             }}
           />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/16 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-linear-to-b from-black/16 to-transparent" />
           <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
             {center}
           </div>
@@ -177,7 +177,7 @@ export function EditorScaffold({
           ) : (
             <aside
               className={cn(
-                "flex shrink-0 flex-col border-l border-white/[0.05] bg-background shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
+                "flex shrink-0 flex-col border-l border-white/5 bg-background shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
                 rightRailWidthClass
               )}
             >
@@ -208,7 +208,7 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-white/[0.05] bg-white/[0.025] px-4">
+    <div className="flex h-12 items-center justify-between border-b border-white/5 bg-white/2.5 px-4">
       <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
@@ -236,7 +236,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/[0.05] bg-background text-white/44 transition-colors hover:bg-card hover:text-white"
+      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/5 bg-background text-white/44 transition-colors hover:bg-card hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (
@@ -261,7 +261,7 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-white/[0.05] px-5 py-3.5", className)}>
+    <section className={cn("border-b border-white/5 px-5 py-3.5", className)}>
       <p className="text-[11px] text-white/38">
         {title}
       </p>
@@ -304,7 +304,7 @@ export function EditorMiniButton({
         className
       )}
     >
-      <div className="pointer-events-auto rounded-2xl border border-white/[0.08] bg-card/95 p-1.5 shadow-[0_30px_80px_-44px_rgba(0,0,0,0.72)]">
+      <div className="pointer-events-auto rounded-2xl border border-white/8 bg-card/95 p-1.5 shadow-[0_30px_80px_-44px_rgba(0,0,0,0.72)]">
         {children}
       </div>
     </div>
@@ -323,8 +323,8 @@ export function EditorCanvasChip({
       className={cn(
         "inline-flex items-center rounded-full border px-3 py-1 text-[11px]",
         active
-          ? "border-white/[0.16] bg-white/[0.08] text-white"
-          : "border-white/[0.08] bg-white/[0.03] text-white/52"
+          ? "border-white/16 bg-white/8 text-white"
+          : "border-white/8 bg-white/3 text-white/52"
       )}
     >
       {children}
@@ -353,8 +353,8 @@ export function EditorSurfaceButton({
       className={cn(
         "w-full rounded-2xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
         active
-          ? "border-white/[0.16] bg-white/[0.09] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.05)]"
-          : "border-white/[0.08] bg-white/[0.025] text-white/72 hover:bg-white/[0.05]",
+          ? "border-white/16 bg-white/9 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.05)]"
+          : "border-white/8 bg-white/2.5 text-white/72 hover:bg-white/5",
         className
       )}
     >
@@ -373,7 +373,7 @@ export function EditorEmptyState({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-dashed border-white/[0.1] bg-white/[0.018] px-4 py-6 text-sm leading-6 text-white/46",
+        "rounded-[24px] border border-dashed border-white/10 bg-white/[0.018] px-4 py-6 text-sm leading-6 text-white/46",
         className
       )}
     >
@@ -400,8 +400,8 @@ export function EditorStripButton({
       className={cn(
         "shrink-0 rounded-[20px] border px-3 py-3 text-left transition-colors",
         active
-          ? "border-white/[0.16] bg-white/[0.09] text-white"
-          : "border-white/[0.08] bg-white/[0.025] text-white/64 hover:bg-white/[0.05]",
+          ? "border-white/16 bg-white/9 text-white"
+          : "border-white/8 bg-white/2.5 text-white/64 hover:bg-white/5",
         className
       )}
     >
@@ -436,7 +436,7 @@ export function EditorChromeButton({
     <Button
       variant={variant}
       className={cn(
-        "rounded-full border-white/[0.08] bg-white/[0.025] text-white transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.985]",
+        "rounded-full border-white/8 bg-white/2.5 text-white transition-all duration-150 hover:bg-white/8 hover:text-white active:scale-[0.985]",
         className
       )}
       {...props}
@@ -470,7 +470,7 @@ export function EditorChromeLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex h-10 items-center rounded-full border border-white/[0.08] bg-white/[0.025] text-white/72 transition-all duration-150 hover:bg-white/[0.08] hover:text-white active:scale-[0.985]",
+        "inline-flex h-10 items-center rounded-full border border-white/8 bg-white/2.5 text-white/72 transition-all duration-150 hover:bg-white/8 hover:text-white active:scale-[0.985]",
         className
       )}
     >
@@ -485,7 +485,7 @@ export function EditorTabsList({
 }: ComponentProps<typeof TabsList>) {
   return (
     <TabsList
-      className={cn("rounded-full bg-white/[0.03] p-1", className)}
+      className={cn("rounded-full bg-white/3 p-1", className)}
       {...props}
     />
   );
@@ -498,7 +498,7 @@ export function EditorTabsTrigger({
   return (
     <TabsTrigger
       className={cn(
-        "rounded-full px-4 text-white/54 transition-colors data-[state=active]:bg-white/[0.08] data-[state=active]:text-white",
+        "rounded-full px-4 text-white/54 transition-colors data-[state=active]:bg-white/8 data-[state=active]:text-white",
         className
       )}
       {...props}

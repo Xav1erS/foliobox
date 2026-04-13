@@ -62,7 +62,7 @@ export default async function PortfoliosPage() {
           />
         ) : (
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-sm">
+            <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -97,7 +97,7 @@ export default async function PortfoliosPage() {
                 return (
                   <Card
                     key={portfolio.id}
-                    className="group border-border/70 bg-card/95 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                    className="group border-border/70 bg-card/95 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
                     <CardContent className="space-y-4 p-5">
                       <div className="flex items-start justify-between gap-3">

@@ -190,7 +190,7 @@ export function PortfolioPublishClient({
           </div>
         </div>
 
-        <div className="border border-neutral-300 bg-[linear-gradient(180deg,_rgba(250,250,249,0.96),_rgba(245,245,244,0.88))] p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
+        <div className="border border-neutral-300 bg-[linear-gradient(180deg,rgba(250,250,249,0.96),rgba(245,245,244,0.88))] p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
             Current State
           </p>

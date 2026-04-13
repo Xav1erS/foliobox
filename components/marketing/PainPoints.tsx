@@ -78,7 +78,7 @@ export function PainPoints() {
               {SECONDARY_PAIN_POINTS.map((item) => (
                 <div
                   key={item.title}
-                  className="border border-white/[0.06] bg-white/[0.02] p-5"
+                  className="border border-white/6 bg-white/2 p-5"
                 >
                   <h4 className="mb-2 text-sm font-medium text-white/60">{item.title}</h4>
                   <p className="text-xs leading-relaxed text-white/45">{item.body}</p>

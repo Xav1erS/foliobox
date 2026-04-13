@@ -257,7 +257,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
             <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
               Current Identity
@@ -271,7 +271,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           </CardContent>
         </Card>
 
-        <Card className="border-border/70 bg-card/95 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
             <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
               Target Role
@@ -285,7 +285,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           </CardContent>
         </Card>
 
-        <Card className="border-border/70 bg-foreground text-background shadow-sm">
+        <Card className="border-border/70 bg-foreground text-background shadow-xs">
           <CardContent className="p-5">
             <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
               Focus Tags
@@ -300,7 +300,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         </Card>
       </div>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -365,7 +365,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -414,7 +414,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -463,7 +463,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
@@ -487,7 +487,7 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-sm">
+      <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">

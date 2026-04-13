@@ -40,7 +40,7 @@ export function PermissionGate({
 
   return (
     <>
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+      <div className="rounded-2xl border border-white/10 bg-white/3 p-6">
         <h3 className="text-base font-semibold text-white">{title}</h3>
         <p className="mt-2 text-sm leading-6 text-white/55">{description}</p>
         <div className="mt-5">
