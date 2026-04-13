@@ -151,6 +151,8 @@ export const ProjectBoardSchema = z.object({
     hasAnalysis: z.boolean(),
     hasPendingSuggestion: z.boolean(),
   }),
+  // AI 生成的内容建议（来自结构建议的 recommendedContent），不放画布上，显示在 Inspector
+  contentSuggestions: z.array(z.string()).optional().default([]),
 });
 
 export type ProjectBoard = z.infer<typeof ProjectBoardSchema>;
@@ -415,6 +417,7 @@ export function createProjectBoard(
     thumbnailAssetId: patch?.thumbnailAssetId ?? null,
     nodes: patch?.nodes ?? [],
     aiMarkers: patch?.aiMarkers ?? { hasAnalysis: false, hasPendingSuggestion: false },
+    contentSuggestions: patch?.contentSuggestions ?? [],
   };
 }
 
@@ -496,6 +499,8 @@ export function buildProjectSceneFromStructureSuggestion(params: {
         usedAssetIds.add(matchedAssetId);
       }
 
+      // 只把真实内容放画布：章节标题（caption）+ 页面标题（title）
+      // section.purpose / recommendedContent 是 AI 给用户的建议，存 contentSuggestions，显示在 Inspector
       const nodes: ProjectBoardNode[] = [
         createProjectTextNode({
           role: "caption",
@@ -522,37 +527,7 @@ export function buildProjectSceneFromStructureSuggestion(params: {
           lineHeight: 1.06,
           zIndex: 2,
         }),
-        createProjectTextNode({
-          role: "body",
-          text: section.purpose,
-          x: 128,
-          y: 294,
-          width: 720,
-          height: 210,
-          fontSize: 28,
-          fontWeight: 400,
-          lineHeight: 1.45,
-          zIndex: 3,
-        }),
       ];
-
-      if (section.recommendedContent.length > 0) {
-        nodes.push(
-          createProjectTextNode({
-            role: "note",
-            text: section.recommendedContent.map((item) => `• ${item}`).join("\n"),
-            x: 128,
-            y: 560,
-            width: 720,
-            height: 220,
-            fontSize: 22,
-            fontWeight: 400,
-            lineHeight: 1.45,
-            color: "#3e3934",
-            zIndex: 4,
-          })
-        );
-      }
 
       if (matchedAssetId) {
         const meta = resolveProjectAssetMeta(
@@ -566,10 +541,15 @@ export function buildProjectSceneFromStructureSuggestion(params: {
             height: 540,
             note: meta.note ?? null,
             roleTag: meta.roleTag ?? null,
-            zIndex: 5,
+            zIndex: 3,
           })
         );
       }
+
+      // 收集 AI 内容建议：purpose 说明 + recommendedContent 要点
+      const contentSuggestions: string[] = [];
+      if (section.purpose) contentSuggestions.push(section.purpose);
+      contentSuggestions.push(...section.recommendedContent);
 
       boards.push(
         createProjectBoard({
@@ -581,6 +561,7 @@ export function buildProjectSceneFromStructureSuggestion(params: {
           status: "draft",
           thumbnailAssetId: matchedAssetId,
           nodes,
+          contentSuggestions,
           aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
         })
       );

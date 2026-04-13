@@ -89,6 +89,7 @@ import {
   type ColorValue,
   type GradientConfig,
 } from "@/components/editor/ColorPickerPopover";
+import { ProjectSetupWizard } from "@/components/editor/ProjectSetupWizard";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
@@ -286,13 +287,13 @@ const ALIBABA_PUHUITI_URL =
   "https://puhuiti.oss-cn-hangzhou.aliyuncs.com/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-55-Regular/AlibabaPuHuiTi-2-55-Regular.woff2";
 const PROJECT_BOARD_MAX = 10;
 const editorPanelCardClass =
-  "rounded-[20px] border border-white/[0.08] bg-[#171411] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  "rounded-[20px] border border-white/[0.08] bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
   "rounded-[18px] border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
 const editorFloatingSurfaceClass =
-  "rounded-[22px] border border-white/[0.08] bg-[#1e1b18] text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
+  "rounded-[22px] border border-white/[0.08] bg-card text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
 const editorPopupSurfaceClass =
-  "rounded-[20px] border border-white/[0.08] bg-[#1e1b18] text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
+  "rounded-[20px] border border-white/[0.08] bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
 const editorPopupItemClass =
   "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
 
@@ -404,6 +405,11 @@ export function ProjectEditorFabricClient({
   const [recognizingMaterials, setRecognizingMaterials] = useState(false);
   const [recognizingIncremental, setRecognizingIncremental] = useState(false);
   const [suggestingStructure, setSuggestingStructure] = useState(false);
+  // 向导模式：项目未完成准备阶段时展示引导，而不是画布
+  const [setupMode, setSetupMode] = useState(
+    () => scene.boards.length === 0 && !initialData.layout?.structureSuggestion?.confirmedAt
+  );
+  const [confirmingStructure, setConfirmingStructure] = useState(false);
   const [surfaceScale, setSurfaceScale] = useState(1);
   const [liveThumbnails, setLiveThumbnails] = useState<Record<string, string>>({});
   const thumbnailCaptureRef = useRef<number | null>(null);
@@ -745,21 +751,37 @@ export function ProjectEditorFabricClient({
 
   function captureBoardThumbnail() {
     const canvas = canvasRef.current;
-    const boardId = activeBoard?.id;
-    if (!canvas || !boardId) return;
+    const board = activeBoard;
+    if (!canvas || !board) return;
     try {
-      const width = canvas.getWidth();
-      if (width <= 0) return;
-      const dataUrl = canvas.toDataURL({
-        format: "jpeg",
-        quality: 0.6,
-        multiplier: Math.min(1, 220 / width),
-      });
+      const srcCanvas = canvas.lowerCanvasEl;
+      const srcW = canvas.getWidth();
+      const srcH = canvas.getHeight();
+      if (srcW <= 0 || srcH <= 0) return;
+
+      // 缩略图目标宽度 220px，等比缩放
+      const scale = Math.min(1, 220 / srcW);
+      const dstW = Math.round(srcW * scale);
+      const dstH = Math.round(srcH * scale);
+
+      // 离屏 canvas：先填白板背景色，再叠 Fabric lower canvas
+      // 避免 JPEG 将透明区域渲染成黑色
+      const offscreen = document.createElement("canvas");
+      offscreen.width = dstW;
+      offscreen.height = dstH;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) return;
+
+      ctx.fillStyle = board.frame.background || "#ffffff";
+      ctx.fillRect(0, 0, dstW, dstH);
+      ctx.drawImage(srcCanvas, 0, 0, dstW, dstH);
+
+      const dataUrl = offscreen.toDataURL("image/jpeg", 0.6);
       setLiveThumbnails((prev) =>
-        prev[boardId] === dataUrl ? prev : { ...prev, [boardId]: dataUrl }
+        prev[board.id] === dataUrl ? prev : { ...prev, [board.id]: dataUrl }
       );
     } catch {
-      // ignore capture errors (e.g., tainted canvas)
+      // ignore capture errors (e.g., tainted canvas from cross-origin images)
     }
   }
 
@@ -1290,6 +1312,89 @@ export function ProjectEditorFabricClient({
       setActionError(error instanceof Error ? error.message : "结构建议生成失败，请稍后重试");
     } finally {
       setSuggestingStructure(false);
+    }
+  }
+
+  // 向导专用：串联识别 → 结构建议，识别失败立即中止，不继续生成结构
+  async function handleWizardAiUnderstand() {
+    if (recognizingMaterials || suggestingStructure) return;
+    setActionError("");
+
+    // Step 1: 素材识别
+    setRecognizingMaterials(true);
+    try {
+      await persistCurrentSceneForAction();
+      const recData = await parseJsonResponse<{ recognition: ProjectMaterialRecognition }>(
+        await fetch(`/api/projects/${initialData.id}/recognition/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      setMaterialRecognition(recData.recognition);
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, { materialRecognition: recData.recognition }) as LayoutJson
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "AI 理解失败，请稍后重试");
+      setRecognizingMaterials(false);
+      return; // 识别失败 → 中止，不执行结构生成
+    }
+    setRecognizingMaterials(false);
+
+    // Step 2: 结构建议（仅在识别成功后执行）
+    setSuggestingStructure(true);
+    try {
+      await persistCurrentSceneForAction();
+      const strData = await parseJsonResponse<{ suggestion: ProjectStructureSuggestion }>(
+        await fetch(`/api/projects/${initialData.id}/structure/suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      setStructureDraft(strData.suggestion);
+      setStructureSuggestion(strData.suggestion);
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, { structureSuggestion: strData.suggestion }) as LayoutJson
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "结构建议生成失败，请稍后重试");
+    } finally {
+      setSuggestingStructure(false);
+    }
+  }
+
+  // 向导专用：确认结构 + 创建画板 + 退出向导
+  async function handleWizardConfirmAndEnter() {
+    if (!structureDraft || confirmingStructure) return;
+    setConfirmingStructure(true);
+    setActionError("");
+    try {
+      // 1. 保存确认后的结构
+      const confirmedSuggestion: ProjectStructureSuggestion = {
+        ...structureDraft,
+        status: "confirmed",
+        confirmedAt: new Date().toISOString(),
+      };
+      await saveStructureDraft(confirmedSuggestion);
+
+      // 2. 创建画板组（无需 window.confirm，向导本身已有确认语义）
+      const nextScene = buildProjectSceneFromStructureSuggestion({
+        suggestion: confirmedSuggestion,
+        assets,
+        projectName: initialData.name,
+        recognition: materialRecognition ?? undefined,
+      });
+      setScene(nextScene);
+      lastSavedSceneRef.current = JSON.stringify(nextScene);
+      await persistScene(nextScene, true);
+
+      // 3. 进入画布编辑模式
+      setSetupMode(false);
+      setLeftPanel("boards");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "创建画板失败，请稍后重试");
+    } finally {
+      setConfirmingStructure(false);
     }
   }
 
@@ -2613,23 +2718,50 @@ export function ProjectEditorFabricClient({
       topNote={topStatusLabel}
       primaryAction={
         <Button
-          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed]"
+          className="h-10 gap-2 rounded-full border border-white/[0.08] bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed] disabled:opacity-40"
           onClick={() => void handleOpenGenerate()}
-          disabled={generating || diagnosing}
+          disabled={generating || diagnosing || setupMode}
+          title={setupMode ? "请先完成项目准备，再生成排版" : undefined}
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           生成排版
         </Button>
       }
       secondaryAction={
-        <EditorChromeButton
-          className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/82 hover:bg-white/[0.08] hover:text-white"
-          onClick={() => void handleRunDiagnosis()}
-          disabled={diagnosing || generating}
-        >
-          {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
-          项目诊断
-        </EditorChromeButton>
+        <div className="flex items-center gap-2">
+          {/* 向导模式：返回画布 / 画布模式：查看项目准备 */}
+          {setupMode ? (
+            scene.boards.length > 0 ? (
+              <EditorChromeButton
+                className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                onClick={() => { setSetupMode(false); setActionError(""); }}
+              >
+                返回画布
+              </EditorChromeButton>
+            ) : null
+          ) : (
+            <EditorChromeButton
+              className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/60 hover:bg-white/[0.08] hover:text-white"
+              onClick={() => {
+                setSetupMode(true);
+                setActionError("");
+                // 进入向导时重置到项目面板，避免结构/图层面板并行暴露
+                setLeftPanel("project");
+              }}
+            >
+              项目准备
+            </EditorChromeButton>
+          )}
+          <EditorChromeButton
+            className="h-10 gap-2 border-white/[0.08] bg-white/[0.04] px-4 text-white/82 hover:bg-white/[0.08] hover:text-white"
+            onClick={() => void handleRunDiagnosis()}
+            disabled={diagnosing || generating || setupMode}
+            title={setupMode ? "请先完成项目准备，再进行诊断" : undefined}
+          >
+            {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+            项目诊断
+          </EditorChromeButton>
+        </div>
       }
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
@@ -2639,8 +2771,11 @@ export function ProjectEditorFabricClient({
       hideLeftRailHeader
       leftRail={
         <div className="flex h-full min-h-0">
-          <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/[0.05] bg-[#110f0d] px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
-            {LEFT_PANEL_ITEMS.map((item) => {
+          <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/[0.05] bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
+            {(setupMode
+              ? LEFT_PANEL_ITEMS.filter((i) => i.key === "project" || i.key === "assets")
+              : LEFT_PANEL_ITEMS
+            ).map((item) => {
               const Icon = item.icon;
               const active = leftPanel === item.key;
               return (
@@ -2670,7 +2805,7 @@ export function ProjectEditorFabricClient({
 
           {leftPanel ? (
             <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-[#15120f] px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-card px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
                 <div className="min-w-0">
                   <p className="text-[10px] tracking-[0.18em] text-white/30">
                     {currentLeftPanelMeta?.label ?? "面板"}
@@ -2720,7 +2855,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 SaaS 后台、品牌官网、移动端应用"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2734,7 +2869,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2748,7 +2883,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 产品设计负责人、全栈开发、独立设计师"
-                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 h-9 rounded-2xl border-white/[0.08] bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2762,7 +2897,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
-                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 min-h-[96px] rounded-[20px] border-white/[0.08] bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2776,7 +2911,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="补充最终结果、影响、亮点与可量化成果。"
-                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/[0.08] bg-[#191613] text-white"
+                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/[0.08] bg-secondary text-white"
                           />
                         </div>
                       </div>
@@ -2817,7 +2952,7 @@ export function ProjectEditorFabricClient({
                         value={assetSearch}
                         onChange={(event) => setAssetSearch(event.target.value)}
                         placeholder="搜索素材标题或 ID"
-                        className="h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white placeholder:text-white/28"
+                        className="h-10 rounded-2xl border-white/[0.08] bg-secondary text-white placeholder:text-white/28"
                       />
                       {pendingRecognitionAssets.length > 0 ? (
                         <div className={cn(editorPanelCardClass, "px-4 py-4")}>
@@ -3086,7 +3221,7 @@ export function ProjectEditorFabricClient({
                                     summary: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
                               />
                             </div>
                             <div>
@@ -3099,7 +3234,7 @@ export function ProjectEditorFabricClient({
                                     narrativeArc: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                               />
                             </div>
                           </div>
@@ -3185,7 +3320,7 @@ export function ProjectEditorFabricClient({
                           {structureDraft.groups.map((group, index) => (
                             <div
                               key={group.id}
-                              className="rounded-[22px] border border-white/[0.08] bg-[#171411] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                              className="rounded-[22px] border border-white/[0.08] bg-secondary p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
@@ -3199,7 +3334,7 @@ export function ProjectEditorFabricClient({
                                         label: event.target.value,
                                       })
                                     }
-                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-sm font-semibold text-white"
+                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-sm font-semibold text-white"
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -3240,7 +3375,7 @@ export function ProjectEditorFabricClient({
                                         narrativeRole: event.target.value,
                                       })
                                     }
-                                    className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                    className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                   />
                                 </div>
                                 <div>
@@ -3252,7 +3387,7 @@ export function ProjectEditorFabricClient({
                                         rationale: event.target.value,
                                       })
                                     }
-                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
                                   />
                                 </div>
                               </div>
@@ -3273,7 +3408,7 @@ export function ProjectEditorFabricClient({
                                               title: event.target.value,
                                             })
                                           }
-                                          className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                          className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                         />
                                       </div>
                                       <Button
@@ -3295,7 +3430,7 @@ export function ProjectEditorFabricClient({
                                             purpose: event.target.value,
                                           })
                                         }
-                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
                                       />
                                     </div>
                                     <div className="mt-3">
@@ -3311,7 +3446,7 @@ export function ProjectEditorFabricClient({
                                           })
                                         }
                                         placeholder="每行一条建议内容点"
-                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-[#1b1815] text-white"
+                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/[0.08] bg-secondary text-white"
                                       />
                                     </div>
                                     <div className="mt-3">
@@ -3327,7 +3462,7 @@ export function ProjectEditorFabricClient({
                                           })
                                         }
                                         placeholder="用逗号分隔建议素材标题或类型"
-                                        className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-[#1b1815] text-white"
+                                        className="mt-1.5 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                       />
                                     </div>
                                   </div>
@@ -3447,6 +3582,28 @@ export function ProjectEditorFabricClient({
         </div>
       }
       center={
+        setupMode ? (
+          <div className="relative flex h-full w-full flex-col overflow-hidden bg-card">
+            <ProjectSetupWizard
+              projectName={initialData.name}
+              facts={projectFactsDraft}
+              assets={assets}
+              materialRecognition={materialRecognition}
+              structureDraft={structureDraft}
+              isStructureConfirmed={Boolean(structureDraft?.confirmedAt)}
+              recognizingMaterials={recognizingMaterials}
+              suggestingStructure={suggestingStructure}
+              confirmingStructure={confirmingStructure}
+              actionError={actionError}
+              hasExistingBoards={scene.boards.length > 0}
+              onAiUnderstand={() => void handleWizardAiUnderstand()}
+              onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
+              onOpenAssetsPanel={() => { setLeftPanel("assets"); }}
+              onOpenProjectPanel={() => { setLeftPanel("project"); }}
+              onReturnToCanvas={() => { setSetupMode(false); setActionError(""); }}
+            />
+          </div>
+        ) : (
         <div
           ref={viewportRef}
           className="relative flex h-full w-full items-center justify-center overflow-hidden"
@@ -3617,7 +3774,7 @@ export function ProjectEditorFabricClient({
                   "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur",
                   actionMessage.tone === "error"
                     ? "border-red-300/20 bg-red-400/10 text-red-100"
-                    : "border-white/[0.08] bg-[#181715]/88 text-white/82"
+                    : "border-white/[0.08] bg-card/88 text-white/82"
                 )}
               >
                 {actionMessage.text}
@@ -3625,7 +3782,7 @@ export function ProjectEditorFabricClient({
             </div>
           ) : null}
         </div>
-      }
+        ) /* end canvas viewport ternary */}
       rightRail={
         <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -3648,7 +3805,7 @@ export function ProjectEditorFabricClient({
                                         : "对象"}
                               </p>
                             </div>
-                            <span className="rounded-full border border-white/[0.08] bg-[#14110f] px-2.5 py-1 text-[11px] text-white/52">
+                            <span className="rounded-full border border-white/[0.08] bg-background px-2.5 py-1 text-[11px] text-white/52">
                               {activeMeta.kind === "multi" ? `${activeMeta.count} 项` : "单个"}
                             </span>
                           </div>
@@ -3665,7 +3822,7 @@ export function ProjectEditorFabricClient({
                                 <Textarea
                                   value={activeMeta.text}
                                   onChange={(event) => updateActiveObject({ text: event.target.value })}
-                                  className="min-h-[80px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                  className="min-h-[80px] rounded-2xl border-white/[0.08] bg-secondary text-white"
                                 />
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
@@ -3674,10 +3831,10 @@ export function ProjectEditorFabricClient({
                                   value={activeMeta.fontFamily}
                                   onValueChange={(value) => updateActiveObject({ fontFamily: value })}
                                 >
-                                  <SelectTrigger className="h-10 rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white focus:ring-white/20">
+                                  <SelectTrigger className="h-10 rounded-xl border-white/[0.08] bg-secondary text-sm text-white focus:ring-white/20">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="border-white/[0.08] bg-[#1e1b18] text-white">
+                                  <SelectContent className="border-white/[0.08] bg-card text-white">
                                     <div className="px-2 pb-1 pt-2 text-[10px] font-medium tracking-[0.14em] text-white/36">
                                       正文字体
                                     </div>
@@ -3745,7 +3902,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontSize: Number(event.target.value) || 16 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3756,7 +3913,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3788,7 +3945,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ lineHeight: Number(event.target.value) || 1.3 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3825,7 +3982,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3834,7 +3991,7 @@ export function ProjectEditorFabricClient({
                                       type="number"
                                       readOnly
                                       value={activeMeta.height}
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white/40"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white/40"
                                     />
                                   </div>
                                   <div>
@@ -3845,7 +4002,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3856,7 +4013,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3879,7 +4036,7 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="给这张图片一个更清晰的名称"
-                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                   />
                                   <label className="mt-3 block text-xs text-white/50">图片描述</label>
                                   <Textarea
@@ -3891,7 +4048,7 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
-                                    className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    className="mt-2 min-h-[96px] rounded-2xl border-white/[0.08] bg-secondary text-white"
                                   />
                                   <Button
                                     type="button"
@@ -3940,7 +4097,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3951,7 +4108,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3962,7 +4119,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3973,7 +4130,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4035,7 +4192,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   {(activeMeta.shape === "rect" || activeMeta.shape === "square") ? (
@@ -4050,7 +4207,7 @@ export function ProjectEditorFabricClient({
                                           const r = Number(event.target.value) || 0;
                                           updateActiveObject({ rx: r, ry: r } as unknown as Partial<FabricObject> & Partial<Textbox>);
                                         }}
-                                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                       />
                                     </div>
                                   ) : null}
@@ -4088,7 +4245,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4099,7 +4256,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4110,7 +4267,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4121,7 +4278,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4170,13 +4327,13 @@ export function ProjectEditorFabricClient({
                         <Input
                           value={activeBoard.name}
                           onChange={(event) => updateActiveBoard({ name: event.target.value })}
-                          className="h-10 rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white"
+                          className="h-10 rounded-xl border-white/[0.08] bg-secondary text-sm text-white"
                           placeholder="画板名称"
                         />
                         <Textarea
                           value={activeBoard.intent}
                           onChange={(event) => updateActiveBoard({ intent: event.target.value })}
-                          className="min-h-[72px] rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white"
+                          className="min-h-[72px] rounded-xl border-white/[0.08] bg-secondary text-sm text-white"
                           placeholder="画板意图（这张画板要讲什么）"
                         />
                       </div>
@@ -4190,21 +4347,19 @@ export function ProjectEditorFabricClient({
 
                       <div className="flex items-center gap-2">
                         <span className="text-[12px] text-white/50">底色</span>
-                        <Input
-                          type="color"
-                          value={activeBoard.frame.background}
-                          onChange={(event) =>
-                            updateActiveBoard({ frameBackground: event.target.value })
-                          }
-                          className="h-8 w-10 rounded-lg border-white/[0.08] bg-[#171411] p-0.5"
+                        <ColorPickerPopover
+                          value={{ mode: "solid", ...parseColorString(activeBoard.frame.background) }}
+                          onChange={(cv) => {
+                            if (cv.mode === "solid") {
+                              updateActiveBoard({ frameBackground: hexToRgba(cv.hex, cv.alpha) });
+                            }
+                          }}
+                          side="left"
+                          align="start"
                         />
-                        <Input
-                          value={activeBoard.frame.background}
-                          onChange={(event) =>
-                            updateActiveBoard({ frameBackground: event.target.value })
-                          }
-                          className="h-8 flex-1 rounded-lg border-white/[0.08] bg-[#171411] text-xs text-white"
-                        />
+                        <span className="truncate text-sm text-white/60">
+                          {parseColorString(activeBoard.frame.background).hex.toUpperCase()}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-3 text-[12px] text-white/50">
@@ -4213,6 +4368,21 @@ export function ProjectEditorFabricClient({
                           {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
                         </span>
                       </div>
+
+                      {/* AI 内容建议（来自结构建议的 purpose + recommendedContent） */}
+                      {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
+                        <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                          <p className="mb-2 text-[10px] tracking-[0.16em] text-white/30">AI 内容建议</p>
+                          <ul className="space-y-1.5">
+                            {activeBoard.contentSuggestions!.map((item, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <span className="mt-0.5 shrink-0 text-[10px] text-white/20">·</span>
+                                <span className="text-[12px] leading-relaxed text-white/50">{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
 
                       <div className="pt-1">
                         <button
@@ -4235,8 +4405,8 @@ export function ProjectEditorFabricClient({
             </div>
         </div>
       }
-      bottomStrip={
-        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/[0.06] bg-[#14110f] p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+      bottomStrip={setupMode ? undefined : (
+        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/[0.06] bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
           <div className="shrink-0 px-2.5">
             <p className="text-sm font-medium text-white/44">
               {scene.boards.length} / {PROJECT_BOARD_MAX}
@@ -4286,9 +4456,10 @@ export function ProjectEditorFabricClient({
             <Plus className="h-4 w-4" />
           </button>
         </div>
-      }
+      )}
       />
-      {actionError ? (
+      {/* 错误 bar 只在画布模式下显示；向导模式下错误已在向导内部展示 */}
+      {!setupMode && actionError ? (
         <div className="border-t border-red-300/12 bg-red-400/8 px-4 py-3 text-sm text-red-100">
           {actionError}
         </div>
@@ -4301,7 +4472,7 @@ export function ProjectEditorFabricClient({
           onClick={() => setDiagnosisDrawerOpen(false)}
         >
           <div
-            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/[0.06] bg-[#161210] shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
+            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/[0.06] bg-card shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 头部 */}
@@ -4448,7 +4619,7 @@ export function ProjectEditorFabricClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="max-w-2xl border-white/[0.08] bg-[#161311] text-white">
+        <DialogContent className="max-w-2xl border-white/[0.08] bg-card text-white">
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription className="text-white/56">
@@ -4491,7 +4662,7 @@ export function ProjectEditorFabricClient({
                         "rounded-2xl border px-3 py-3 text-left transition-colors",
                         scene.generationScope.mode === item.mode
                           ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
                       )}
                       onClick={() => setGenerationMode(item.mode as GenerationScope["mode"])}
                     >
@@ -4552,7 +4723,7 @@ export function ProjectEditorFabricClient({
                       "rounded-2xl border px-3 py-3 text-left transition-colors",
                       styleSelection.source === "none"
                         ? "border-white/[0.16] bg-white/[0.1] text-white"
-                        : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                        : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
                     )}
                     onClick={() => setStyleSelection({ source: "none" })}
                   >
@@ -4567,7 +4738,7 @@ export function ProjectEditorFabricClient({
                         "rounded-2xl border px-3 py-3 text-left transition-colors",
                         styleSelection.source === "preset" && styleSelection.presetKey === preset.key
                           ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
                       )}
                       onClick={() => setStyleSelection({ source: "preset", presetKey: preset.key })}
                     >
@@ -4583,7 +4754,7 @@ export function ProjectEditorFabricClient({
                         "rounded-2xl border px-3 py-3 text-left transition-colors md:col-span-2",
                         styleSelection.source === "reference_set" && styleSelection.referenceSetId === set.id
                           ? "border-white/[0.16] bg-white/[0.1] text-white"
-                          : "border-white/[0.08] bg-[#14110f] text-white/70 hover:bg-white/[0.05]"
+                          : "border-white/[0.08] bg-background text-white/70 hover:bg-white/[0.05]"
                       )}
                       onClick={() =>
                         setStyleSelection({
@@ -4695,7 +4866,7 @@ function SortableBoardRow({
       >
         <div
           className={cn(
-            "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+            "flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
               ? "border-white/[0.16] shadow-[0_10px_18px_-14px_rgba(255,255,255,0.18)]"
               : "border-white/[0.08] group-hover:border-white/[0.12]"
@@ -4791,7 +4962,7 @@ function SortableFilmstripCard({
       >
         <div
           className={cn(
-            "overflow-hidden rounded-[12px] border bg-[#0b0b0a] transition-all duration-200",
+            "overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
               ? "border-white/[0.18] shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
               : "border-white/[0.08] group-hover:border-white/[0.12]"
@@ -4823,7 +4994,7 @@ function SortableFilmstripCard({
             event.stopPropagation();
             onDelete();
           }}
-          className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.12] bg-[#0f0f0e]/95 text-white/60 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
+          className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.12] bg-background/95 text-white/60 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
           aria-label="删除画板"
         >
           <X className="h-3 w-3" />
@@ -4893,7 +5064,7 @@ function SortableLayerRow({
       >
         <div
           className={cn(
-            "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-[#14110f] text-[10px] font-semibold transition-all",
+            "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-background text-[10px] font-semibold transition-all",
             selected
               ? "border-white/[0.18] text-white shadow-[0_10px_16px_-14px_rgba(255,255,255,0.18)]"
               : "border-white/[0.08] text-white/70 group-hover:border-white/[0.12]"
