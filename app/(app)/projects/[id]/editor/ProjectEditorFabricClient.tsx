@@ -84,6 +84,8 @@ import {
   ColorPickerPopover,
   fabricFillToColorValue,
   gradientConfigToFabricOptions,
+  hexToRgba,
+  parseColorString,
   type ColorValue,
   type GradientConfig,
 } from "@/components/editor/ColorPickerPopover";
@@ -166,8 +168,10 @@ type ActiveObjectMeta =
       id: string;
       shape: ProjectShapeType;
       fill: string;
+      fillAlpha: number;
       gradient: import("@/components/editor/ColorPickerPopover").GradientConfig | null;
       stroke: string | null;
+      strokeAlpha: number;
       strokeWidth: number;
       opacity: number;
       rx: number;
@@ -958,7 +962,7 @@ export function ProjectEditorFabricClient({
     if (!activeObject || activeObject.type === "activeSelection") return;
 
     if (colorValue.mode === "solid") {
-      activeObject.set({ fill: colorValue.hex });
+      activeObject.set({ fill: hexToRgba(colorValue.hex, colorValue.alpha) });
     } else {
       const opts = gradientConfigToFabricOptions(colorValue.gradient);
       const grad = new (fabric as unknown as Record<string, new (o: unknown) => unknown>).Gradient(opts);
@@ -1775,13 +1779,17 @@ export function ProjectEditorFabricClient({
         ? (Number(shapeObj.rx) || 0)
         : 0;
       const colorValue = fabricFillToColorValue(current.fill);
+      const strokeRaw = typeof current.stroke === "string" ? current.stroke : null;
+      const strokeParsed = strokeRaw ? parseColorString(strokeRaw) : { hex: "#000000", alpha: 1 };
       setActiveMeta({
         kind: "shape",
         id: data.nodeId ?? "shape",
         shape: data.shapeType ?? "rect",
         fill: colorValue.mode === "solid" ? colorValue.hex : "#111111",
+        fillAlpha: colorValue.mode === "solid" ? colorValue.alpha : 1,
         gradient: colorValue.mode === "gradient" ? colorValue.gradient : null,
-        stroke: typeof current.stroke === "string" ? current.stroke : null,
+        stroke: strokeParsed.hex,
+        strokeAlpha: strokeParsed.alpha,
         strokeWidth: typeof current.strokeWidth === "number" ? current.strokeWidth : 0,
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
         rx: shapeRx,
@@ -1844,6 +1852,15 @@ export function ProjectEditorFabricClient({
       padding: 3,
       lockRotation: true,
     });
+    // 隐藏旋转手柄（lockRotation=true 但 mtr 仍会显示，隐藏避免误解）
+    target.setControlsVisibility({ mtr: false });
+  }
+
+  function applyTextChrome(target: FabricSceneObject) {
+    applyObjectChrome(target);
+    // 文本禁止竖向拉伸：隐藏上下中间手柄，锁定 Y 轴缩放
+    target.set({ lockScalingY: true });
+    target.setControlsVisibility({ mt: false, mb: false });
   }
 
   function serializeBoardFromCanvas(canvas: FabricCanvas, board: ProjectBoard): ProjectBoard {
@@ -1909,7 +1926,7 @@ export function ProjectEditorFabricClient({
             y: Math.round(top),
             width: Math.round(width),
             height: Math.round(height),
-            fill: colorValue.mode === "solid" ? colorValue.hex : "#111111",
+            fill: colorValue.mode === "solid" ? hexToRgba(colorValue.hex, colorValue.alpha) : "#111111",
             gradient: colorValue.mode === "gradient" ? colorValue.gradient : null,
             stroke: typeof object.stroke === "string" ? object.stroke : null,
             strokeWidth: typeof object.strokeWidth === "number" ? object.strokeWidth : 0,
@@ -1980,7 +1997,7 @@ export function ProjectEditorFabricClient({
           nodeType: "text",
           role: node.role,
         };
-        applyObjectChrome(textbox);
+        applyTextChrome(textbox);
         canvas.add(textbox);
         continue;
       }
@@ -2277,7 +2294,7 @@ export function ProjectEditorFabricClient({
       nodeType: "text",
       role: "title",
     };
-    applyObjectChrome(textbox);
+    applyTextChrome(textbox);
     canvas.add(textbox);
     canvas.setActiveObject(textbox);
     canvas.requestRenderAll();
@@ -3749,7 +3766,7 @@ export function ProjectEditorFabricClient({
                                     <label className="text-xs text-white/50">颜色</label>
                                     <div className="mt-2 flex items-center gap-2">
                                       <ColorPickerPopover
-                                        value={{ mode: "solid", hex: activeMeta.color }}
+                                        value={{ mode: "solid", hex: activeMeta.color, alpha: 1 }}
                                         onChange={(colorValue) => {
                                           if (colorValue.mode === "solid") {
                                             updateActiveObject({ fill: colorValue.hex });
@@ -3975,31 +3992,37 @@ export function ProjectEditorFabricClient({
                                     value={
                                       activeMeta.gradient
                                         ? { mode: "gradient", gradient: activeMeta.gradient }
-                                        : { mode: "solid", hex: activeMeta.fill }
+                                        : { mode: "solid", hex: activeMeta.fill, alpha: activeMeta.fillAlpha }
                                     }
                                     onChange={(colorValue) => setActiveObjectFill(colorValue)}
                                     side="left"
                                     align="start"
                                   />
                                   <span className="truncate text-sm text-white/60">
-                                    {activeMeta.gradient ? "渐变" : activeMeta.fill.toUpperCase()}
+                                    {activeMeta.gradient
+                                      ? "渐变"
+                                      : activeMeta.fillAlpha < 1
+                                        ? `${activeMeta.fill.toUpperCase()} ${Math.round(activeMeta.fillAlpha * 100)}%`
+                                        : activeMeta.fill.toUpperCase()}
                                   </span>
                                 </div>
                                 {/* 描边 */}
                                 <label className="mt-3 block text-xs text-white/50">描边色</label>
                                 <div className="mt-2 flex items-center gap-2">
                                   <ColorPickerPopover
-                                    value={{ mode: "solid", hex: activeMeta.stroke ?? "#000000" }}
+                                    value={{ mode: "solid", hex: activeMeta.stroke ?? "#000000", alpha: activeMeta.strokeAlpha }}
                                     onChange={(colorValue) => {
                                       if (colorValue.mode === "solid") {
-                                        updateActiveObject({ stroke: colorValue.hex });
+                                        updateActiveObject({ stroke: hexToRgba(colorValue.hex, colorValue.alpha) });
                                       }
                                     }}
                                     side="left"
                                     align="start"
                                   />
                                   <span className="truncate text-sm text-white/60">
-                                    {(activeMeta.stroke ?? "#000000").toUpperCase()}
+                                    {activeMeta.strokeAlpha < 1
+                                      ? `${(activeMeta.stroke ?? "#000000").toUpperCase()} ${Math.round(activeMeta.strokeAlpha * 100)}%`
+                                      : (activeMeta.stroke ?? "#000000").toUpperCase()}
                                   </span>
                                 </div>
                                 {/* 描边宽度 / 圆角 */}

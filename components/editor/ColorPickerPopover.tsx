@@ -42,6 +42,33 @@ function isValidHex(hex: string) {
   return /^#[0-9a-fA-F]{6}$/.test(hex);
 }
 
+/** Parse hex or rgba() string into { hex, alpha } */
+export function parseColorString(str: string): { hex: string; alpha: number } {
+  if (!str) return { hex: "#000000", alpha: 1 };
+  if (/^#[0-9a-fA-F]{6}$/.test(str)) return { hex: str, alpha: 1 };
+  const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
+  if (m) {
+    const r = parseInt(m[1]);
+    const g = parseInt(m[2]);
+    const b = parseInt(m[3]);
+    const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+    const hex =
+      "#" +
+      [r, g, b].map((x) => Math.min(255, Math.max(0, x)).toString(16).padStart(2, "0")).join("");
+    return { hex, alpha: Math.max(0, Math.min(1, a)) };
+  }
+  return { hex: "#000000", alpha: 1 };
+}
+
+/** Convert hex + alpha to rgba() string (returns plain hex if alpha === 1) */
+export function hexToRgba(hex: string, alpha: number): string {
+  if (alpha >= 1) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${parseFloat(alpha.toFixed(3))})`;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GradientStop = { offset: number; color: string };
@@ -52,7 +79,7 @@ export type GradientConfig = {
 };
 
 export type ColorValue =
-  | { mode: "solid"; hex: string }
+  | { mode: "solid"; hex: string; alpha: number }
   | { mode: "gradient"; gradient: GradientConfig };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -146,6 +173,63 @@ function HueSlider({ hue, onChange }: { hue: number; onChange: (h: number) => vo
   );
 }
 
+function AlphaSlider({
+  hex,
+  alpha,
+  onChange,
+}: {
+  hex: string;
+  alpha: number;
+  onChange: (a: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const track = useCallback(
+    (e: React.PointerEvent) => {
+      const rect = ref.current!.getBoundingClientRect();
+      onChange(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
+    },
+    [onChange],
+  );
+
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  return (
+    <div
+      className="relative h-4 w-full cursor-pointer overflow-hidden rounded-full"
+      style={{
+        background:
+          "repeating-conic-gradient(#666 0% 25%, #999 0% 50%) 0 0 / 8px 8px",
+      }}
+    >
+      <div
+        ref={ref}
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: `linear-gradient(to right, rgba(${r},${g},${b},0) 0%, rgba(${r},${g},${b},1) 100%)`,
+        }}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          track(e);
+        }}
+        onPointerMove={(e) => {
+          if (e.buttons === 1) track(e);
+        }}
+      >
+        <div
+          className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
+          style={{
+            left: `${alpha * 100}%`,
+            background: `rgba(${r},${g},${b},${alpha})`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function GradientStopBar({
   gradient,
   activeIndex,
@@ -173,7 +257,6 @@ function GradientStopBar({
           if (e.target !== barRef.current) return;
           const rect = barRef.current!.getBoundingClientRect();
           const offset = (e.clientX - rect.left) / rect.width;
-          // interpolate color at that offset
           const color = gradient.stops[activeIndex]?.color ?? "#888888";
           onAddStop(Math.max(0, Math.min(1, offset)), color);
         }}
@@ -240,6 +323,7 @@ export function ColorPickerPopover({
   const [hexInput, setHexInput] = useState(
     value.mode === "solid" ? value.hex : (value.gradient.stops[0]?.color ?? "#000000"),
   );
+  const [alpha, setAlpha] = useState(value.mode === "solid" ? (value.alpha ?? 1) : 1);
   const [gradient, setGradient] = useState<GradientConfig>(
     value.mode === "gradient" ? value.gradient : DEFAULT_GRADIENT,
   );
@@ -253,12 +337,14 @@ export function ColorPickerPopover({
       const h = hexToHsv(value.hex);
       setHsv(h);
       setHexInput(value.hex);
+      setAlpha(value.alpha ?? 1);
     } else {
       setGradient(value.gradient);
       const stopColor = value.gradient.stops[0]?.color ?? "#000000";
       setHsv(hexToHsv(stopColor));
       setHexInput(stopColor);
       setActiveStopIndex(0);
+      setAlpha(1);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -271,7 +357,7 @@ export function ColorPickerPopover({
     const hex = hsvToHex(newHsv.h, newHsv.s, newHsv.v);
     setHexInput(hex);
     if (mode === "solid") {
-      onChange({ mode: "solid", hex });
+      onChange({ mode: "solid", hex, alpha });
     } else {
       const next = {
         ...gradient,
@@ -291,7 +377,7 @@ export function ColorPickerPopover({
     const newHsv = hexToHsv(hex);
     setHsv(newHsv);
     if (mode === "solid") {
-      onChange({ mode: "solid", hex });
+      onChange({ mode: "solid", hex, alpha });
     } else {
       const next = {
         ...gradient,
@@ -304,10 +390,22 @@ export function ColorPickerPopover({
     }
   }
 
+  function handleAlphaChange(a: number) {
+    setAlpha(a);
+    if (mode === "solid") {
+      onChange({ mode: "solid", hex: currentHex, alpha: a });
+    }
+  }
+
+  function handleOpacityInputChange(pct: number) {
+    const a = Math.max(0, Math.min(1, pct / 100));
+    handleAlphaChange(a);
+  }
+
   function switchMode(next: "solid" | "gradient") {
     setMode(next);
     if (next === "solid") {
-      onChange({ mode: "solid", hex: currentHex });
+      onChange({ mode: "solid", hex: currentHex, alpha });
     } else {
       onChange({ mode: "gradient", gradient });
     }
@@ -357,15 +455,20 @@ export function ColorPickerPopover({
   }
 
   // Trigger swatch preview
-  const swatchStyle =
+  const swatchBg =
     value.mode === "gradient"
-      ? {
-          background: `linear-gradient(${value.gradient.angle}deg, ${value.gradient.stops
-            .sort((a, b) => a.offset - b.offset)
-            .map((s) => `${s.color} ${s.offset * 100}%`)
-            .join(", ")})`,
-        }
-      : { background: value.hex };
+      ? `linear-gradient(${value.gradient.angle}deg, ${value.gradient.stops
+          .sort((a, b) => a.offset - b.offset)
+          .map((s) => `${s.color} ${s.offset * 100}%`)
+          .join(", ")})`
+      : hexToRgba(value.hex, value.alpha ?? 1);
+
+  // Preview swatch for current color in picker
+  const r = parseInt(currentHex.slice(1, 3), 16);
+  const g = parseInt(currentHex.slice(3, 5), 16);
+  const b = parseInt(currentHex.slice(5, 7), 16);
+  const previewBg =
+    mode === "solid" ? `rgba(${r},${g},${b},${alpha})` : currentHex;
 
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
@@ -374,11 +477,20 @@ export function ColorPickerPopover({
           type="button"
           disabled={disabled}
           className={cn(
-            "h-10 w-10 shrink-0 rounded-xl border-2 border-white/[0.12] shadow-sm transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40",
+            "relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border-2 border-white/[0.12] shadow-sm transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40",
             className,
           )}
-          style={swatchStyle}
-        />
+        >
+          {/* Checkerboard base (shows through for alpha < 1) */}
+          <span
+            className="absolute inset-0"
+            style={{
+              background: "repeating-conic-gradient(#888 0% 25%, #bbb 0% 50%) 0 0 / 8px 8px",
+            }}
+          />
+          {/* Color overlay */}
+          <span className="absolute inset-0" style={{ background: swatchBg }} />
+        </button>
       </PopoverTrigger>
       <PopoverContent
         side={side}
@@ -387,7 +499,7 @@ export function ColorPickerPopover({
         className="w-[256px] border-white/[0.08] bg-[#1e1b18] p-0 text-white shadow-[0_24px_56px_-16px_rgba(0,0,0,0.9)]"
       >
         {/* Mode tabs */}
-        <div className="flex border-b border-white/[0.07]">
+        <div className="relative flex border-b border-white/[0.07]">
           {(["solid", "gradient"] as const).map((m) => (
             <button
               key={m}
@@ -458,12 +570,24 @@ export function ColorPickerPopover({
           {/* Hue slider */}
           <HueSlider hue={hsv.h} onChange={(h) => handleHsvChange({ ...hsv, h })} />
 
-          {/* Hex + preview row */}
+          {/* Alpha slider (solid mode only) */}
+          {mode === "solid" ? (
+            <AlphaSlider hex={currentHex} alpha={alpha} onChange={handleAlphaChange} />
+          ) : null}
+
+          {/* Hex + preview + opacity row */}
           <div className="flex items-center gap-2">
-            <div
-              className="h-8 w-8 shrink-0 rounded-lg border border-white/[0.12]"
-              style={{ background: currentHex }}
-            />
+            {/* Color preview swatch (with checkerboard for alpha) */}
+            <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/[0.12]">
+              <span
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "repeating-conic-gradient(#888 0% 25%, #bbb 0% 50%) 0 0 / 6px 6px",
+                }}
+              />
+              <span className="absolute inset-0" style={{ background: previewBg }} />
+            </div>
             <input
               type="text"
               value={hexInput.toUpperCase()}
@@ -471,6 +595,25 @@ export function ColorPickerPopover({
               maxLength={7}
               className="h-8 flex-1 rounded-lg border border-white/[0.08] bg-[#171411] px-2 text-center font-mono text-sm text-white"
             />
+            {/* Opacity % input (solid mode only) */}
+            {mode === "solid" ? (
+              <div className="relative flex shrink-0 items-center">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={Math.round(alpha * 100)}
+                  onChange={(e) =>
+                    handleOpacityInputChange(Number(e.target.value))
+                  }
+                  className="h-8 w-[52px] rounded-lg border border-white/[0.08] bg-[#171411] pl-2 pr-5 text-right text-sm text-white [appearance:textfield]"
+                />
+                <span className="pointer-events-none absolute right-2 text-xs text-white/40">
+                  %
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       </PopoverContent>
@@ -498,10 +641,11 @@ export function gradientConfigToFabricOptions(config: GradientConfig) {
   };
 }
 
-/** Try to read a GradientConfig from a Fabric fill value (may be string or Gradient object) */
+/** Try to read a ColorValue from a Fabric fill value (string or Gradient object) */
 export function fabricFillToColorValue(fill: unknown): ColorValue {
   if (typeof fill === "string") {
-    return { mode: "solid", hex: isValidHex(fill) ? fill : "#111111" };
+    const parsed = parseColorString(fill);
+    return { mode: "solid", hex: parsed.hex, alpha: parsed.alpha };
   }
   if (fill && typeof fill === "object") {
     const f = fill as Record<string, unknown>;
@@ -521,5 +665,5 @@ export function fabricFillToColorValue(fill: unknown): ColorValue {
       return { mode: "gradient", gradient: { angle: angleDeg, stops } };
     }
   }
-  return { mode: "solid", hex: "#111111" };
+  return { mode: "solid", hex: "#111111", alpha: 1 };
 }
