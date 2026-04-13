@@ -124,7 +124,7 @@ function StepCard({
     <div
       ref={stepRef}
       className={cn(
-        "rounded-2xl border p-4 transition-colors",
+        "rounded-xl border p-4 transition-colors",
         status === "done"
           ? "border-white/6 bg-white/3"
           : status === "warn"
@@ -250,7 +250,7 @@ export function ProjectSetupWizard({
       {/* ── 覆盖层：重新分析确认 ─────────────────────────── */}
       {reanalysisConfirmOpen ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#1e1b18] p-6 shadow-2xl">
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-white/10 bg-card p-6 shadow-2xl">
             <div className="mb-1 flex items-center gap-2 text-amber-400">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">重新分析会覆盖当前结构</span>
@@ -282,7 +282,7 @@ export function ProjectSetupWizard({
       {/* ── 覆盖层：确认结构覆盖画板 (Fix 3) ─────────────── */}
       {boardsDestroyConfirmOpen ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#1e1b18] p-6 shadow-2xl">
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-white/10 bg-card p-6 shadow-2xl">
             <div className="mb-1 flex items-center gap-2 text-red-400">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">当前画板内容将被替换</span>
@@ -594,7 +594,7 @@ export function ProjectSetupWizard({
                 <button
                   type="button"
                   onClick={onReturnToCanvas}
-                  className="flex w-full animate-in fade-in-0 slide-in-from-bottom-2 items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all duration-300 hover:bg-neutral-100 active:scale-[0.99]"
+                  className="flex w-full animate-in fade-in-0 slide-in-from-bottom-2 items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all duration-300 hover:bg-neutral-100 active:scale-[0.99]"
                 >
                   返回画布
                   <ArrowRight className="h-4 w-4" />
@@ -616,7 +616,7 @@ export function ProjectSetupWizard({
                   type="button"
                   onClick={handleConfirmClick}
                   disabled={confirmingStructure}
-                  className="flex w-full animate-in fade-in-0 slide-in-from-bottom-2 items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all duration-300 hover:bg-neutral-100 active:scale-[0.99] disabled:opacity-60"
+                  className="flex w-full animate-in fade-in-0 slide-in-from-bottom-2 items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all duration-300 hover:bg-neutral-100 active:scale-[0.99] disabled:opacity-60"
                 >
                   {confirmingStructure ? (
                     <>

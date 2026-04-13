@@ -1946,11 +1946,11 @@ export function ProjectEditorFabricClient({
 
   function applyObjectChrome(target: FabricSceneObject) {
     target.set({
-      borderColor: "rgba(244, 239, 232, 0.92)",
+      borderColor: "rgba(255, 255, 255, 0.92)",
       borderScaleFactor: 1.2,
       borderOpacityWhenMoving: 0.95,
-      cornerColor: "#f7f2eb",
-      cornerStrokeColor: "#1a1714",
+      cornerColor: "#fafafa",
+      cornerStrokeColor: "#171717",
       transparentCorners: false,
       cornerStyle: "circle",
       cornerSize: 11,
@@ -2718,7 +2718,7 @@ export function ProjectEditorFabricClient({
       topNote={topStatusLabel}
       primaryAction={
         <Button
-          className="h-10 gap-2 rounded-full border border-white/8 bg-[#f4efe8] px-4 text-neutral-950 shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-[#f7f3ed] disabled:opacity-40"
+          className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
           onClick={() => void handleOpenGenerate()}
           disabled={generating || diagnosing || setupMode}
           title={setupMode ? "请先完成项目准备，再生成排版" : undefined}
@@ -2855,7 +2855,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 SaaS 后台、品牌官网、移动端应用"
-                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2869,7 +2869,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2883,7 +2883,7 @@ export function ProjectEditorFabricClient({
                               }))
                             }
                             placeholder="例如 产品设计负责人、全栈开发、独立设计师"
-                            className="mt-1.5 h-9 rounded-2xl border-white/8 bg-secondary text-white"
+                            className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
@@ -2933,7 +2933,7 @@ export function ProjectEditorFabricClient({
                           type="button"
                           onClick={handleOpenAssetUpload}
                           disabled={uploadingAssets}
-                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                          className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
                         >
                           {uploadingAssets ? (
                             <>
@@ -2952,7 +2952,7 @@ export function ProjectEditorFabricClient({
                         value={assetSearch}
                         onChange={(event) => setAssetSearch(event.target.value)}
                         placeholder="搜索素材标题或 ID"
-                        className="h-10 rounded-2xl border-white/8 bg-secondary text-white placeholder:text-white/28"
+                        className="h-10 rounded-xl border-white/8 bg-secondary text-white placeholder:text-white/28"
                       />
                       {pendingRecognitionAssets.length > 0 ? (
                         <div className={cn(editorPanelCardClass, "px-4 py-4")}>
@@ -2966,7 +2966,7 @@ export function ProjectEditorFabricClient({
                             type="button"
                             onClick={() => void handleRecognizeIncrementalMaterials()}
                             disabled={recognizingIncremental}
-                            className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                            className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
                           >
                             {recognizingIncremental ? (
                               <>
@@ -3061,7 +3061,7 @@ export function ProjectEditorFabricClient({
                           type="button"
                           onClick={() => void handleRecognizeMaterials()}
                           disabled={!hasStructureInputs || recognizingMaterials}
-                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                          className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
                         >
                           {recognizingMaterials ? (
                             <>
@@ -3166,7 +3166,7 @@ export function ProjectEditorFabricClient({
                           type="button"
                           onClick={() => void handleSuggestStructure()}
                           disabled={!canSuggestStructure || suggestingStructure}
-                          className="mt-4 h-10 w-full rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100 disabled:bg-white/20 disabled:text-white/50"
+                          className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100 disabled:bg-white/20 disabled:text-white/50"
                         >
                           {suggestingStructure ? (
                             <>
@@ -3234,7 +3234,7 @@ export function ProjectEditorFabricClient({
                                     narrativeArc: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
                               />
                             </div>
                           </div>
@@ -3244,7 +3244,7 @@ export function ProjectEditorFabricClient({
                               type="button"
                               onClick={() => void saveStructureDraft()}
                               disabled={structureSaveState === "saving"}
-                              className="h-10 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                              className="h-10 rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
                             >
                               {structureSaveState === "saving" ? (
                                 <>
@@ -3263,7 +3263,7 @@ export function ProjectEditorFabricClient({
                               variant="outline"
                               onClick={() => void confirmStructureDraft()}
                               disabled={structureSaveState === "saving"}
-                              className="h-10 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
+                              className="h-10 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                             >
                               <Check className="mr-2 h-4 w-4" />
                               确认当前结构
@@ -3278,7 +3278,7 @@ export function ProjectEditorFabricClient({
                                 structureDraft.status !== "confirmed" ||
                                 structureDraft.groups.length === 0
                               }
-                              className="h-10 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
+                              className="h-10 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
                             >
                               {applyingStructure ? (
                                 <>
@@ -3311,7 +3311,7 @@ export function ProjectEditorFabricClient({
                               type="button"
                               variant="outline"
                               onClick={addStructureGroup}
-                              className="h-9 rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
+                              className="h-9 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                             >
                               <Plus className="mr-2 h-4 w-4" />
                               新增分组
@@ -3334,7 +3334,7 @@ export function ProjectEditorFabricClient({
                                         label: event.target.value,
                                       })
                                     }
-                                    className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-sm font-semibold text-white"
+                                    className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm font-semibold text-white"
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -3350,7 +3350,7 @@ export function ProjectEditorFabricClient({
                                     size="icon"
                                     onClick={() => mergeStructureGroupIntoPrevious(group.id)}
                                     disabled={index === 0}
-                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white disabled:text-white/20"
+                                    className="h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white disabled:text-white/20"
                                   >
                                     <GripVertical className="h-4 w-4" />
                                   </Button>
@@ -3359,7 +3359,7 @@ export function ProjectEditorFabricClient({
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => deleteStructureGroup(group.id)}
-                                    className="h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white"
+                                    className="h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -3375,7 +3375,7 @@ export function ProjectEditorFabricClient({
                                         narrativeRole: event.target.value,
                                       })
                                     }
-                                    className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                    className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                   />
                                 </div>
                                 <div>
@@ -3408,7 +3408,7 @@ export function ProjectEditorFabricClient({
                                               title: event.target.value,
                                             })
                                           }
-                                          className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                          className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                         />
                                       </div>
                                       <Button
@@ -3416,7 +3416,7 @@ export function ProjectEditorFabricClient({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => deleteStructureSection(group.id, section.id)}
-                                        className="mt-5 h-9 w-9 rounded-2xl text-white/56 hover:bg-white/6 hover:text-white"
+                                        className="mt-5 h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
@@ -3462,7 +3462,7 @@ export function ProjectEditorFabricClient({
                                           })
                                         }
                                         placeholder="用逗号分隔建议素材标题或类型"
-                                        className="mt-1.5 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                        className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                   </div>
@@ -3471,7 +3471,7 @@ export function ProjectEditorFabricClient({
                                   type="button"
                                   variant="outline"
                                   onClick={() => addStructureSection(group.id)}
-                                  className="h-9 w-full rounded-2xl border-white/8 bg-white/3 text-white hover:bg-white/6"
+                                  className="h-9 w-full rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
                                 >
                                   <Plus className="mr-2 h-4 w-4" />
                                   在这一组里新增小节
@@ -3822,7 +3822,7 @@ export function ProjectEditorFabricClient({
                                 <Textarea
                                   value={activeMeta.text}
                                   onChange={(event) => updateActiveObject({ text: event.target.value })}
-                                  className="min-h-[80px] rounded-2xl border-white/8 bg-secondary text-white"
+                                  className="min-h-[80px] rounded-xl border-white/8 bg-secondary text-white"
                                 />
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
@@ -3902,7 +3902,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontSize: Number(event.target.value) || 16 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3913,7 +3913,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ fontWeight: Number(event.target.value) || 400 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3945,7 +3945,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ lineHeight: Number(event.target.value) || 1.3 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -3982,7 +3982,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -3991,7 +3991,7 @@ export function ProjectEditorFabricClient({
                                       type="number"
                                       readOnly
                                       value={activeMeta.height}
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white/40"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white/40"
                                     />
                                   </div>
                                   <div>
@@ -4002,7 +4002,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4013,7 +4013,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4036,7 +4036,7 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="给这张图片一个更清晰的名称"
-                                    className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                    className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                   />
                                   <label className="mt-3 block text-xs text-white/50">图片描述</label>
                                   <Textarea
@@ -4048,13 +4048,13 @@ export function ProjectEditorFabricClient({
                                       }))
                                     }
                                     placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
-                                    className="mt-2 min-h-[96px] rounded-2xl border-white/8 bg-secondary text-white"
+                                    className="mt-2 min-h-[96px] rounded-xl border-white/8 bg-secondary text-white"
                                   />
                                   <Button
                                     type="button"
                                     onClick={() => void saveSelectedImageDetails()}
                                     disabled={assetDetailsSaving}
-                                    className="mt-3 h-10 w-full gap-2 rounded-2xl bg-white text-neutral-950 hover:bg-neutral-100"
+                                    className="mt-3 h-10 w-full gap-2 rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
                                   >
                                     {assetDetailsSaving ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -4097,7 +4097,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4108,7 +4108,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4119,7 +4119,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4130,7 +4130,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4192,7 +4192,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveObject({ strokeWidth: Number(event.target.value) || 0 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   {(activeMeta.shape === "rect" || activeMeta.shape === "square") ? (
@@ -4207,7 +4207,7 @@ export function ProjectEditorFabricClient({
                                           const r = Number(event.target.value) || 0;
                                           updateActiveObject({ rx: r, ry: r } as unknown as Partial<FabricObject> & Partial<Textbox>);
                                         }}
-                                        className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                        className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                       />
                                     </div>
                                   ) : null}
@@ -4245,7 +4245,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ width: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4256,7 +4256,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ height: Number(event.target.value) || 1 })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4267,7 +4267,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ x: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                   <div>
@@ -4278,7 +4278,7 @@ export function ProjectEditorFabricClient({
                                       onChange={(event) =>
                                         updateActiveDimensions({ y: Number(event.target.value) })
                                       }
-                                      className="mt-2 h-10 rounded-2xl border-white/8 bg-secondary text-white"
+                                      className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                     />
                                   </div>
                                 </div>
@@ -4659,7 +4659,7 @@ export function ProjectEditorFabricClient({
                       key={item.mode}
                       type="button"
                       className={cn(
-                        "rounded-2xl border px-3 py-3 text-left transition-colors",
+                        "rounded-xl border px-3 py-3 text-left transition-colors",
                         scene.generationScope.mode === item.mode
                           ? "border-white/16 bg-white/10 text-white"
                           : "border-white/8 bg-background text-white/70 hover:bg-white/5"
@@ -4720,7 +4720,7 @@ export function ProjectEditorFabricClient({
                   <button
                     type="button"
                     className={cn(
-                      "rounded-2xl border px-3 py-3 text-left transition-colors",
+                      "rounded-xl border px-3 py-3 text-left transition-colors",
                       styleSelection.source === "none"
                         ? "border-white/16 bg-white/10 text-white"
                         : "border-white/8 bg-background text-white/70 hover:bg-white/5"
@@ -4735,7 +4735,7 @@ export function ProjectEditorFabricClient({
                       key={preset.key}
                       type="button"
                       className={cn(
-                        "rounded-2xl border px-3 py-3 text-left transition-colors",
+                        "rounded-xl border px-3 py-3 text-left transition-colors",
                         styleSelection.source === "preset" && styleSelection.presetKey === preset.key
                           ? "border-white/16 bg-white/10 text-white"
                           : "border-white/8 bg-background text-white/70 hover:bg-white/5"
@@ -4751,7 +4751,7 @@ export function ProjectEditorFabricClient({
                       key={set.id}
                       type="button"
                       className={cn(
-                        "rounded-2xl border px-3 py-3 text-left transition-colors md:col-span-2",
+                        "rounded-xl border px-3 py-3 text-left transition-colors md:col-span-2",
                         styleSelection.source === "reference_set" && styleSelection.referenceSetId === set.id
                           ? "border-white/16 bg-white/10 text-white"
                           : "border-white/8 bg-background text-white/70 hover:bg-white/5"

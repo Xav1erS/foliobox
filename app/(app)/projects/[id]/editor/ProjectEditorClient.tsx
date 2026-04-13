@@ -443,7 +443,7 @@ function LeftRailIconButton({
       aria-label={label}
       title={label}
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-current/20 bg-black/10">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-current/20 bg-black/10">
         <Icon className="h-4 w-4" />
       </span>
       <span className="leading-none">{label}</span>
@@ -3069,7 +3069,7 @@ const BoardDropSurface = forwardRef<
                 <div
                   key={node.id}
                   className={cn(
-                    "absolute rounded-2xl transition-all",
+                    "absolute rounded-xl transition-all",
                     selected && "ring-2 ring-black/35"
                   )}
                   style={nodeStyle}

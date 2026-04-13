@@ -18,7 +18,7 @@ import type { PlanSummaryCopy } from "@/lib/entitlement";
 import { cn } from "@/lib/utils";
 
 export const editorFieldClass =
-  "rounded-2xl border-white/8 bg-secondary text-white placeholder:text-white/24 shadow-none";
+  "rounded-xl border-white/8 bg-secondary text-white placeholder:text-white/24 shadow-none";
 
 type EditorScaffoldProps = {
   objectLabel: string;
@@ -71,7 +71,7 @@ export function EditorScaffold({
 
   return (
     <div className="dark flex h-full min-h-screen flex-col overflow-hidden bg-background text-white">
-      <header className="border-b border-white/5 bg-background shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
+      <header className="border-b border-white/10 bg-background shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
         <div className="flex min-h-[64px] items-center gap-3 px-5 py-2">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">
             <ArrowLeft className="h-4 w-4" />
@@ -128,7 +128,7 @@ export function EditorScaffold({
         ) : (
           <aside
             className={cn(
-                "flex shrink-0 flex-col border-r border-white/5 bg-background shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
+                "flex shrink-0 flex-col border-r border-white/10 bg-background shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out",
               leftRailWidthClass
             )}
           >
@@ -143,7 +143,7 @@ export function EditorScaffold({
           </aside>
         )}
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{
@@ -177,7 +177,7 @@ export function EditorScaffold({
           ) : (
             <aside
               className={cn(
-                "flex shrink-0 flex-col border-l border-white/5 bg-background shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
+                "flex shrink-0 flex-col border-l border-white/10 bg-background shadow-[inset_1px_0_0_rgba(255,255,255,0.03)] transition-[width] duration-300 ease-out animate-in fade-in-0 slide-in-from-right-2",
                 rightRailWidthClass
               )}
             >
@@ -208,7 +208,7 @@ function RailHeader({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-white/5 bg-white/2.5 px-4">
+    <div className="flex h-12 items-center justify-between border-b border-white/10 bg-white/2.5 px-4">
       <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
@@ -236,7 +236,7 @@ function CollapsedRailButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/5 bg-background text-white/44 transition-colors hover:bg-card hover:text-white"
+      className="flex w-11 shrink-0 flex-col items-center justify-center gap-2 border-white/10 bg-background text-white/44 transition-colors hover:bg-card hover:text-white"
       aria-label={`展开${label}`}
     >
       {side === "left" ? (
@@ -261,7 +261,7 @@ export function EditorRailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("border-b border-white/5 px-5 py-3.5", className)}>
+    <section className={cn("border-b border-white/10 px-5 py-3.5", className)}>
       <p className="text-[11px] text-white/38">
         {title}
       </p>
@@ -304,7 +304,7 @@ export function EditorMiniButton({
         className
       )}
     >
-      <div className="pointer-events-auto rounded-2xl border border-white/8 bg-card/95 p-1.5 shadow-[0_30px_80px_-44px_rgba(0,0,0,0.72)]">
+      <div className="pointer-events-auto rounded-xl border border-white/8 bg-card/95 p-1.5 shadow-[0_30px_80px_-44px_rgba(0,0,0,0.72)]">
         {children}
       </div>
     </div>
@@ -351,7 +351,7 @@ export function EditorSurfaceButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full rounded-2xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+        "w-full rounded-xl border px-3 py-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
         active
           ? "border-white/16 bg-white/9 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.05)]"
           : "border-white/8 bg-white/2.5 text-white/72 hover:bg-white/5",

@@ -496,7 +496,7 @@ export function ColorPickerPopover({
         side={side}
         align={align}
         sideOffset={8}
-        className="w-[256px] border-white/8 bg-[#1e1b18] p-0 text-white shadow-[0_24px_56px_-16px_rgba(0,0,0,0.9)]"
+        className="w-[256px] border-white/8 bg-card p-0 text-white shadow-[0_24px_56px_-16px_rgba(0,0,0,0.9)]"
       >
         {/* Mode tabs */}
         <div className="relative flex border-b border-white/[0.07]">
@@ -543,7 +543,7 @@ export function ColorPickerPopover({
                   max={360}
                   value={gradient.angle}
                   onChange={(e) => handleAngleChange(Number(e.target.value) % 360)}
-                  className="h-7 w-16 rounded-lg border border-white/8 bg-[#171411] px-2 text-center text-sm text-white [appearance:textfield]"
+                  className="h-7 w-16 rounded-lg border border-white/8 bg-secondary px-2 text-center text-sm text-white [appearance:textfield]"
                 />
                 <span className="text-[11px] text-white/40">°</span>
                 {gradient.stops.length > 2 ? (
@@ -593,7 +593,7 @@ export function ColorPickerPopover({
               value={hexInput.toUpperCase()}
               onChange={(e) => handleHexInputChange(e.target.value)}
               maxLength={7}
-              className="h-8 flex-1 rounded-lg border border-white/8 bg-[#171411] px-2 text-center font-mono text-sm text-white"
+              className="h-8 flex-1 rounded-lg border border-white/8 bg-secondary px-2 text-center font-mono text-sm text-white"
             />
             {/* Opacity % input (solid mode only) */}
             {mode === "solid" ? (
@@ -607,7 +607,7 @@ export function ColorPickerPopover({
                   onChange={(e) =>
                     handleOpacityInputChange(Number(e.target.value))
                   }
-                  className="h-8 w-[52px] rounded-lg border border-white/8 bg-[#171411] pl-2 pr-5 text-right text-sm text-white [appearance:textfield]"
+                  className="h-8 w-[52px] rounded-lg border border-white/8 bg-secondary pl-2 pr-5 text-right text-sm text-white [appearance:textfield]"
                 />
                 <span className="pointer-events-none absolute right-2 text-xs text-white/40">
                   %

@@ -873,7 +873,7 @@ export function PortfolioEditorClient({
                               </div>
 
                               <div className="flex-1 px-5 py-5">
-                                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+                                <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
                                   <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
                                     {pageRoleLabel(page.pageRole)}
                                   </p>
