@@ -20,6 +20,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   ChevronDown,
   Circle,
   Copy,
@@ -57,6 +60,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,6 +80,13 @@ import {
   EditorTabsList,
   EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
+import {
+  ColorPickerPopover,
+  fabricFillToColorValue,
+  gradientConfigToFabricOptions,
+  type ColorValue,
+  type GradientConfig,
+} from "@/components/editor/ColorPickerPopover";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
@@ -122,25 +139,42 @@ type ActiveObjectMeta =
       kind: "text";
       id: string;
       text: string;
+      fontFamily: string;
       fontSize: number;
       fontWeight: number;
+      lineHeight: number;
+      textAlign: "left" | "center" | "right";
       color: string;
       opacity: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
     }
   | {
       kind: "image";
       id: string;
       assetId: string | null;
       opacity: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
     }
   | {
       kind: "shape";
       id: string;
       shape: ProjectShapeType;
       fill: string;
+      gradient: import("@/components/editor/ColorPickerPopover").GradientConfig | null;
       stroke: string | null;
       strokeWidth: number;
       opacity: number;
+      rx: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
     };
 
 type LayerItem = {
@@ -217,15 +251,44 @@ function clamp(value: number, min: number, max: number) {
 }
 
 const SURFACE_FIT_PADDING = 48;
+
+// 正文字体
+const EDITOR_FONTS_BODY = [
+  { label: "思源黑体", value: "Noto Sans SC" },
+  { label: "思源宋体", value: "Noto Serif SC" },
+  { label: "阿里巴巴普惠体", value: "Alibaba PuHuiTi" },
+  { label: "站酷小薇体", value: "ZCOOL XiaoWei" },
+] as const;
+
+// 展示/艺术字体
+const EDITOR_FONTS_DISPLAY = [
+  { label: "得意黑", value: "Smiley Sans" },
+  { label: "站酷庆科黄油体", value: "ZCOOL QingKe HuangYou" },
+  { label: "Playfair Display", value: "Playfair Display" },
+  { label: "Cormorant Garamond", value: "Cormorant Garamond" },
+  { label: "Bebas Neue", value: "Bebas Neue" },
+  { label: "Syne", value: "Syne" },
+] as const;
+
+const EDITOR_FONTS = [...EDITOR_FONTS_BODY, ...EDITOR_FONTS_DISPLAY];
+
+const GOOGLE_FONTS_URL =
+  "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+XiaoWei&family=ZCOOL+QingKe+HuangYou&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&family=Bebas+Neue&family=Syne:wght@400;700;800&display=swap";
+
+// 得意黑 + 阿里普惠体通过各自 CDN 加载（自托管字体，无 Google Fonts 收录）
+const SMILEY_SANS_URL =
+  "https://cdn.jsdelivr.net/gh/atelier-anchor/smiley-sans@1.1.1/demo/SmileySans-Oblique.woff2";
+const ALIBABA_PUHUITI_URL =
+  "https://puhuiti.oss-cn-hangzhou.aliyuncs.com/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-55-Regular/AlibabaPuHuiTi-2-55-Regular.woff2";
 const PROJECT_BOARD_MAX = 10;
 const editorPanelCardClass =
   "rounded-[20px] border border-white/[0.08] bg-[#171411] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
   "rounded-[18px] border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
 const editorFloatingSurfaceClass =
-  "rounded-[22px] border border-white/[0.08] bg-[#1c1916]/95 text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)] backdrop-blur-xl";
+  "rounded-[22px] border border-white/[0.08] bg-[#1e1b18] text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
 const editorPopupSurfaceClass =
-  "rounded-[20px] border border-white/[0.08] bg-[#1c1916]/97 text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.82)] backdrop-blur-xl";
+  "rounded-[20px] border border-white/[0.08] bg-[#1e1b18] text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
 const editorPopupItemClass =
   "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
 
@@ -881,6 +944,55 @@ export function ProjectEditorFabricClient({
     const activeObject = canvas.getActiveObject() as FabricObject | ActiveSelection | null;
     if (!activeObject || activeObject.type === "activeSelection") return;
     activeObject.set(patch);
+    activeObject.setCoords();
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
+  function setActiveObjectFill(colorValue: ColorValue) {
+    const canvas = canvasRef.current;
+    const fabric = fabricRef.current;
+    if (!canvas || !fabric) return;
+    const activeObject = canvas.getActiveObject() as FabricObject | null;
+    if (!activeObject || activeObject.type === "activeSelection") return;
+
+    if (colorValue.mode === "solid") {
+      activeObject.set({ fill: colorValue.hex });
+    } else {
+      const opts = gradientConfigToFabricOptions(colorValue.gradient);
+      const grad = new (fabric as unknown as Record<string, new (o: unknown) => unknown>).Gradient(opts);
+      activeObject.set({ fill: grad as unknown as string });
+    }
+    activeObject.setCoords();
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
+  function updateActiveDimensions(patch: { x?: number; y?: number; width?: number; height?: number }) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject() as FabricObject | null;
+    if (!activeObject || activeObject.type === "activeSelection") return;
+
+    const updates: Record<string, number> = {};
+    if (patch.x !== undefined) updates.left = patch.x;
+    if (patch.y !== undefined) updates.top = patch.y;
+    if (patch.width !== undefined) {
+      const naturalW = activeObject.width ?? 1;
+      if (activeObject.type === "textbox") {
+        updates.width = Math.max(1, patch.width);
+      } else {
+        updates.scaleX = Math.max(0.001, patch.width / naturalW);
+      }
+    }
+    if (patch.height !== undefined) {
+      const naturalH = activeObject.height ?? 1;
+      updates.scaleY = Math.max(0.001, patch.height / naturalH);
+    }
+
+    activeObject.set(updates as Partial<FabricObject>);
     activeObject.setCoords();
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
@@ -1616,39 +1728,67 @@ export function ProjectEditorFabricClient({
 
     const current = activeObjects[0];
     const data = current.data;
+    const scaledW = typeof current.getScaledWidth === "function" ? current.getScaledWidth() : (current.width ?? 0);
+    const scaledH = typeof current.getScaledHeight === "function" ? current.getScaledHeight() : (current.height ?? 0);
+    const objX = current.left ?? 0;
+    const objY = current.top ?? 0;
+
     if (data?.nodeType === "image") {
       setActiveMeta({
         kind: "image",
         id: data.nodeId ?? "image",
         assetId: data.assetId ?? null,
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
+        x: Math.round(objX),
+        y: Math.round(objY),
+        width: Math.round(scaledW),
+        height: Math.round(scaledH),
       });
       return;
     }
 
     if (data?.nodeType === "text" || current.type === "textbox") {
       const textbox = current as unknown as Textbox;
+      const tb = textbox as unknown as Record<string, unknown>;
       setActiveMeta({
         kind: "text",
         id: data?.nodeId ?? "text",
         text: textbox.text ?? "",
+        fontFamily: String(tb.fontFamily ?? "Inter"),
         fontSize: Number(textbox.fontSize) || 32,
         fontWeight: Number(textbox.fontWeight) || 500,
+        lineHeight: Number(tb.lineHeight) || 1.3,
+        textAlign: (tb.textAlign as "left" | "center" | "right") ?? "left",
         color: String(textbox.fill ?? "#111111"),
         opacity: typeof textbox.opacity === "number" ? textbox.opacity : 1,
+        x: Math.round(objX),
+        y: Math.round(objY),
+        width: Math.round(scaledW),
+        height: Math.round(scaledH),
       });
       return;
     }
 
     if (data?.nodeType === "shape") {
+      const shapeObj = current as unknown as Record<string, unknown>;
+      const shapeRx = data.shapeType === "rect" || data.shapeType === "square"
+        ? (Number(shapeObj.rx) || 0)
+        : 0;
+      const colorValue = fabricFillToColorValue(current.fill);
       setActiveMeta({
         kind: "shape",
         id: data.nodeId ?? "shape",
         shape: data.shapeType ?? "rect",
-        fill: typeof current.fill === "string" ? current.fill : "#111111",
+        fill: colorValue.mode === "solid" ? colorValue.hex : "#111111",
+        gradient: colorValue.mode === "gradient" ? colorValue.gradient : null,
         stroke: typeof current.stroke === "string" ? current.stroke : null,
         strokeWidth: typeof current.strokeWidth === "number" ? current.strokeWidth : 0,
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
+        rx: shapeRx,
+        x: Math.round(objX),
+        y: Math.round(objY),
+        width: Math.round(scaledW),
+        height: Math.round(scaledH),
       });
       return;
     }
@@ -1733,6 +1873,7 @@ export function ProjectEditorFabricClient({
 
       if (data?.nodeType === "text") {
         const textbox = object as unknown as Textbox;
+        const tb = textbox as unknown as Record<string, unknown>;
         acc.push(
           createProjectTextNode({
             id: data.nodeId ?? newNodeId("text"),
@@ -1744,6 +1885,7 @@ export function ProjectEditorFabricClient({
             height: Math.round(height),
             fontSize: Number(textbox.fontSize) || 32,
             fontWeight: Number(textbox.fontWeight) || 500,
+            fontFamily: String(tb.fontFamily ?? "Inter"),
             lineHeight: Number(textbox.lineHeight) || 1.3,
             align: (textbox.textAlign as ProjectBoardTextNode["align"]) ?? "left",
             color: String(textbox.fill ?? "#111111"),
@@ -1754,17 +1896,25 @@ export function ProjectEditorFabricClient({
       }
 
       if (data?.nodeType === "shape") {
+        const shapeObjRaw = object as unknown as Record<string, unknown>;
+        const shapeType = data.shapeType ?? "rect";
+        const serializedRx = (shapeType === "rect" || shapeType === "square")
+          ? (Number(shapeObjRaw.rx) || 0)
+          : 0;
+        const colorValue = fabricFillToColorValue(object.fill);
         acc.push(
-          createProjectShapeNode(data.shapeType ?? "rect", {
+          createProjectShapeNode(shapeType, {
             id: data.nodeId ?? newNodeId("shape"),
             x: Math.round(left),
             y: Math.round(top),
             width: Math.round(width),
             height: Math.round(height),
-            fill: typeof object.fill === "string" ? object.fill : "#111111",
+            fill: colorValue.mode === "solid" ? colorValue.hex : "#111111",
+            gradient: colorValue.mode === "gradient" ? colorValue.gradient : null,
             stroke: typeof object.stroke === "string" ? object.stroke : null,
             strokeWidth: typeof object.strokeWidth === "number" ? object.strokeWidth : 0,
             opacity: typeof object.opacity === "number" ? object.opacity : 1,
+            rx: serializedRx,
             zIndex: index + 1,
           })
         );
@@ -1819,6 +1969,7 @@ export function ProjectEditorFabricClient({
           width: node.width,
           fontSize: node.fontSize,
           fontWeight: String(node.fontWeight),
+          fontFamily: node.fontFamily ?? "Inter",
           lineHeight: node.lineHeight,
           textAlign: node.align,
           fill: node.color,
@@ -1836,10 +1987,16 @@ export function ProjectEditorFabricClient({
 
       if (node.type === "shape") {
         let shape: FabricSceneObject | null = null;
+        // Resolve fill: prefer gradient over solid if present
+        let resolvedFill: unknown = node.fill;
+        if (node.gradient) {
+          const opts = gradientConfigToFabricOptions(node.gradient);
+          resolvedFill = new (fabric as unknown as Record<string, new (o: unknown) => unknown>).Gradient(opts);
+        }
         const base = {
           left: node.x,
           top: node.y,
-          fill: node.fill,
+          fill: resolvedFill as string,
           stroke: node.stroke ?? undefined,
           strokeWidth: node.strokeWidth,
           opacity: node.opacity,
@@ -1867,12 +2024,13 @@ export function ProjectEditorFabricClient({
             strokeUniform: true,
           }) as unknown as FabricSceneObject;
         } else {
+          const cornerR = node.rx ?? 0;
           shape = new fabric.Rect({
             ...base,
             width: node.width,
             height: node.height,
-            rx: node.shape === "square" ? 0 : 0,
-            ry: node.shape === "square" ? 0 : 0,
+            rx: cornerR,
+            ry: cornerR,
           }) as unknown as FabricSceneObject;
         }
 
@@ -1946,6 +2104,7 @@ export function ProjectEditorFabricClient({
         height: initRenderH,
         preserveObjectStacking: true,
         selection: true,
+        backgroundColor: "#ffffff",
       });
       canvasRef.current = canvas;
       setSurfaceScale(initScale);
@@ -2013,6 +2172,23 @@ export function ProjectEditorFabricClient({
       disposed = true;
       cleanup?.();
     };
+  }, []);
+
+  useEffect(() => {
+    // 加载自托管字体（得意黑 + 阿里普惠体）
+    const fonts = [
+      { family: "Smiley Sans", url: SMILEY_SANS_URL },
+      { family: "Alibaba PuHuiTi", url: ALIBABA_PUHUITI_URL },
+    ];
+    fonts.forEach(({ family, url }) => {
+      if (document.fonts.check(`16px "${family}"`)) return;
+      const face = new FontFace(family, `url(${url})`, { display: "swap" });
+      face.load().then((loaded) => {
+        document.fonts.add(loaded);
+      }).catch(() => {
+        // 网络不通时静默失败，不影响编辑器使用
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -2092,6 +2268,7 @@ export function ProjectEditorFabricClient({
       width: 520,
       fontSize: 64,
       fontWeight: "700",
+      fontFamily: "Inter",
       fill: "#111111",
       editable: true,
     }) as unknown as FabricSceneObject;
@@ -2407,6 +2584,8 @@ export function ProjectEditorFabricClient({
 
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       <EditorScaffold
       objectLabel=""
       objectName={initialData.name}
@@ -3466,16 +3645,81 @@ export function ProjectEditorFabricClient({
                             <div className="space-y-3">
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
-                                <label className="text-xs text-white/50">文本内容</label>
                                 <Textarea
                                   value={activeMeta.text}
                                   onChange={(event) => updateActiveObject({ text: event.target.value })}
-                                  className="mt-2 min-h-[84px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                  className="min-h-[80px] rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                                 />
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
+                                <p className="mb-2.5 text-[11px] tracking-[0.16em] text-white/34">字体</p>
+                                <Select
+                                  value={activeMeta.fontFamily}
+                                  onValueChange={(value) => updateActiveObject({ fontFamily: value })}
+                                >
+                                  <SelectTrigger className="h-10 rounded-xl border-white/[0.08] bg-[#171411] text-sm text-white focus:ring-white/20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-white/[0.08] bg-[#1e1b18] text-white">
+                                    <div className="px-2 pb-1 pt-2 text-[10px] font-medium tracking-[0.14em] text-white/36">
+                                      正文字体
+                                    </div>
+                                    {EDITOR_FONTS_BODY.map((font) => (
+                                      <SelectItem
+                                        key={font.value}
+                                        value={font.value}
+                                        className="focus:bg-white/[0.07] focus:text-white"
+                                        style={{ fontFamily: font.value }}
+                                      >
+                                        {font.label}
+                                      </SelectItem>
+                                    ))}
+                                    <div className="mx-2 my-1.5 h-px bg-white/[0.06]" />
+                                    <div className="px-2 pb-1 text-[10px] font-medium tracking-[0.14em] text-white/36">
+                                      展示 / 艺术字体
+                                    </div>
+                                    {EDITOR_FONTS_DISPLAY.map((font) => (
+                                      <SelectItem
+                                        key={font.value}
+                                        value={font.value}
+                                        className="focus:bg-white/[0.07] focus:text-white"
+                                        style={{ fontFamily: font.value }}
+                                      >
+                                        {font.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
-                                <div className="grid grid-cols-2 gap-2">
+                                {/* 对齐 */}
+                                <label className="text-xs text-white/50">对齐</label>
+                                <div className="mt-2 flex gap-1">
+                                  {(["left", "center", "right"] as const).map((align) => (
+                                    <button
+                                      key={align}
+                                      type="button"
+                                      onClick={() => updateActiveObject({ textAlign: align })}
+                                      className={cn(
+                                        "flex h-8 flex-1 items-center justify-center rounded-lg transition-colors",
+                                        activeMeta.textAlign === align
+                                          ? "bg-white/15 text-white"
+                                          : "text-white/40 hover:bg-white/[0.07] hover:text-white/70"
+                                      )}
+                                    >
+                                      {align === "left" ? (
+                                        <AlignLeft className="h-3.5 w-3.5" />
+                                      ) : align === "center" ? (
+                                        <AlignCenter className="h-3.5 w-3.5" />
+                                      ) : (
+                                        <AlignRight className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                                {/* 字号 / 字重 */}
+                                <div className="mt-3 grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">字号</label>
                                     <Input
@@ -3499,28 +3743,103 @@ export function ProjectEditorFabricClient({
                                     />
                                   </div>
                                 </div>
+                                {/* 颜色 / 行高 */}
                                 <div className="mt-3 grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">颜色</label>
-                                    <Input
-                                      type="color"
-                                      value={activeMeta.color}
-                                      onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                                    />
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <ColorPickerPopover
+                                        value={{ mode: "solid", hex: activeMeta.color }}
+                                        onChange={(colorValue) => {
+                                          if (colorValue.mode === "solid") {
+                                            updateActiveObject({ fill: colorValue.hex });
+                                          }
+                                        }}
+                                        side="left"
+                                        align="start"
+                                      />
+                                    </div>
                                   </div>
                                   <div>
-                                    <label className="text-xs text-white/50">透明度</label>
+                                    <label className="text-xs text-white/50">行高</label>
+                                    <Input
+                                      type="number"
+                                      min={0.8}
+                                      max={4}
+                                      step={0.05}
+                                      value={activeMeta.lineHeight}
+                                      onChange={(event) =>
+                                        updateActiveObject({ lineHeight: Number(event.target.value) || 1.3 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                </div>
+                                {/* 透明度 */}
+                                <div className="mt-3">
+                                  <label className="text-xs text-white/50">透明度</label>
+                                  <div className="mt-2 flex items-center gap-2">
                                     <Input
                                       type="range"
                                       min={0}
                                       max={1}
-                                      step={0.05}
+                                      step={0.01}
                                       value={activeMeta.opacity}
                                       onChange={(event) =>
                                         updateActiveObject({ opacity: Number(event.target.value) })
                                       }
-                                      className="mt-3"
+                                      className="h-8 flex-1"
+                                    />
+                                    <span className="w-9 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                      {Math.round(activeMeta.opacity * 100)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* 位置与尺寸 */}
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">宽 W</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.width}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ width: Number(event.target.value) || 1 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">高 H</label>
+                                    <Input
+                                      type="number"
+                                      readOnly
+                                      value={activeMeta.height}
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white/40"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">X</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.x}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ x: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">Y</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.y}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ y: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                                     />
                                   </div>
                                 </div>
@@ -3575,17 +3894,72 @@ export function ProjectEditorFabricClient({
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
                                 <label className="text-xs text-white/50">透明度</label>
-                                <Input
-                                  type="range"
-                                  min={0}
-                                  max={1}
-                                  step={0.05}
-                                  value={activeMeta.opacity}
-                                  onChange={(event) =>
-                                    updateActiveObject({ opacity: Number(event.target.value) })
-                                  }
-                                  className="mt-3"
-                                />
+                                <div className="mt-2 flex items-center gap-2">
+                                  <Input
+                                    type="range"
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    value={activeMeta.opacity}
+                                    onChange={(event) =>
+                                      updateActiveObject({ opacity: Number(event.target.value) })
+                                    }
+                                    className="h-8 flex-1"
+                                  />
+                                  <span className="w-9 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                    {Math.round(activeMeta.opacity * 100)}%
+                                  </span>
+                                </div>
+                              </div>
+                              {/* 位置与尺寸 */}
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">宽 W</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.width}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ width: Number(event.target.value) || 1 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">高 H</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.height}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ height: Number(event.target.value) || 1 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">X</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.x}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ x: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">Y</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.y}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ y: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ) : null}
@@ -3594,20 +3968,41 @@ export function ProjectEditorFabricClient({
                             <div className="space-y-3">
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
-                                <label className="text-xs text-white/50">填充色</label>
-                                <Input
-                                  type="color"
-                                  value={activeMeta.fill}
-                                  onChange={(event) => updateActiveObject({ fill: event.target.value })}
-                                  className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                                />
+                                {/* 填充 */}
+                                <label className="text-xs text-white/50">填充</label>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <ColorPickerPopover
+                                    value={
+                                      activeMeta.gradient
+                                        ? { mode: "gradient", gradient: activeMeta.gradient }
+                                        : { mode: "solid", hex: activeMeta.fill }
+                                    }
+                                    onChange={(colorValue) => setActiveObjectFill(colorValue)}
+                                    side="left"
+                                    align="start"
+                                  />
+                                  <span className="truncate text-sm text-white/60">
+                                    {activeMeta.gradient ? "渐变" : activeMeta.fill.toUpperCase()}
+                                  </span>
+                                </div>
+                                {/* 描边 */}
                                 <label className="mt-3 block text-xs text-white/50">描边色</label>
-                                <Input
-                                  type="color"
-                                  value={activeMeta.stroke ?? "#000000"}
-                                  onChange={(event) => updateActiveObject({ stroke: event.target.value })}
-                                  className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] p-1"
-                                />
+                                <div className="mt-2 flex items-center gap-2">
+                                  <ColorPickerPopover
+                                    value={{ mode: "solid", hex: activeMeta.stroke ?? "#000000" }}
+                                    onChange={(colorValue) => {
+                                      if (colorValue.mode === "solid") {
+                                        updateActiveObject({ stroke: colorValue.hex });
+                                      }
+                                    }}
+                                    side="left"
+                                    align="start"
+                                  />
+                                  <span className="truncate text-sm text-white/60">
+                                    {(activeMeta.stroke ?? "#000000").toUpperCase()}
+                                  </span>
+                                </div>
+                                {/* 描边宽度 / 圆角 */}
                                 <div className="mt-3 grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">描边宽度</label>
@@ -3620,18 +4015,90 @@ export function ProjectEditorFabricClient({
                                       className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                                     />
                                   </div>
-                                  <div>
-                                    <label className="text-xs text-white/50">透明度</label>
+                                  {(activeMeta.shape === "rect" || activeMeta.shape === "square") ? (
+                                    <div>
+                                      <label className="text-xs text-white/50">圆角</label>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={500}
+                                        value={activeMeta.rx}
+                                        onChange={(event) => {
+                                          const r = Number(event.target.value) || 0;
+                                          updateActiveObject({ rx: r, ry: r } as unknown as Partial<FabricObject> & Partial<Textbox>);
+                                        }}
+                                        className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                      />
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {/* 透明度 */}
+                                <div className="mt-3">
+                                  <label className="text-xs text-white/50">透明度</label>
+                                  <div className="mt-2 flex items-center gap-2">
                                     <Input
                                       type="range"
                                       min={0}
                                       max={1}
-                                      step={0.05}
+                                      step={0.01}
                                       value={activeMeta.opacity}
                                       onChange={(event) =>
                                         updateActiveObject({ opacity: Number(event.target.value) })
                                       }
-                                      className="mt-3"
+                                      className="h-8 flex-1"
+                                    />
+                                    <span className="w-9 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                      {Math.round(activeMeta.opacity * 100)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* 位置与尺寸 */}
+                              <div className={cn(editorPanelMutedCardClass, "p-3")}>
+                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-xs text-white/50">宽 W</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.width}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ width: Number(event.target.value) || 1 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">高 H</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.height}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ height: Number(event.target.value) || 1 })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">X</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.x}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ x: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-white/50">Y</label>
+                                    <Input
+                                      type="number"
+                                      value={activeMeta.y}
+                                      onChange={(event) =>
+                                        updateActiveDimensions({ y: Number(event.target.value) })
+                                      }
+                                      className="mt-2 h-10 rounded-2xl border-white/[0.08] bg-[#171411] text-white"
                                     />
                                   </div>
                                 </div>

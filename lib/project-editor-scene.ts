@@ -68,6 +68,7 @@ const ProjectBoardTextNodeSchema = z.object({
   height: z.number(),
   fontSize: z.number(),
   fontWeight: z.number(),
+  fontFamily: z.string().optional().default("Inter"),
   lineHeight: z.number(),
   align: z.enum(["left", "center", "right"]),
   color: z.string(),
@@ -93,6 +94,19 @@ const ProjectBoardImageNodeSchema = z.object({
   zIndex: z.number(),
 });
 
+const GradientStopSchema = z.object({
+  offset: z.number(),
+  color: z.string(),
+});
+
+const GradientConfigSchema = z
+  .object({
+    angle: z.number().default(90),
+    stops: z.array(GradientStopSchema).min(2),
+  })
+  .nullable()
+  .optional();
+
 const ProjectBoardShapeNodeSchema = z.object({
   id: z.string(),
   type: z.literal("shape"),
@@ -102,9 +116,11 @@ const ProjectBoardShapeNodeSchema = z.object({
   width: z.number(),
   height: z.number(),
   fill: z.string(),
+  gradient: GradientConfigSchema.default(null),
   stroke: z.string().nullable(),
   strokeWidth: z.number(),
   opacity: z.number(),
+  rx: z.number().optional().default(0),
   zIndex: z.number(),
 });
 
@@ -334,6 +350,7 @@ export function createProjectTextNode(
     height: patch.height ?? 120,
     fontSize: patch.fontSize ?? (patch.role === "title" ? 72 : patch.role === "metric" ? 56 : 28),
     fontWeight: patch.fontWeight ?? (patch.role === "title" ? 700 : patch.role === "metric" ? 600 : 400),
+    fontFamily: patch.fontFamily ?? "Inter",
     lineHeight: patch.lineHeight ?? (patch.role === "title" ? 1.08 : 1.45),
     align: patch.align ?? "left",
     color: patch.color ?? DEFAULT_TEXT_COLOR,
@@ -374,9 +391,11 @@ export function createProjectShapeNode(
     width: patch?.width ?? 320,
     height: patch?.height ?? 200,
     fill: patch?.fill ?? "#111111",
+    gradient: patch?.gradient ?? null,
     stroke: patch?.stroke ?? null,
     strokeWidth: patch?.strokeWidth ?? 0,
     opacity: patch?.opacity ?? 1,
+    rx: patch?.rx ?? 0,
     zIndex: patch?.zIndex ?? 3,
   };
 }
