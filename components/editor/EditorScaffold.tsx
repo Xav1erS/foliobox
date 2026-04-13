@@ -143,7 +143,7 @@ export function EditorScaffold({
           </aside>
         )}
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <div
             className="pointer-events-none absolute inset-0 opacity-100"
             style={{

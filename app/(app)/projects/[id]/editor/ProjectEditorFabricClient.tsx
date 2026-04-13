@@ -3608,7 +3608,7 @@ export function ProjectEditorFabricClient({
           ref={viewportRef}
           className="relative flex h-full w-full items-center justify-center overflow-hidden"
           style={{
-            backgroundColor: "#15120f",
+            backgroundColor: "#0a0a0a",
             backgroundImage:
               "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1.5px)",
             backgroundSize: "20px 20px",
