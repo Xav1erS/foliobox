@@ -625,7 +625,7 @@ export function PortfolioEditorClient({
                     >
                       <div className="flex items-center gap-2">
                         {item.done ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-80">
+                        <p className="text-eyebrow font-mono uppercase tracking-[0.16em] opacity-80">
                           {item.label}
                         </p>
                       </div>
@@ -744,7 +744,7 @@ export function PortfolioEditorClient({
                         active={selectedCanvasItem?.id === page.id}
                         onClick={() => setSelectedCanvasItemId(page.id)}
                       >
-                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                        <p className="text-eyebrow font-mono uppercase tracking-[0.16em] opacity-70">
                           Page {index + 1}
                         </p>
                         <p className="mt-2 text-sm font-medium">{page.title}</p>
@@ -818,7 +818,7 @@ export function PortfolioEditorClient({
                 {pages.length === 0 ? (
                   <div className="flex w-[720px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/3 px-10 py-20 text-center">
                     <div className="max-w-xl">
-                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/34">
+                      <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/34">
                         Empty Canvas
                       </p>
                       <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
@@ -859,14 +859,14 @@ export function PortfolioEditorClient({
                               <div className="border-b border-neutral-200 px-5 py-4">
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+                                    <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
                                       {page.type === "fixed" ? "Fixed Page" : "Project Page"}
                                     </p>
                                     <h2 className="mt-2 text-lg font-semibold tracking-tight text-neutral-950">
                                       {page.title}
                                     </h2>
                                   </div>
-                                  <span className="rounded-full border border-neutral-200 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-500">
+                                  <span className="rounded-full border border-neutral-200 px-2.5 py-1 text-eyebrow font-mono uppercase tracking-[0.16em] text-neutral-500">
                                     {page.pageCountSuggestion}
                                   </span>
                                 </div>
@@ -874,7 +874,7 @@ export function PortfolioEditorClient({
 
                               <div className="flex-1 px-5 py-5">
                                 <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
-                                  <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">
+                                  <p className="text-eyebrow font-mono uppercase tracking-[0.16em] text-neutral-400">
                                     {pageRoleLabel(page.pageRole)}
                                   </p>
                                   <p className="mt-3 text-sm leading-6 text-neutral-600">
@@ -1057,7 +1057,7 @@ export function PortfolioEditorClient({
                   active={selectedCanvasItem?.id === page.id}
                   className="w-44"
                 >
-                  <p className="truncate text-[10px] font-mono uppercase tracking-[0.16em] opacity-70">
+                  <p className="truncate text-eyebrow font-mono uppercase tracking-[0.16em] opacity-70">
                     Page {index + 1}
                   </p>
                   <p className="mt-2 truncate text-sm font-medium">{page.title}</p>
@@ -1092,7 +1092,7 @@ export function PortfolioEditorClient({
             <Card className="shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs uppercase tracking-[0.14em]">
                     预检
                   </Badge>
                   {generatePrecheck?.suggestedMode === "reuse" ? (
@@ -1126,7 +1126,7 @@ export function PortfolioEditorClient({
             </Card>
             <Card className="shadow-none">
               <CardContent className="space-y-3 p-4">
-                <Badge variant="secondary" className="w-fit rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.14em]">
+                <Badge variant="secondary" className="w-fit rounded-full px-2.5 py-1 text-xs uppercase tracking-[0.14em]">
                   当前上下文
                 </Badge>
                 <div className="space-y-1">

@@ -66,7 +66,7 @@ export default async function PortfoliosPage() {
               <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                       全部作品集
                     </Badge>
                     <span className="text-sm text-muted-foreground">{portfolios.length} 份</span>
@@ -112,14 +112,14 @@ export default async function PortfoliosPage() {
                             })} 更新
                           </p>
                         </div>
-                        <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                        <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                           {statusLabel}
                         </Badge>
                       </div>
 
                       <div className="space-y-2">
                         <div>
-                          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
                             项目池
                           </p>
                           <p className="mt-1 text-sm text-foreground/88">

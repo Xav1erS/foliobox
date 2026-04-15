@@ -203,7 +203,7 @@ export function ProjectSetupWizard({
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">重新分析会覆盖当前结构</span>
             </div>
-            <p className="mt-2 text-[13px] leading-relaxed text-white/50">
+            <p className="mt-2 text-sm leading-relaxed text-white/50">
               AI 会重新理解你的项目，已有的结构建议将被替换。
               如果你已经根据旧结构创建了画板，建议先记录当前内容。
             </p>
@@ -234,7 +234,7 @@ export function ProjectSetupWizard({
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span className="font-medium">当前画板内容将被替换</span>
             </div>
-            <p className="mt-2 text-[13px] leading-relaxed text-white/50">
+            <p className="mt-2 text-sm leading-relaxed text-white/50">
               确认结构后，系统会按新结构重建所有画板，你在画布上的现有编辑内容将被清空。
               此操作不可撤销。
             </p>
@@ -275,7 +275,7 @@ export function ProjectSetupWizard({
                   type="button"
                   onClick={() => scrollToSection(step.key)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] transition-colors",
+                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs transition-colors",
                     isActive
                       ? "bg-white/10 text-white"
                       : "text-white/45 hover:bg-white/5 hover:text-white/70",
@@ -283,7 +283,7 @@ export function ProjectSetupWizard({
                 >
                   <span
                     className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                       step.done
                         ? "bg-emerald-500/25 text-emerald-300"
                         : isActive
@@ -298,7 +298,7 @@ export function ProjectSetupWizard({
               </div>
             );
           })}
-          <div className="ml-auto text-[11px] text-white/30">{factsSaveLabel}</div>
+          <div className="ml-auto text-xs text-white/30">{factsSaveLabel}</div>
         </div>
       </div>
 
@@ -408,26 +408,26 @@ export function ProjectSetupWizard({
                       ? "AI 正在理解你的设计稿…"
                       : "AI 正在生成项目结构建议…"}
                   </p>
-                  <p className="mt-1 text-[12px] text-white/35">通常需要 10–30 秒</p>
+                  <p className="mt-1 text-xs text-white/35">通常需要 10–30 秒</p>
                 </div>
               </div>
             ) : recognitionDone && materialRecognition ? (
               <div className="space-y-3">
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                  <p className="text-[11px] uppercase tracking-wider text-white/35">
+                  <p className="text-xs uppercase tracking-wider text-white/35">
                     AI 理解摘要
                   </p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-white/75">
+                  <p className="mt-2 text-sm leading-relaxed text-white/75">
                     {materialRecognition.summary}
                   </p>
                   {materialRecognition.missingInfo.length > 0 ? (
                     <div className="mt-4 rounded-xl bg-amber-500/10 px-4 py-3">
-                      <p className="mb-1.5 text-[11px] font-medium text-amber-300/80">
+                      <p className="mb-1.5 text-xs font-medium text-amber-300/80">
                         AI 希望了解更多
                       </p>
                       <ul className="space-y-1">
                         {materialRecognition.missingInfo.map((item, i) => (
-                          <li key={i} className="text-[12px] leading-relaxed text-white/55">
+                          <li key={i} className="text-xs leading-relaxed text-white/55">
                             · {item}
                           </li>
                         ))}
@@ -439,7 +439,7 @@ export function ProjectSetupWizard({
                   type="button"
                   onClick={handleAiClick}
                   disabled={!assetsUploaded}
-                  className="text-[12px] text-white/45 transition-colors hover:text-white/80 disabled:opacity-40"
+                  className="text-xs text-white/45 transition-colors hover:text-white/80 disabled:opacity-40"
                 >
                   如果素材或背景有变化，可以 <span className="underline">重新理解</span>
                 </button>
@@ -447,15 +447,15 @@ export function ProjectSetupWizard({
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
                 {!assetsUploaded ? (
-                  <p className="mb-4 text-[13px] text-amber-300/70">
+                  <p className="mb-4 text-sm text-amber-300/70">
                     请先上传至少一张设计稿
                   </p>
                 ) : !factsComplete ? (
-                  <p className="mb-4 text-[13px] text-amber-300/70">
+                  <p className="mb-4 text-sm text-amber-300/70">
                     建议先补充项目背景，AI 理解会更准确
                   </p>
                 ) : (
-                  <p className="mb-4 text-[13px] text-white/50">
+                  <p className="mb-4 text-sm text-white/50">
                     准备就绪，让 AI 理解你的项目
                   </p>
                 )}
@@ -491,12 +491,12 @@ export function ProjectSetupWizard({
             {structureReady && structureDraft ? (
               <div className="space-y-4">
                 {isStructureConfirmed ? (
-                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-[13px] text-emerald-300/85">
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300/85">
                     <Check className="h-4 w-4" />
                     结构已确认，画板已按此结构创建
                   </div>
                 ) : (
-                  <p className="text-[13px] leading-relaxed text-white/55">
+                  <p className="text-sm leading-relaxed text-white/55">
                     {structureDraft.summary}
                   </p>
                 )}
@@ -507,10 +507,10 @@ export function ProjectSetupWizard({
                       className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[13px] font-medium text-white/85">
+                        <span className="text-sm font-medium text-white/85">
                           {group.label}
                         </span>
-                        <span className="text-[11px] text-white/35">
+                        <span className="text-xs text-white/35">
                           {group.sections.length} 页
                         </span>
                       </div>
@@ -518,7 +518,7 @@ export function ProjectSetupWizard({
                         {group.sections.map((section) => (
                           <span
                             key={section.id}
-                            className="rounded-lg bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/55"
+                            className="rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs text-white/55"
                           >
                             {section.title}
                           </span>
@@ -528,7 +528,7 @@ export function ProjectSetupWizard({
                   ))}
                 </div>
                 {actionError ? (
-                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] text-red-300/85">
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300/85">
                     {actionError}
                   </div>
                 ) : null}
@@ -544,7 +544,7 @@ export function ProjectSetupWizard({
                 ) : (
                   <>
                     {hasExistingBoards ? (
-                      <p className="text-center text-[12px] text-amber-400/70">
+                      <p className="text-center text-xs text-amber-400/70">
                         确认后将替换当前所有画板内容
                       </p>
                     ) : null}
@@ -570,7 +570,7 @@ export function ProjectSetupWizard({
                 )}
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-[13px] text-white/35">
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/35">
                 完成上一步的 AI 理解后，这里会显示项目结构建议
               </div>
             )}
@@ -597,12 +597,12 @@ function SectionHeader({
   return (
     <div className="mb-5">
       <div className="flex items-baseline gap-3">
-        <span className="text-[11px] font-semibold text-white/30">
+        <span className="text-xs font-semibold text-white/30">
           0{index}
         </span>
         <h2 className="text-[18px] font-semibold text-white/90">{title}</h2>
       </div>
-      <p className="mt-1.5 text-[12px] leading-relaxed text-white/40">{hint}</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-white/40">{hint}</p>
     </div>
   );
 }
@@ -620,7 +620,7 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="mb-1.5 block text-[11px] text-white/45">
+      <label className="mb-1.5 block text-xs text-white/45">
         {label}
         {required ? <span className="ml-1 text-amber-300/80">*</span> : null}
       </label>
@@ -659,7 +659,7 @@ function AssetsGrid({
           <p className="text-sm font-medium">
             {uploadingAssets ? "上传中…" : "上传设计稿"}
           </p>
-          <p className="mt-1 text-[12px] text-white/35">支持 JPG / PNG / WebP</p>
+          <p className="mt-1 text-xs text-white/35">支持 JPG / PNG / WebP</p>
         </div>
       </button>
     );
@@ -686,7 +686,7 @@ function AssetsGrid({
         ) : (
           <Plus className="h-5 w-5" />
         )}
-        <span className="text-[12px]">
+        <span className="text-xs">
           {uploadingAssets ? "上传中" : "添加素材"}
         </span>
       </button>
@@ -735,7 +735,7 @@ function AssetCard({
             if (titleChanged) onUpdateTitle(asset.id, title);
           }}
           placeholder="素材标题"
-          className="h-8 rounded-lg border-white/8 bg-white/[0.04] text-[12px] text-white placeholder:text-white/30"
+          className="h-8 rounded-lg border-white/8 bg-white/[0.04] text-xs text-white placeholder:text-white/30"
         />
         <Textarea
           value={note}
@@ -744,10 +744,10 @@ function AssetCard({
             if (noteChanged) onUpdateNote(asset.id, note);
           }}
           placeholder="这张图是什么？在项目中起什么作用？"
-          className="min-h-[60px] rounded-lg border-white/8 bg-white/[0.04] text-[12px] text-white placeholder:text-white/30"
+          className="min-h-[60px] rounded-lg border-white/8 bg-white/[0.04] text-xs text-white placeholder:text-white/30"
         />
         {!meta.note ? (
-          <div className="flex items-center gap-1.5 text-[10px] text-amber-300/60">
+          <div className="flex items-center gap-1.5 text-xs text-amber-300/60">
             <AlertTriangle className="h-3 w-3" />
             未描述
           </div>

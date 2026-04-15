@@ -7,6 +7,28 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
+  /*
+   * Font size scale
+   *
+   * Chinese minimum: 12px (text-xs)
+   * Semantic mapping:
+   *   text-eyebrow  10px/14px  — font-mono Latin labels only (eyebrow, step markers)
+   *   text-xs       12px/16px  — 辅助文案 · caption (Chinese minimum)
+   *   text-sm       14px/20px  — 正文 · 摘要
+   *   text-base     16px/24px  — 正文大 · 标题小
+   *   text-xl       20px/28px  — 标题中
+   *   text-2xl      24px/32px  — 标题大
+   *   text-3xl      30px/36px  — 展示标题小
+   *   text-display  40px/52px  — 展示标题中
+   *   text-hero     56px/72px  — 展示标题大
+   */
+  --text-eyebrow: 0.625rem;
+  --text-eyebrow--line-height: 0.875rem;
+  --text-display: 2.5rem;
+  --text-display--line-height: 3.25rem;
+  --text-hero: 3.5rem;
+  --text-hero--line-height: 4.5rem;
+
   --color-brand-red: #d12f2f;
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

@@ -89,7 +89,7 @@ export function StyleReferencesClient({
       <section className="grid gap-3 md:grid-cols-3">
         <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             My Sets
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{sets.length}</p>
@@ -100,7 +100,7 @@ export function StyleReferencesClient({
         </Card>
         <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Presets
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
@@ -113,7 +113,7 @@ export function StyleReferencesClient({
         </Card>
         <Card className="border-border/70 bg-foreground text-background shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-background/45">
             Usage
           </p>
           <p className="mt-2 text-base font-medium leading-7">
@@ -128,7 +128,7 @@ export function StyleReferencesClient({
           <CardContent className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-xl border border-border/70 bg-muted/35 px-5 py-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
             Upload Set
             </Badge>
           </div>
@@ -214,7 +214,7 @@ export function StyleReferencesClient({
               <CardContent className="px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-foreground">{preset.label}</p>
-                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]">
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-eyebrow uppercase tracking-[0.16em]">
                     preset
                   </Badge>
                 </div>
@@ -244,7 +244,7 @@ export function StyleReferencesClient({
                     {set.description ? (
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">{set.description}</p>
                     ) : null}
-                    <Badge variant="outline" className="mt-2 rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]">
+                    <Badge variant="outline" className="mt-2 rounded-md px-2 py-0.5 font-mono text-eyebrow uppercase tracking-[0.16em]">
                       {set.imageUrls.length} images
                     </Badge>
                   </div>

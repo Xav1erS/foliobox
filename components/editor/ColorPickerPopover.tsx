@@ -506,7 +506,7 @@ export function ColorPickerPopover({
               type="button"
               onClick={() => switchMode(m)}
               className={cn(
-                "flex-1 py-2.5 text-[13px] transition-colors",
+                "flex-1 py-2.5 text-sm transition-colors",
                 mode === m
                   ? "text-white"
                   : "text-white/40 hover:text-white/70",
@@ -536,7 +536,7 @@ export function ColorPickerPopover({
                 onAddStop={handleAddStop}
               />
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-white/40">角度</label>
+                <label className="text-xs text-white/40">角度</label>
                 <input
                   type="number"
                   min={0}
@@ -545,12 +545,12 @@ export function ColorPickerPopover({
                   onChange={(e) => handleAngleChange(Number(e.target.value) % 360)}
                   className="h-7 w-16 rounded-lg border border-white/8 bg-secondary px-2 text-center text-sm text-white [appearance:textfield]"
                 />
-                <span className="text-[11px] text-white/40">°</span>
+                <span className="text-xs text-white/40">°</span>
                 {gradient.stops.length > 2 ? (
                   <button
                     type="button"
                     onClick={() => handleRemoveStop(activeStopIndex)}
-                    className="ml-auto text-[11px] text-white/30 hover:text-white/60"
+                    className="ml-auto text-xs text-white/30 hover:text-white/60"
                   >
                     删除节点
                   </button>

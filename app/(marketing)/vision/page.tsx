@@ -121,7 +121,7 @@ export default async function VisionPage() {
             </div>
 
             <div className="border border-white/10 bg-white/2 p-4 sm:p-5">
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
+              <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/25">
                 结构草图
               </p>
               <IsometricWireframe variant="hero" className="mt-4 opacity-80" />
@@ -146,7 +146,7 @@ export default async function VisionPage() {
                   i !== 0 ? "border-t border-white/[0.07] sm:border-l sm:border-t-0" : ""
                 }`}
               >
-                <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                <p className="text-xs font-medium uppercase tracking-[0.25em] text-white/30">
                   {item.label}
                 </p>
                 <p className="mt-2.5 text-sm leading-[1.75] text-white/65">{item.value}</p>
@@ -214,11 +214,11 @@ export default async function VisionPage() {
 
           {/* Vision diagram */}
           <div className="mt-8 border border-white/10 p-5 sm:p-7">
-            <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
+            <p className="mb-5 text-xs font-medium uppercase tracking-[0.3em] text-white/25">
               系统结构图
             </p>
             <IsometricWireframe className="mx-auto max-w-2xl opacity-75" />
-            <p className="mt-5 border-t border-white/[0.07] pt-4 text-[11px] leading-[1.7] text-white/30">
+            <p className="mt-5 border-t border-white/[0.07] pt-4 text-xs leading-[1.7] text-white/30">
               四个模块，最终回到同一个工作台。现在只有第一个在线上。
             </p>
           </div>
@@ -247,7 +247,7 @@ export default async function VisionPage() {
                 noCorners
               >
                 <div className="px-5 py-5">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/25">
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/25">
                     不是不会做
                   </p>
                   <p className="mt-3 text-base leading-[1.85] text-white/80 sm:text-lg">
@@ -311,7 +311,7 @@ export default async function VisionPage() {
             <div className="space-y-5">
               <div className="border border-white/10">
                 <div className="border-b border-white/[0.07] px-5 py-3">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                  <p className="text-xs font-medium uppercase tracking-[0.25em] text-white/30">
                     默认包含
                   </p>
                 </div>
@@ -330,7 +330,7 @@ export default async function VisionPage() {
 
               <div className="border border-white/10">
                 <div className="border-b border-white/[0.07] px-5 py-3">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-white/30">
+                  <p className="text-xs font-medium uppercase tracking-[0.25em] text-white/30">
                     不默认包含
                   </p>
                 </div>

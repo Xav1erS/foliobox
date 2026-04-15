@@ -22,7 +22,7 @@ export function WorkflowProgressBar({ currentStep }: { currentStep: 1 | 2 | 3 | 
           >
             <span
               className={[
-                "shrink-0 text-[10px] font-mono",
+                "shrink-0 text-eyebrow font-mono",
                 isActive ? "text-neutral-400" : isDone ? "text-neutral-400" : "text-neutral-300",
               ].join(" ")}
             >

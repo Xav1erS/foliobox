@@ -29,7 +29,7 @@ export function IndexedRowList({
             itemClassName,
           )}
         >
-          <span className="mt-0.5 shrink-0 font-mono text-[11px] tracking-[0.2em] text-white/25">
+          <span className="mt-0.5 shrink-0 font-mono text-xs tracking-[0.2em] text-white/25">
             {item.id}
           </span>
           <div className="min-w-0 flex-1">
@@ -38,7 +38,7 @@ export function IndexedRowList({
                 {item.title}
               </p>
               {item.rightLabel ? (
-                <span className="shrink-0 border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.15em] text-white/30">
+                <span className="shrink-0 border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
                   {item.rightLabel}
                 </span>
               ) : null}

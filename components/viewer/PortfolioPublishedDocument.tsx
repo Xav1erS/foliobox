@@ -38,7 +38,7 @@ export function PortfolioPublishedDocument({
         <p className="mt-4 max-w-3xl text-sm leading-7 text-white/80 sm:text-[15px]">
           {content.narrativeSummary}
         </p>
-        <div className="mt-5 inline-flex border border-white/20 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/80">
+        <div className="mt-5 inline-flex border border-white/20 px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/80">
           {styleProfile.label}
         </div>
       </section>
@@ -52,13 +52,13 @@ export function PortfolioPublishedDocument({
               style={{ borderColor: "var(--folio-border)" }}
             >
               <p
-                className="text-[11px] uppercase tracking-[0.18em]"
+                className="text-xs uppercase tracking-[0.18em]"
                 style={{ color: "var(--folio-body)" }}
               >
                 Page {index + 1}
               </p>
               <p
-                className="mt-2 text-[11px] uppercase tracking-[0.18em]"
+                className="mt-2 text-xs uppercase tracking-[0.18em]"
                 style={{ color: "var(--folio-body)" }}
               >
                 {page.type === "fixed" ? "固定页" : "项目页"}
@@ -84,7 +84,7 @@ export function PortfolioPublishedDocument({
           style={{ borderColor: "var(--folio-border)" }}
         >
           <p
-            className="text-[11px] uppercase tracking-[0.18em]"
+            className="text-xs uppercase tracking-[0.18em]"
             style={{ color: "var(--folio-body)" }}
           >
             Packaging Notes

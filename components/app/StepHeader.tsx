@@ -40,7 +40,7 @@ export function StepHeader({
           <span />
         )}
         {status ? (
-          <span className={`border px-3 py-1 text-[11px] ${statusClassName}`}>
+          <span className={`border px-3 py-1 text-xs ${statusClassName}`}>
             {status}
           </span>
         ) : null}

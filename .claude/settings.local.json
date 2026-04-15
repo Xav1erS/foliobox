@@ -39,7 +39,8 @@
       "mcp__shadcn__search_items_in_registries",
       "Read(//c/Users/admin/.claude//**)",
       "Read(//c/Users/admin//**)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

@@ -33,7 +33,7 @@ export default async function StyleReferencesPage() {
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                 视觉样本库
               </Badge>
               <span className="text-sm text-muted-foreground">{sets.length} 组个人参考图</span>

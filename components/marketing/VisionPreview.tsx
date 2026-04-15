@@ -52,11 +52,11 @@ export function VisionPreview() {
 
           {/* Right: vision diagram in a structural frame */}
           <div className="border border-white/10 p-5 sm:p-7">
-            <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.3em] text-white/25">
+            <p className="mb-5 text-xs font-medium uppercase tracking-[0.3em] text-white/25">
               系统结构 / 规划方向
             </p>
             <IsometricWireframe className="mx-auto max-w-full opacity-80" />
-            <p className="mt-5 border-t border-white/[0.07] pt-4 text-[11px] leading-[1.8] text-white/30">
+            <p className="mt-5 border-t border-white/[0.07] pt-4 text-xs leading-[1.8] text-white/30">
               四个模块，最终回到同一个工作台。现在只有第一个。
             </p>
           </div>

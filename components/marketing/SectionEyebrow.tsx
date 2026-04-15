@@ -13,13 +13,13 @@ export function SectionEyebrow({
 }: SectionEyebrowProps) {
   return (
     <div className={cn("flex items-center gap-4", className)}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/30">
+      <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/30">
         {label}
       </p>
       {secondaryLabel ? (
         <>
           <span className="h-px w-8 bg-white/15" />
-          <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-white/20">
+          <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/20">
             {secondaryLabel}
           </p>
         </>

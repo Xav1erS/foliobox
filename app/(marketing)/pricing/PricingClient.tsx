@@ -178,7 +178,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
                     key={`${plan.planType}-${key}`}
                     className="border border-white/10 bg-black/10 px-3 py-2"
                   >
-                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/35">
+                    <p className="text-eyebrow font-mono uppercase tracking-[0.16em] text-white/35">
                       {quota.label}
                     </p>
                     <p className="mt-1 text-sm font-medium text-white/82">

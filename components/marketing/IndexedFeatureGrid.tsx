@@ -28,10 +28,10 @@ export function IndexedFeatureGrid({
           )}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.15em] text-white/30">
+            <span className="border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
               {item.status}
             </span>
-            <span className="font-mono text-[11px] tracking-[0.25em] text-white/20">
+            <span className="font-mono text-xs tracking-[0.25em] text-white/20">
               {item.id}
             </span>
           </div>

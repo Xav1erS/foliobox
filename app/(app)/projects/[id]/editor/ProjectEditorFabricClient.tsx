@@ -305,7 +305,7 @@ const editorFloatingSurfaceClass =
 const editorPopupSurfaceClass =
   "rounded-[20px] border border-white/8 bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
 const editorPopupItemClass =
-  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-[13px] text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
+  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
 
 function packageModeLabel(mode: string | null) {
   if (mode === "DEEP") return "深讲";
@@ -2901,7 +2901,7 @@ export function ProjectEditorFabricClient({
             <div className="min-w-0 flex-1 overflow-y-auto animate-in fade-in-0 slide-in-from-left-2 duration-200">
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-card px-5 py-2 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.82)]">
                 <div className="min-w-0">
-                  <p className="text-[10px] tracking-[0.18em] text-white/30">
+                  <p className="text-xs tracking-[0.18em] text-white/30">
                     {currentLeftPanelMeta?.label ?? "面板"}
                   </p>
                 </div>
@@ -2921,13 +2921,13 @@ export function ProjectEditorFabricClient({
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium text-white">输入项目背景</p>
-                            <p className="mt-0.5 text-[11px] text-white/38">
+                            <p className="mt-0.5 text-xs text-white/38">
                               这里的内容会直接作为诊断和排版生成的上下文。
                             </p>
                           </div>
                           <span
                             className={cn(
-                              "rounded-full border px-2.5 py-1 text-[11px]",
+                              "rounded-full border px-2.5 py-1 text-xs",
                               factsSaveState === "error"
                                 ? "border-red-300/20 bg-red-400/10 text-red-100"
                                 : "border-white/8 bg-white/4 text-white/54"
@@ -2943,7 +2943,7 @@ export function ProjectEditorFabricClient({
                           title="这些客观条件一经确定不可更改，如需修改请删除项目后重建"
                         >
                           <div className="mb-1.5 flex items-center justify-between">
-                            <span className="text-[10px] uppercase tracking-wider text-white/40">
+                            <span className="text-xs uppercase tracking-wider text-white/40">
                               项目客观条件
                             </span>
                             <Lock className="h-3 w-3 text-white/30" />
@@ -2993,7 +2993,7 @@ export function ProjectEditorFabricClient({
                           </div>
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">
+                          <label className="text-xs text-white/42">
                             项目周期 <span className="text-amber-300/80">*</span>
                           </label>
                           <Input
@@ -3009,7 +3009,7 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">头衔 / Title</label>
+                          <label className="text-xs text-white/42">头衔 / Title</label>
                           <Input
                             value={projectFactsDraft.roleTitle}
                             onChange={(event) =>
@@ -3023,7 +3023,7 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">
+                          <label className="text-xs text-white/42">
                             项目背景 <span className="text-amber-300/80">*</span>
                           </label>
                           <Textarea
@@ -3039,7 +3039,7 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">
+                          <label className="text-xs text-white/42">
                             业务目标 <span className="text-amber-300/80">*</span>
                           </label>
                           <Textarea
@@ -3055,7 +3055,7 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">最大挑战</label>
+                          <label className="text-xs text-white/42">最大挑战</label>
                           <Textarea
                             value={projectFactsDraft.biggestChallenge}
                             onChange={(event) =>
@@ -3069,7 +3069,7 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">结果与成果</label>
+                          <label className="text-xs text-white/42">结果与成果</label>
                           <Textarea
                             value={projectFactsDraft.resultSummary}
                             onChange={(event) =>
@@ -3260,7 +3260,7 @@ export function ProjectEditorFabricClient({
                         <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
                           <div>
                             <p className="text-sm font-medium text-white">{materialRecognition.summary}</p>
-                            <p className="mt-2 text-[11px] text-white/34">
+                            <p className="mt-2 text-xs text-white/34">
                               更新于{" "}
                               {materialRecognition.generatedAt
                                 ? new Date(materialRecognition.generatedAt).toLocaleString("zh-CN")
@@ -3272,7 +3272,7 @@ export function ProjectEditorFabricClient({
                               {materialRecognition.recognizedTypes.map((type) => (
                                 <span
                                   key={type}
-                                  className="rounded-full border border-white/8 bg-white/3 px-2.5 py-1 text-[11px] text-white/58"
+                                  className="rounded-full border border-white/8 bg-white/3 px-2.5 py-1 text-xs text-white/58"
                                 >
                                   {type}
                                 </span>
@@ -3305,13 +3305,13 @@ export function ProjectEditorFabricClient({
                               {materialRecognition.lastIncrementalDiff.changes.length > 0 ? (
                                 <div className="mt-3 space-y-1.5">
                                   {materialRecognition.lastIncrementalDiff.changes.map((change) => (
-                                    <p key={change} className="text-[11px] leading-5 text-white/38">
+                                    <p key={change} className="text-xs leading-5 text-white/38">
                                       • {change}
                                     </p>
                                   ))}
                                 </div>
                               ) : null}
-                              <p className="mt-3 text-[11px] text-white/34">
+                              <p className="mt-3 text-xs text-white/34">
                                 {materialRecognition.lastIncrementalDiff.shouldRefreshStructure
                                   ? "这次增量建议刷新结构建议。"
                                   : "这次增量还不需要重做结构。"}
@@ -3354,7 +3354,7 @@ export function ProjectEditorFabricClient({
                           )}
                         </Button>
                         {!materialRecognition ? (
-                          <p className="mt-3 text-[11px] leading-5 text-white/34">
+                          <p className="mt-3 text-xs leading-5 text-white/34">
                             先识别素材，再起结构草稿。
                           </p>
                         ) : null}
@@ -3460,10 +3460,10 @@ export function ProjectEditorFabricClient({
                                 </>
                               )}
                             </Button>
-                            <span className="text-[11px] text-white/34">{structureSaveLabel}</span>
+                            <span className="text-xs text-white/34">{structureSaveLabel}</span>
                           </div>
 
-                          <p className="text-[11px] text-white/30">
+                          <p className="text-xs text-white/30">
                             更新于{" "}
                             {structureDraft.generatedAt
                               ? new Date(structureDraft.generatedAt).toLocaleString("zh-CN")
@@ -3492,7 +3492,7 @@ export function ProjectEditorFabricClient({
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-[11px] tracking-[0.16em] text-white/30">
+                                  <p className="text-xs tracking-[0.16em] text-white/30">
                                     GROUP {index + 1}
                                   </p>
                                   <Input
@@ -3568,7 +3568,7 @@ export function ProjectEditorFabricClient({
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0 flex-1">
-                                        <label className="text-[11px] text-white/34">小节标题</label>
+                                        <label className="text-xs text-white/34">小节标题</label>
                                         <Input
                                           value={section.title}
                                           onChange={(event) =>
@@ -3590,7 +3590,7 @@ export function ProjectEditorFabricClient({
                                       </Button>
                                     </div>
                                     <div className="mt-3">
-                                      <label className="text-[11px] text-white/34">这一小节要讲什么</label>
+                                      <label className="text-xs text-white/34">这一小节要讲什么</label>
                                       <Textarea
                                         value={section.purpose}
                                         onChange={(event) =>
@@ -3602,7 +3602,7 @@ export function ProjectEditorFabricClient({
                                       />
                                     </div>
                                     <div className="mt-3">
-                                      <label className="text-[11px] text-white/34">建议内容点</label>
+                                      <label className="text-xs text-white/34">建议内容点</label>
                                       <Textarea
                                         value={section.recommendedContent.join("\n")}
                                         onChange={(event) =>
@@ -3618,7 +3618,7 @@ export function ProjectEditorFabricClient({
                                       />
                                     </div>
                                     <div className="mt-3">
-                                      <label className="text-[11px] text-white/34">建议素材</label>
+                                      <label className="text-xs text-white/34">建议素材</label>
                                       <Input
                                         value={section.suggestedAssets.join("、")}
                                         onChange={(event) =>
@@ -3701,7 +3701,7 @@ export function ProjectEditorFabricClient({
                       >
                         新建画板
                       </EditorChromeButton>
-                      <div className="flex items-center justify-between px-1 text-[12px] text-white/52">
+                      <div className="flex items-center justify-between px-1 text-xs text-white/52">
                         <span>已用画板</span>
                         <span className="text-white/78">
                           {scene.boards.length} / {PROJECT_BOARD_MAX}
@@ -3750,7 +3750,16 @@ export function ProjectEditorFabricClient({
         </div>
       )}
       center={
-        setupMode ? (
+        <>
+        <input
+          ref={assetUploadRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="hidden"
+          onChange={(event) => void handleAssetFilesPicked(event.target.files)}
+        />
+        {setupMode ? (
           <div className="relative flex h-full w-full flex-col overflow-hidden bg-card">
             <ProjectSetupWizard
               projectName={initialData.name}
@@ -3891,15 +3900,6 @@ export function ProjectEditorFabricClient({
             </div>
           </div>
 
-          <input
-            ref={assetUploadRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(event) => void handleAssetFilesPicked(event.target.files)}
-          />
-
           <div
             ref={surfaceRef}
             className="relative overflow-hidden rounded-[12px] shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
@@ -3963,7 +3963,8 @@ export function ProjectEditorFabricClient({
             </div>
           ) : null}
         </div>
-        ) /* end canvas viewport ternary */}
+        )} /* end canvas viewport ternary */
+        </>}
       rightRail={setupMode ? undefined : (
         <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -3986,7 +3987,7 @@ export function ProjectEditorFabricClient({
                                         : "对象"}
                               </p>
                             </div>
-                            <span className="rounded-full border border-white/8 bg-background px-2.5 py-1 text-[11px] text-white/52">
+                            <span className="rounded-full border border-white/8 bg-background px-2.5 py-1 text-xs text-white/52">
                               {activeMeta.kind === "multi" ? `${activeMeta.count} 项` : "单个"}
                             </span>
                           </div>
@@ -3999,7 +4000,7 @@ export function ProjectEditorFabricClient({
                           {activeMeta.kind === "text" ? (
                             <div className="space-y-3">
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">内容</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">内容</p>
                                 <Textarea
                                   value={activeMeta.text}
                                   onChange={(event) => updateActiveObject({ text: event.target.value })}
@@ -4007,7 +4008,7 @@ export function ProjectEditorFabricClient({
                                 />
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2.5 text-[11px] tracking-[0.16em] text-white/34">字体</p>
+                                <p className="mb-2.5 text-xs tracking-[0.16em] text-white/34">字体</p>
                                 <Select
                                   value={activeMeta.fontFamily}
                                   onValueChange={(value) => updateActiveObject({ fontFamily: value })}
@@ -4016,7 +4017,7 @@ export function ProjectEditorFabricClient({
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="border-white/8 bg-card text-white">
-                                    <div className="px-2 pb-1 pt-2 text-[10px] font-medium tracking-[0.14em] text-white/36">
+                                    <div className="px-2 pb-1 pt-2 text-xs font-medium tracking-[0.14em] text-white/36">
                                       正文字体
                                     </div>
                                     {EDITOR_FONTS_BODY.map((font) => (
@@ -4030,7 +4031,7 @@ export function ProjectEditorFabricClient({
                                       </SelectItem>
                                     ))}
                                     <div className="mx-2 my-1.5 h-px bg-white/6" />
-                                    <div className="px-2 pb-1 text-[10px] font-medium tracking-[0.14em] text-white/36">
+                                    <div className="px-2 pb-1 text-xs font-medium tracking-[0.14em] text-white/36">
                                       展示 / 艺术字体
                                     </div>
                                     {EDITOR_FONTS_DISPLAY.map((font) => (
@@ -4047,7 +4048,7 @@ export function ProjectEditorFabricClient({
                                 </Select>
                               </div>
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">样式</p>
                                 {/* 对齐 */}
                                 <label className="text-xs text-white/50">对齐</label>
                                 <div className="mt-2 flex gap-1">
@@ -4153,7 +4154,7 @@ export function ProjectEditorFabricClient({
                               </div>
                               {/* 位置与尺寸 */}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">位置与尺寸</p>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">宽 W</label>
@@ -4206,7 +4207,7 @@ export function ProjectEditorFabricClient({
                             <div className="space-y-3">
                               {selectedImageAsset ? (
                                 <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                  <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">素材语义</p>
+                                  <p className="mb-2 text-xs tracking-[0.16em] text-white/34">素材语义</p>
                                   <label className="text-xs text-white/50">图片名称</label>
                                   <Input
                                     value={imageDetailsDraft.title}
@@ -4247,7 +4248,7 @@ export function ProjectEditorFabricClient({
                                 </div>
                               ) : null}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">显示</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">显示</p>
                                 <label className="text-xs text-white/50">透明度</label>
                                 <div className="mt-2 flex items-center gap-2">
                                   <Input
@@ -4268,7 +4269,7 @@ export function ProjectEditorFabricClient({
                               </div>
                               {/* 位置与尺寸 */}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">位置与尺寸</p>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">宽 W</label>
@@ -4322,7 +4323,7 @@ export function ProjectEditorFabricClient({
                           {activeMeta.kind === "shape" ? (
                             <div className="space-y-3">
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">样式</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">样式</p>
                                 {/* 填充 */}
                                 <label className="text-xs text-white/50">填充</label>
                                 <div className="mt-2 flex items-center gap-2">
@@ -4416,7 +4417,7 @@ export function ProjectEditorFabricClient({
                               </div>
                               {/* 位置与尺寸 */}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
-                                <p className="mb-2 text-[11px] tracking-[0.16em] text-white/34">位置与尺寸</p>
+                                <p className="mb-2 text-xs tracking-[0.16em] text-white/34">位置与尺寸</p>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
                                     <label className="text-xs text-white/50">宽 W</label>
@@ -4519,7 +4520,7 @@ export function ProjectEditorFabricClient({
                         />
                       </div>
 
-                      <div className="flex items-center justify-between text-[12px] text-white/50">
+                      <div className="flex items-center justify-between text-xs text-white/50">
                         <span>尺寸</span>
                         <span className="text-white/78">
                           {activeBoard.frame.width} × {activeBoard.frame.height}
@@ -4527,7 +4528,7 @@ export function ProjectEditorFabricClient({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-[12px] text-white/50">底色</span>
+                        <span className="text-xs text-white/50">底色</span>
                         <ColorPickerPopover
                           value={{ mode: "solid", ...parseColorString(activeBoard.frame.background) }}
                           onChange={(cv) => {
@@ -4543,7 +4544,7 @@ export function ProjectEditorFabricClient({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 text-[12px] text-white/50">
+                      <div className="flex items-center gap-3 text-xs text-white/50">
                         <span>内容</span>
                         <span className="text-white/78">
                           {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
@@ -4553,12 +4554,12 @@ export function ProjectEditorFabricClient({
                       {/* AI 内容建议（来自结构建议的 purpose + recommendedContent） */}
                       {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
                         <div className="rounded-xl border border-white/6 bg-white/2.5 p-3">
-                          <p className="mb-2 text-[10px] tracking-[0.16em] text-white/30">AI 内容建议</p>
+                          <p className="mb-2 text-xs tracking-[0.16em] text-white/30">AI 内容建议</p>
                           <ul className="space-y-1.5">
                             {activeBoard.contentSuggestions!.map((item, i) => (
                               <li key={i} className="flex items-start gap-1.5">
-                                <span className="mt-0.5 shrink-0 text-[10px] text-white/20">·</span>
-                                <span className="text-[12px] leading-relaxed text-white/50">{item}</span>
+                                <span className="mt-0.5 shrink-0 text-xs text-white/20">·</span>
+                                <span className="text-xs leading-relaxed text-white/50">{item}</span>
                               </li>
                             ))}
                           </ul>
@@ -4570,7 +4571,7 @@ export function ProjectEditorFabricClient({
                           type="button"
                           onClick={() => deleteBoard(activeBoard.id)}
                           disabled={scene.boards.length <= 1}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-[12px] text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-xs text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           删除当前画板
@@ -4592,7 +4593,7 @@ export function ProjectEditorFabricClient({
             <p className="text-sm font-medium text-white/44">
               {scene.boards.length} / {PROJECT_BOARD_MAX}
             </p>
-            <p className="mt-1 text-[11px] text-white/26">画板</p>
+            <p className="mt-1 text-xs text-white/26">画板</p>
           </div>
           <DndContext
             sensors={sensors}
@@ -4660,7 +4661,7 @@ export function ProjectEditorFabricClient({
             <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-white/90">项目诊断</p>
-                <p className="mt-0.5 text-[11px] text-white/36">
+                <p className="mt-0.5 text-xs text-white/36">
                   {diagnosing ? "正在分析…" : "基于当前画板范围的诊断结论"}
                 </p>
               </div>
@@ -4995,8 +4996,8 @@ function LockedChip({
 }) {
   return (
     <div className={cn("rounded-lg bg-white/[0.04] px-2.5 py-1.5", className)}>
-      <div className="text-[10px] text-white/35">{label}</div>
-      <div className="mt-0.5 truncate text-[11px] font-medium text-white/80">{value}</div>
+      <div className="text-xs text-white/35">{label}</div>
+      <div className="mt-0.5 truncate text-xs font-medium text-white/80">{value}</div>
     </div>
   );
 }
@@ -5024,7 +5025,7 @@ function SetupContextSidebar({
   return (
     <div className="flex h-full flex-col gap-4 px-4 py-5">
       <div>
-        <p className="text-[10px] uppercase tracking-[0.18em] text-white/30">
+        <p className="text-xs uppercase tracking-[0.18em] text-white/30">
           项目准备阶段
         </p>
         <h2 className="mt-1.5 truncate text-[15px] font-semibold text-white/90">
@@ -5033,7 +5034,7 @@ function SetupContextSidebar({
       </div>
       <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+          <span className="text-xs uppercase tracking-[0.14em] text-white/40">
             客观条件
           </span>
           <Lock className="h-3 w-3 text-white/30" />
@@ -5045,7 +5046,7 @@ function SetupContextSidebar({
           <LockedChip label="项目性质" value={natureLabel} />
           <LockedChip label="我的职责" value={involvementLabel} />
         </div>
-        <p className="mt-3 text-[10px] leading-relaxed text-white/30">
+        <p className="mt-3 text-xs leading-relaxed text-white/30">
           这些条件在创建项目时已锁定，不可更改。
         </p>
       </div>
@@ -5231,7 +5232,7 @@ function SortableFilmstripCard({
             <div className="flex aspect-video items-center justify-center bg-white" />
           )}
         </div>
-        <p className="mt-1 truncate text-[10px] text-white/46">{index + 1}</p>
+        <p className="mt-1 truncate text-xs text-white/46">{index + 1}</p>
         {active ? (
           <div className="pointer-events-none absolute inset-x-5 bottom-4 h-[2px] rounded-full bg-white/70" />
         ) : null}
@@ -5314,7 +5315,7 @@ function SortableLayerRow({
       >
         <div
           className={cn(
-            "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-background text-[10px] font-semibold transition-all",
+            "flex h-10 w-12 items-center justify-center overflow-hidden rounded-xl border bg-background text-xs font-semibold transition-all",
             selected
               ? "border-white/18 text-white shadow-[0_10px_16px_-14px_rgba(255,255,255,0.18)]"
               : "border-white/8 text-white/70 group-hover:border-white/12"
@@ -5335,7 +5336,7 @@ function SortableLayerRow({
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{item.label}</p>
-          <p className="mt-0.5 text-[11px] text-white/36">
+          <p className="mt-0.5 text-xs text-white/36">
             {item.type === "image" ? "图片" : item.type === "text" ? "文本" : "形状"}
           </p>
         </div>

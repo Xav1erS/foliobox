@@ -104,7 +104,7 @@ export function PortfolioPublishClient({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
             Status
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
@@ -115,7 +115,7 @@ export function PortfolioPublishClient({
           </p>
         </div>
         <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
             Public URL
           </p>
           <p className="mt-2 truncate text-sm font-medium text-neutral-900">
@@ -126,7 +126,7 @@ export function PortfolioPublishClient({
           </p>
         </div>
         <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/40">
             Export
           </p>
           <p className="mt-2 text-base font-medium leading-7">
@@ -139,7 +139,7 @@ export function PortfolioPublishClient({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="border border-neutral-300 bg-white p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
             Process
           </p>
           <p className="mt-2 text-lg font-semibold text-neutral-900">发布与导出流程</p>
@@ -191,7 +191,7 @@ export function PortfolioPublishClient({
         </div>
 
         <div className="border border-neutral-300 bg-[linear-gradient(180deg,rgba(250,250,249,0.96),rgba(245,245,244,0.88))] p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
             Current State
           </p>
           <div className="mt-3 space-y-3">

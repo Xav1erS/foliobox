@@ -80,7 +80,7 @@ export function EditorScaffold({
 
           <div className="min-w-0 flex-1">
             {hasHeaderMeta ? (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/36">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-white/36">
                 {objectLabel ? <span>{objectLabel}</span> : null}
                 {statusLabel ? (
                   <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-white/62">
@@ -95,7 +95,7 @@ export function EditorScaffold({
                 {objectName}
               </h1>
               {topNote ? (
-                <div className="hidden min-w-0 max-w-xl truncate text-[13px] text-white/34 xl:block">
+                <div className="hidden min-w-0 max-w-xl truncate text-sm text-white/34 xl:block">
                   {topNote}
                 </div>
               ) : null}
@@ -209,7 +209,7 @@ function RailHeader({
 }) {
   return (
     <div className="flex h-12 items-center justify-between border-b border-white/10 bg-white/2.5 px-4">
-      <p className="text-[11px] font-medium tracking-[0.18em] text-white/34">
+      <p className="text-xs font-medium tracking-[0.18em] text-white/34">
         {label}
       </p>
       <EditorChromeIconButton onClick={onCollapse} aria-label={`折叠${label}`}>
@@ -244,7 +244,7 @@ function CollapsedRailButton({
       ) : (
         <PanelRightOpen className="h-4 w-4" />
       )}
-      <span className="rotate-180 text-[10px] tracking-[0.14em] [writing-mode:vertical-rl]">
+      <span className="rotate-180 text-xs tracking-[0.14em] [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -262,7 +262,7 @@ export function EditorRailSection({
 }) {
   return (
     <section className={cn("border-b border-white/10 px-5 py-3.5", className)}>
-      <p className="text-[11px] text-white/38">
+      <p className="text-xs text-white/38">
         {title}
       </p>
       <div className="mt-2.5">{children}</div>
@@ -321,7 +321,7 @@ export function EditorCanvasChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-3 py-1 text-[11px]",
+        "inline-flex items-center rounded-full border px-3 py-1 text-xs",
         active
           ? "border-white/16 bg-white/8 text-white"
           : "border-white/8 bg-white/3 text-white/52"

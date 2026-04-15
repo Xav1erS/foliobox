@@ -219,10 +219,10 @@ export function ImageUploadZone({
                 <div className={`border-t px-2.5 py-2 ${cardFooterBorder}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className={`truncate text-[11px] ${fileNameColor}`}>
+                      <p className={`truncate text-xs ${fileNameColor}`}>
                         第 {i + 1} 张
                       </p>
-                      <p className={`text-[10px] ${fileSizeColor}`}>
+                      <p className={`text-xs ${fileSizeColor}`}>
                         {formatBytes(files[i]?.size ?? 0)}
                       </p>
                     </div>
@@ -240,7 +240,7 @@ export function ImageUploadZone({
             ))}
           </div>
 
-          <p className={`text-[11px] ${dragHintColor}`}>
+          <p className={`text-xs ${dragHintColor}`}>
             可拖拽缩略图调整顺序，系统会按当前顺序理解截图
           </p>
         </div>

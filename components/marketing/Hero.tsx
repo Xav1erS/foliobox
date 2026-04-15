@@ -137,7 +137,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <div className="h-3 w-3 bg-white/10" />
                 <div className="h-3 w-3 bg-white/10" />
               </div>
-              <div className="bg-white/5 px-4 py-1 text-center text-[11px] text-white/20" style={{ width: 260 }}>
+              <div className="bg-white/5 px-4 py-1 text-center text-xs text-white/20" style={{ width: 260 }}>
                 foliobox.art/portfolio/preview
               </div>
             </div>
@@ -146,7 +146,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr]" style={{ minHeight: 400 }}>
               {/* Left sidebar: project list */}
               <div className="border-b border-white/6 bg-white/1.5 p-5 sm:border-b-0 sm:border-r">
-                <p className="mb-4 text-[10px] uppercase tracking-widest text-white/25">我的项目</p>
+                <p className="mb-4 text-xs uppercase tracking-widest text-white/25">我的项目</p>
                 <div className="space-y-1">
                   {[
                     { label: "企业数据中台改版", active: true },
@@ -170,12 +170,12 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 </div>
 
                 <div className="mt-6 border-t border-white/6 pt-5">
-                  <p className="mb-3 text-[10px] uppercase tracking-widest text-white/20">导出</p>
+                  <p className="mb-3 text-xs uppercase tracking-widest text-white/20">导出</p>
                   <div className="space-y-2">
-                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/8 text-[11px] text-white/50">
+                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/8 text-xs text-white/50">
                       分享链接
                     </div>
-                    <div className="flex h-7 items-center justify-center border border-white/6 text-[11px] text-white/30">
+                    <div className="flex h-7 items-center justify-center border border-white/6 text-xs text-white/30">
                       导出 PDF
                     </div>
                   </div>
@@ -187,10 +187,10 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 {/* Project header */}
                 <div className="mb-6 border-b border-white/6 pb-6">
                   <div className="mb-3 flex items-center gap-2">
-                    <span className="border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-400">
+                    <span className="border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">
                       B 端 · 数据可视化
                     </span>
-                    <span className="border border-white/8 px-2.5 py-0.5 text-[11px] text-white/35">
+                    <span className="border border-white/8 px-2.5 py-0.5 text-xs text-white/35">
                       UX 设计师
                     </span>
                   </div>
@@ -240,12 +240,12 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             }}
           >
             <div className="p-4">
-              <p className="mb-2 text-[10px] text-white/30">评分报告</p>
+              <p className="mb-2 text-xs text-white/30">评分报告</p>
               <div className="flex items-end gap-2 mb-3">
                 <span className="text-3xl font-bold tabular-nums text-white">72</span>
                 <span className="mb-1 text-xs text-white/30">/ 100</span>
               </div>
-              <div className="mb-3 inline-flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-400">
+              <div className="mb-3 inline-flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-400">
                 <span className="h-1 w-1 bg-amber-400" />
                 具备投递价值，但建议局部优化
               </div>
@@ -256,8 +256,8 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 ].map((d) => (
                   <div key={d.label}>
                     <div className="mb-1 flex justify-between">
-                      <span className="text-[10px] text-white/35">{d.label}</span>
-                      <span className="font-mono text-[10px] text-white/25">{d.score}</span>
+                      <span className="text-xs text-white/35">{d.label}</span>
+                      <span className="font-mono text-eyebrow text-white/25">{d.score}</span>
                     </div>
                     <div className="h-1 w-full overflow-hidden bg-white/8">
                       <div

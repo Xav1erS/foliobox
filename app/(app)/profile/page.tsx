@@ -79,7 +79,7 @@ export default async function ProfilePage({
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Profile Readiness
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
@@ -92,7 +92,7 @@ export default async function ProfilePage({
         </Card>
         <Card className="border-border/70 bg-card/95 shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Plan
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
@@ -105,7 +105,7 @@ export default async function ProfilePage({
         </Card>
         <Card className="border-border/70 bg-foreground text-background shadow-xs">
           <CardContent className="p-5">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-background/45">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-background/45">
             Why It Matters
           </p>
           <p className="mt-2 text-base font-medium leading-7">
@@ -123,7 +123,7 @@ export default async function ProfilePage({
         <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                 当前方案与权益
               </Badge>
             </div>
@@ -196,7 +196,7 @@ export default async function ProfilePage({
         <CardHeader>
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${quotaStatusClass}`} />
-            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
               处理预算
             </Badge>
           </div>

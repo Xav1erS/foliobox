@@ -422,7 +422,7 @@ function useElementSize<T extends HTMLElement>() {
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] text-white/42">
+    <p className="text-xs text-white/42">
       {children}
     </p>
   );
@@ -463,7 +463,7 @@ function LeftRailIconButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full flex-col items-center gap-2 rounded-[18px] border px-2 py-3 text-[11px] transition-colors",
+        "group flex w-full flex-col items-center gap-2 rounded-[18px] border px-2 py-3 text-xs transition-colors",
         active
           ? "border-white/[0.14] bg-white/8 text-white shadow-[0_16px_32px_-24px_rgba(0,0,0,0.6)]"
           : "border-white/8 bg-white/[0.018] text-white/42 hover:bg-white/5 hover:text-white/78"
@@ -534,7 +534,7 @@ function DraggableAssetCard({
             {asset.isCover ? <Badge variant="outline" className="border-white/18 text-white/70">封面</Badge> : null}
           </div>
           {meta.roleTag ? (
-            <div className="absolute bottom-2 left-2 rounded-full border border-white/8 bg-black/55 px-2 py-1 text-[10px] text-white/72 backdrop-blur-sm">
+            <div className="absolute bottom-2 left-2 rounded-full border border-white/8 bg-black/55 px-2 py-1 text-xs text-white/72 backdrop-blur-sm">
               {meta.roleTag}
             </div>
           ) : null}
@@ -553,7 +553,7 @@ function DraggableAssetCard({
                 event.stopPropagation();
                 onToggleSelected(asset.id);
               }}
-              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/8 hover:text-white"
+              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-xs text-white/62 transition-colors hover:bg-white/8 hover:text-white"
             >
               {asset.selected ? "移出生成" : "纳入生成"}
             </button>
@@ -563,7 +563,7 @@ function DraggableAssetCard({
                 event.stopPropagation();
                 onSetCover(asset.id);
               }}
-              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[11px] text-white/62 transition-colors hover:bg-white/8 hover:text-white"
+              className="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-xs text-white/62 transition-colors hover:bg-white/8 hover:text-white"
             >
               设为封面
             </button>
@@ -2051,7 +2051,7 @@ export function ProjectEditorClient({
                                       className="h-full w-full object-cover"
                                     />
                                   ) : (
-                                    <div className="flex h-full items-center justify-center text-[10px] text-white/28">
+                                    <div className="flex h-full items-center justify-center text-xs text-white/28">
                                       16:9
                                     </div>
                                   )}
@@ -2102,15 +2102,15 @@ export function ProjectEditorClient({
                     <p className="max-w-[180px] truncate text-sm font-semibold">
                       {activeBoard?.name ?? "Untitled board"}
                     </p>
-                    <p className="max-w-[220px] truncate text-[11px] text-neutral-500">
+                    <p className="max-w-[220px] truncate text-xs text-neutral-500">
                       {activeBoard?.intent || "把左侧素材拖进画板，先搭出这一页的主结构。"}
                     </p>
                   </div>
                   <div className="h-8 w-px bg-black/8" />
-                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-[11px] text-neutral-700">
+                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-xs text-neutral-700">
                     {boardStatusLabel(activeBoard?.status ?? "empty")}
                   </span>
-                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-[11px] text-neutral-700">
+                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-xs text-neutral-700">
                     {scene.generationScope.mode === "current"
                       ? "当前页"
                       : scene.generationScope.mode === "selected"
@@ -2836,7 +2836,7 @@ export function ProjectEditorClient({
             <Card className="shadow-none">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
                     范围
                   </Badge>
                   <Button variant="outline" className="h-9 px-3" onClick={refreshGeneratePrecheck}>
@@ -2878,7 +2878,7 @@ export function ProjectEditorClient({
             <Card className="shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
                     预检
                   </Badge>
                   {generatePrecheck?.suggestedMode === "reuse" ? (
@@ -3057,18 +3057,18 @@ const BoardDropSurface = forwardRef<
         }}
       >
         <div className="pointer-events-none absolute left-6 top-6 z-1 flex items-start justify-between gap-4">
-          <div className="rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/56 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+          <div className="rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-xs text-black/56 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             {board.name}
           </div>
         </div>
-        <div className="pointer-events-none absolute right-6 top-6 z-1 rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-[11px] text-black/46 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+        <div className="pointer-events-none absolute right-6 top-6 z-1 rounded-full border border-black/8 bg-white/94 px-3 py-1.5 text-xs text-black/46 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.28)] backdrop-blur-sm">
           {PROJECT_BOARD_WIDTH} × {PROJECT_BOARD_HEIGHT}
         </div>
 
         {board.nodes.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center px-10">
             <div className="max-w-lg rounded-[30px] border border-black/8 bg-[#faf8f4]/96 px-8 py-10 text-center shadow-[0_36px_80px_-54px_rgba(0,0,0,0.28)] backdrop-blur-sm">
-              <p className="text-[11px] text-black/34">Empty board</p>
+              <p className="text-xs text-black/34">Empty board</p>
               <p className="mt-4 text-[30px] font-semibold tracking-[-0.04em] text-neutral-950">
                 把第一张素材拖进来
               </p>
@@ -3221,7 +3221,7 @@ const BoardDropSurface = forwardRef<
                 </button>
                 {selected ? (
                   <>
-                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-black/8 bg-white/92 px-2 py-1 text-[10px] text-black/65 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.3)]">
+                    <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-black/8 bg-white/92 px-2 py-1 text-xs text-black/65 shadow-[0_12px_28px_-18px_rgba(0,0,0,0.3)]">
                       {node.roleTag ?? "image"}
                     </div>
                     <button

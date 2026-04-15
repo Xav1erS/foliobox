@@ -89,14 +89,14 @@ export function ProjectsCollection({
                   </p>
                   <p className="mt-1 text-xs font-mono text-muted-foreground">{project.updatedAt}</p>
                 </div>
-                <Badge variant="secondary" className="shrink-0 rounded-md px-2 py-0.5 font-mono text-[11px]">
+                <Badge variant="secondary" className="shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
                   {status.label}
                 </Badge>
               </div>
 
               <div className="space-y-2">
                 <div>
-                  <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
                     下一步
                   </p>
                   <p className="mt-1 text-sm text-foreground/88">

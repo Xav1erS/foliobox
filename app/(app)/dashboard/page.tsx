@@ -246,12 +246,12 @@ export default async function DashboardPage({
           <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                   来自评分
                 </Badge>
                 {focusedScoreLevel ? (
                   <Badge
-                    className={`rounded-md px-2 py-0.5 font-mono text-[11px] ${LEVEL_COLOR[focusedScoreLevel].fg} ${LEVEL_COLOR[focusedScoreLevel].bg}`}
+                    className={`rounded-md px-2 py-0.5 font-mono text-xs ${LEVEL_COLOR[focusedScoreLevel].fg} ${LEVEL_COLOR[focusedScoreLevel].bg}`}
                   >
                     {PORTFOLIO_SCORE_LEVEL_CONFIG[focusedScoreLevel].label}
                   </Badge>
@@ -321,7 +321,7 @@ export default async function DashboardPage({
           <Card className="border-border/70 bg-card/95 shadow-xs">
             <CardHeader>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                   开始使用
                 </Badge>
               </div>
@@ -397,11 +397,11 @@ export default async function DashboardPage({
             <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                     继续工作
                   </Badge>
                   {primaryIsPortfolio && activePortfolio ? (
-                    <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                    <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-xs">
                       作品集优先
                     </Badge>
                   ) : null}
@@ -428,7 +428,7 @@ export default async function DashboardPage({
                 {primaryIsPortfolio && activePortfolio ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                      <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-xs">
                         {PORTFOLIO_STATUS_LABEL[activePortfolio.status] ?? activePortfolio.status}
                       </Badge>
                       <span className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
@@ -446,7 +446,7 @@ export default async function DashboardPage({
                 ) : recentProject ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                      <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-xs">
                         {projectStageLabel(recentProject)}
                       </Badge>
                       <span className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
@@ -467,7 +467,7 @@ export default async function DashboardPage({
                   <>
                     <Separator />
                     <div className="space-y-3">
-                      <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                      <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
                         同时进行
                       </p>
                       <Link
@@ -477,7 +477,7 @@ export default async function DashboardPage({
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
                             <span className="truncate text-sm font-medium text-foreground">{secondaryProject.name}</span>
-                            <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-[10px]">
+                            <Badge variant="outline" className="rounded-md px-2 py-0.5 font-mono text-eyebrow">
                               {projectStageLabel(secondaryProject)}
                             </Badge>
                           </span>
@@ -498,7 +498,7 @@ export default async function DashboardPage({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                    <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
                       最近项目
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">项目对象会持续沉淀在这里，后续可以直接回到 editor。</p>
@@ -519,7 +519,7 @@ export default async function DashboardPage({
             <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                     快速入口
                   </Badge>
                 </div>
@@ -561,7 +561,7 @@ export default async function DashboardPage({
             <Card className="border-border/70 bg-card/95 shadow-xs">
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                     当前权益
                   </Badge>
                 </div>
@@ -587,7 +587,7 @@ export default async function DashboardPage({
                       key={quota.label}
                       className="rounded-xl border border-border/70 bg-background px-4 py-3"
                     >
-                      <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                      <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
                         {quota.label}
                       </p>
                       <p className="mt-2 text-sm font-medium text-foreground">
@@ -611,12 +611,12 @@ export default async function DashboardPage({
               <Card className="border-border/70 bg-card/95 shadow-xs">
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-[11px]">
+                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
                       最近评分
                     </Badge>
                     {latestScoreLevel ? (
                       <Badge
-                        className={`rounded-md px-2 py-0.5 font-mono text-[11px] ${LEVEL_COLOR[latestScoreLevel].fg} ${LEVEL_COLOR[latestScoreLevel].bg}`}
+                        className={`rounded-md px-2 py-0.5 font-mono text-xs ${LEVEL_COLOR[latestScoreLevel].fg} ${LEVEL_COLOR[latestScoreLevel].bg}`}
                       >
                         {PORTFOLIO_SCORE_LEVEL_CONFIG[latestScoreLevel].label}
                       </Badge>

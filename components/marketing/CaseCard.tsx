@@ -18,7 +18,7 @@ function DashboardMock() {
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2">
         <div className="h-1.5 w-1.5 bg-emerald-500/60" />
-        <span className="text-[10px] font-medium text-emerald-400/70">B 端 · 中后台系统</span>
+        <span className="text-xs font-medium text-emerald-400/70">B 端 · 中后台系统</span>
       </div>
       <div className="flex flex-1">
         <div className="h-full w-9 shrink-0 border-r border-white/6 bg-white/2 p-2">
@@ -61,7 +61,7 @@ function MobileMock() {
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-blue-500/20 bg-blue-500/[0.07] px-3 py-2">
         <div className="h-1.5 w-1.5 bg-blue-400/60" />
-        <span className="text-[10px] font-medium text-blue-400/70">C 端 · App 产品</span>
+        <span className="text-xs font-medium text-blue-400/70">C 端 · App 产品</span>
       </div>
       <div className="flex flex-1 items-center justify-center gap-3 px-4">
         {[
@@ -92,7 +92,7 @@ function DocumentMock() {
       {/* Top stripe */}
       <div className="flex items-center gap-2 border-b border-violet-500/20 bg-violet-500/[0.07] px-3 py-2">
         <div className="h-1.5 w-1.5 bg-violet-400/60" />
-        <span className="text-[10px] font-medium text-violet-400/70">G 端 · 流程与系统</span>
+        <span className="text-xs font-medium text-violet-400/70">G 端 · 流程与系统</span>
       </div>
       <div className="flex flex-1 flex-col gap-0 p-3">
         <div className="mb-2 flex items-center justify-between">
@@ -152,7 +152,7 @@ export function CaseCard({
       <div className="flex flex-1 flex-col p-5">
         {/* Score pill + demo badge */}
         <div className="mb-4 flex items-center gap-2">
-          <span className="border border-white/8 px-2 py-0.5 text-[10px] text-white/35">
+          <span className="border border-white/8 px-2 py-0.5 text-xs text-white/35">
             演示案例
           </span>
           <span className="h-3 w-px bg-white/8" />

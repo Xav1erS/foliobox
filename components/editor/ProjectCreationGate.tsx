@@ -277,14 +277,14 @@ export function ProjectCreationGate({
     <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-[640px] rounded-2xl border border-white/10 bg-neutral-950 p-7 shadow-2xl">
         <div className="mb-5">
-          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
+          <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wider text-white/40">
             <Lock className="h-3 w-3" />
             开始编辑前 · 一经确定不可更改
           </div>
           <h2 className="text-xl font-semibold text-white/95">
             确认「{projectName}」的项目客观条件
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-white/50">
+          <p className="mt-2 text-sm leading-relaxed text-white/50">
             这些条件决定 AI 怎么拆解叙事结构、推荐视觉风格和挑选章节模板。
             <span className="text-amber-400/80">一经确定不可更改</span>
             ，如需修改只能删除项目重建。
@@ -331,7 +331,7 @@ export function ProjectCreationGate({
                 </div>
                 <div
                   className={cn(
-                    "text-[11px] font-medium",
+                    "text-xs font-medium",
                     active ? "text-white/95" : filled ? "text-white/70" : "text-white/40",
                   )}
                 >
@@ -390,7 +390,7 @@ export function ProjectCreationGate({
         {error ? (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/8 px-3 py-2.5">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400/80" />
-            <p className="text-[12px] leading-relaxed text-red-300/90">{error}</p>
+            <p className="text-xs leading-relaxed text-red-300/90">{error}</p>
           </div>
         ) : null}
 
@@ -400,7 +400,7 @@ export function ProjectCreationGate({
             onClick={handleBack}
             disabled={stepIndex === 0 || submitting}
             className={cn(
-              "flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-3 text-[13px] font-medium transition-all",
+              "flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-3 text-sm font-medium transition-all",
               stepIndex === 0 || submitting
                 ? "cursor-not-allowed text-white/25"
                 : "text-white/70 hover:border-white/20 hover:bg-white/5",
@@ -475,7 +475,7 @@ function OptionGrid<T extends string>({
             <div
               className={cn(
                 "font-medium text-white/90",
-                compact ? "text-[12px]" : "text-[13px]",
+                compact ? "text-xs" : "text-sm",
               )}
             >
               {option.label}
@@ -483,7 +483,7 @@ function OptionGrid<T extends string>({
             <div
               className={cn(
                 "mt-0.5 leading-relaxed text-white/40",
-                compact ? "text-[10px]" : "text-[11px]",
+                compact ? "text-xs" : "text-xs",
               )}
             >
               {option.description}

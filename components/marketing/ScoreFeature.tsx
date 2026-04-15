@@ -70,7 +70,7 @@ export function ScoreFeature() {
                 <div className="h-2.5 w-2.5 bg-white/10" />
                 <div className="h-2.5 w-2.5 bg-white/10" />
               </div>
-              <div className="ml-3 text-[11px] text-white/20">评分结果示例</div>
+              <div className="ml-3 text-xs text-white/20">评分结果示例</div>
             </div>
 
             {/* Score content */}
@@ -98,7 +98,7 @@ export function ScoreFeature() {
                     <div className="mb-1.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-white/65">{d.label}</span>
-                        <span className="text-[10px] text-white/35">{d.weight} 分权重</span>
+                        <span className="text-xs text-white/35">{d.weight} 分权重</span>
                       </div>
                       <span className="font-mono text-xs text-white/50">{d.score}</span>
                     </div>
@@ -134,7 +134,7 @@ export function ScoreFeature() {
               </div>
 
               <div className="mt-4 border-t border-white/[0.07] pt-4">
-                <div className="grid grid-cols-3 gap-3 text-[11px] leading-[1.7] text-white/35">
+                <div className="grid grid-cols-3 gap-3 text-xs leading-[1.7] text-white/35">
                   <div className="border border-white/[0.07] px-3 py-2">
                     01 上传现状
                   </div>

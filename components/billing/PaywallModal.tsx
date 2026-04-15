@@ -228,7 +228,7 @@ export function PaywallModal({
                     const quota = currentQuotas[key];
                     return (
                       <div key={key} className="border border-neutral-200 bg-white px-3 py-2">
-                        <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                        <p className="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
                           {quota.label}
                         </p>
                         <p className="mt-1 text-sm text-neutral-700">
@@ -268,7 +268,7 @@ export function PaywallModal({
                           {plan.displayName}
                         </span>
                         {isRec && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
                             推荐
                           </span>
                         )}
@@ -301,7 +301,7 @@ export function PaywallModal({
                                   key={`${plan.planType}-${key}`}
                                   className="rounded-lg border border-neutral-200 bg-white px-3 py-2"
                                 >
-                                  <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                  <p className="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
                                     {quota.label}
                                   </p>
                                   <p className="mt-1 text-xs font-medium text-neutral-700">
@@ -313,7 +313,7 @@ export function PaywallModal({
                           : (
                             <>
                               <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
-                                <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                <p className="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
                                   项目排版
                                 </p>
                                 <p className="mt-1 text-xs font-medium text-neutral-700">
@@ -324,7 +324,7 @@ export function PaywallModal({
                                 </p>
                               </div>
                               <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
-                                <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">
+                                <p className="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
                                   作品集包装
                                 </p>
                                 <p className="mt-1 text-xs font-medium text-neutral-700">
@@ -397,7 +397,7 @@ export function PaywallModal({
             )}
           </div>
 
-          <p className="mt-4 text-center text-[11px] text-neutral-300">
+          <p className="mt-4 text-center text-xs text-neutral-300">
             支持微信支付 / 支付宝
           </p>
         </div>

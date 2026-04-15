@@ -53,7 +53,7 @@ export default async function PortfolioPublishPage({
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
               Projects
             </p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
@@ -62,7 +62,7 @@ export default async function PortfolioPublishPage({
             <p className="mt-2 text-sm leading-6 text-neutral-500">当前纳入这份作品集的项目数量。</p>
           </div>
           <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
               Packaging
             </p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
@@ -73,7 +73,7 @@ export default async function PortfolioPublishPage({
             </p>
           </div>
           <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
-            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/40">
               Output
             </p>
             <p className="mt-2 text-base font-medium leading-7">

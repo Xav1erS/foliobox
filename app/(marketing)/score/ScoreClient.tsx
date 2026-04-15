@@ -511,7 +511,7 @@ export function ScoreClient() {
             <div className="mt-6 border border-white/10 bg-black/20 p-4 text-left">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <p className="text-xs text-white/40">{resolvedInputSummary}</p>
-                <span className={`inline-flex items-center gap-1 border px-2.5 py-1 text-[10px] font-medium ${loadingStageToneClassName}`}>
+                <span className={`inline-flex items-center gap-1 border px-2.5 py-1 text-xs font-medium ${loadingStageToneClassName}`}>
                   <span className={`h-1.5 w-1.5 ${loadingStageAccentClassName}`} />
                   {loadingStageLabel}
                 </span>
@@ -522,13 +522,13 @@ export function ScoreClient() {
                     <div className="h-full w-1/2 animate-pulse bg-sky-300" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-sky-300/40 bg-sky-300/10 text-[11px] text-sky-100">
+                    <span className="flex h-6 w-6 items-center justify-center border border-sky-300/40 bg-sky-300/10 text-xs text-sky-100">
                       1
                     </span>
                     <span className="text-sm text-white/75">上传评分材料</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-white/10 bg-white/3 text-[11px] text-white/35">
+                    <span className="flex h-6 w-6 items-center justify-center border border-white/10 bg-white/3 text-xs text-white/35">
                       2
                     </span>
                     <span className="text-sm text-white/35">上传完成后开始正式评分</span>
@@ -546,7 +546,7 @@ export function ScoreClient() {
                     <span className="text-sm text-white/75">评分结果已生成</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-emerald-300/40 bg-emerald-300/10 text-[11px] text-emerald-100">
+                    <span className="flex h-6 w-6 items-center justify-center border border-emerald-300/40 bg-emerald-300/10 text-xs text-emerald-100">
                       <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                     <span className="text-sm text-white/75">正在进入结果页</span>
@@ -555,7 +555,7 @@ export function ScoreClient() {
                     不需要再次点击按钮，页面会自动进入这次评分结果。
                   </div>
                   <div className="border border-white/10 bg-white/3 px-3 py-2 text-left">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-white/35">接下来</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-white/35">接下来</p>
                     <p className="mt-2 text-sm text-white/75">我们会先打开评分结果页，再从结果里引导你进入下一步整理。</p>
                   </div>
                 </div>
@@ -578,7 +578,7 @@ export function ScoreClient() {
                       return (
                         <div key={step} className="flex items-center gap-3">
                           <span
-                            className={`flex h-6 w-6 items-center justify-center text-[11px] ${
+                            className={`flex h-6 w-6 items-center justify-center text-xs ${
                               state === "done"
                                 ? "bg-white text-black"
                                 : state === "active"
