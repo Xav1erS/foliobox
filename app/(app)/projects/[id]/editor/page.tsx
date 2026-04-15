@@ -39,9 +39,16 @@ export default async function ProjectEditorPage({
         facts: {
           select: {
             projectType: true,
+            audience: true,
+            platform: true,
+            projectNature: true,
+            involvementLevel: true,
             industry: true,
             roleTitle: true,
+            timeline: true,
             background: true,
+            businessGoal: true,
+            biggestChallenge: true,
             resultSummary: true,
           },
         },
@@ -86,9 +93,34 @@ export default async function ProjectEditorPage({
     updatedAt: project.updatedAt.toISOString(),
     facts: {
       projectType: project.facts?.projectType ?? "",
+      audience: (project.facts?.audience ?? "") as
+        | ""
+        | "TO_C"
+        | "TO_B"
+        | "TO_G"
+        | "INTERNAL",
+      platform: (project.facts?.platform ?? "") as
+        | ""
+        | "WEB"
+        | "MOBILE"
+        | "DESKTOP"
+        | "AUTOMOTIVE"
+        | "LARGE_SCREEN"
+        | "CROSS_PLATFORM",
+      projectNature: (project.facts?.projectNature ?? "") as
+        | ""
+        | "NEW_BUILD"
+        | "MAJOR_REDESIGN"
+        | "ITERATION"
+        | "DESIGN_SYSTEM"
+        | "CONCEPT",
+      involvementLevel: (project.facts?.involvementLevel ?? "") as "" | "LEAD" | "CORE" | "SUPPORT",
       industry: project.facts?.industry ?? "",
       roleTitle: project.facts?.roleTitle ?? "",
+      timeline: project.facts?.timeline ?? "",
       background: project.facts?.background ?? "",
+      businessGoal: project.facts?.businessGoal ?? "",
+      biggestChallenge: project.facts?.biggestChallenge ?? "",
       resultSummary: project.facts?.resultSummary ?? "",
     },
     assets: project.assets,

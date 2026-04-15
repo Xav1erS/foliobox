@@ -143,11 +143,39 @@ type ProjectAsset = {
   metaJson?: unknown;
 };
 
+type InvolvementLevelValue = "" | "LEAD" | "CORE" | "SUPPORT";
+
+type AudienceValue = "" | "TO_C" | "TO_B" | "TO_G" | "INTERNAL";
+type PlatformValue =
+  | ""
+  | "WEB"
+  | "MOBILE"
+  | "DESKTOP"
+  | "AUTOMOTIVE"
+  | "LARGE_SCREEN"
+  | "CROSS_PLATFORM";
+type ProjectNatureValue =
+  | ""
+  | "NEW_BUILD"
+  | "MAJOR_REDESIGN"
+  | "ITERATION"
+  | "DESIGN_SYSTEM"
+  | "CONCEPT";
+
 type ProjectFactsForm = {
+  // legacy free-text field kept only for the legacy editor (?engine=legacy)
   projectType: string;
+  // new locked-on-creation client conditions used by Fabric editor
+  audience: AudienceValue;
+  platform: PlatformValue;
   industry: string;
+  projectNature: ProjectNatureValue;
+  involvementLevel: InvolvementLevelValue;
   roleTitle: string;
+  timeline: string;
   background: string;
+  businessGoal: string;
+  biggestChallenge: string;
   resultSummary: string;
 };
 
