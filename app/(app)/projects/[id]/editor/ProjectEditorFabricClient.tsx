@@ -40,6 +40,7 @@ import {
   Triangle,
   Type,
   Layers,
+  Lock,
   Check,
   Plus,
   MoreHorizontal,
@@ -90,6 +91,15 @@ import {
   type GradientConfig,
 } from "@/components/editor/ColorPickerPopover";
 import { ProjectSetupWizard } from "@/components/editor/ProjectSetupWizard";
+import {
+  ProjectCreationGate,
+  AUDIENCE_OPTIONS,
+  PLATFORM_OPTIONS,
+  INDUSTRY_OPTIONS,
+  PROJECT_NATURE_OPTIONS,
+  INVOLVEMENT_OPTIONS,
+  type ProjectCreationGatePayload,
+} from "@/components/editor/ProjectCreationGate";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
 import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
@@ -418,6 +428,15 @@ export function ProjectEditorFabricClient({
   const [factsSaveState, setFactsSaveState] = useState<"saved" | "saving" | "dirty" | "error">(
     "saved"
   );
+  // 创建门:受众、平台、行业、性质、职责必须在进入前确定,且一旦确定不可更改。
+  const [creationGateSubmitting, setCreationGateSubmitting] = useState(false);
+  const [creationGateError, setCreationGateError] = useState("");
+  const needsCreationGate =
+    !projectFactsDraft.audience ||
+    !projectFactsDraft.platform ||
+    !projectFactsDraft.industry.trim() ||
+    !projectFactsDraft.projectNature ||
+    !projectFactsDraft.involvementLevel;
   const [structureSaveState, setStructureSaveState] = useState<
     "saved" | "saving" | "dirty" | "error"
   >("saved");
@@ -636,10 +655,10 @@ export function ProjectEditorFabricClient({
       : null;
   const hasStructureInputs =
     assets.length > 0 ||
-    Boolean(projectFactsDraft.projectType.trim()) ||
+    Boolean(projectFactsDraft.audience) ||
     Boolean(projectFactsDraft.industry.trim()) ||
-    Boolean(projectFactsDraft.roleTitle.trim()) ||
     Boolean(projectFactsDraft.background.trim()) ||
+    Boolean(projectFactsDraft.businessGoal.trim()) ||
     Boolean(projectFactsDraft.resultSummary.trim());
   const canSuggestStructure =
     hasStructureInputs && Boolean(materialRecognition || structureSuggestion);
@@ -1120,6 +1139,45 @@ export function ProjectEditorFabricClient({
       mergeProjectLayoutDocument(current, { editorScene: sceneToSave }) as LayoutJson
     );
     setSaveState("saved");
+  }
+
+  async function handleCreationGateSubmit(payload: ProjectCreationGatePayload) {
+    if (creationGateSubmitting) return;
+    setCreationGateSubmitting(true);
+    setCreationGateError("");
+    try {
+      const response = await fetch(`/api/projects/${initialData.id}/facts`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.message ?? data.error ?? "锁定失败,请稍后重试");
+      }
+      const nextFacts = {
+        ...projectFactsDraft,
+        audience: payload.audience,
+        platform: payload.platform,
+        industry: payload.industry,
+        projectNature: payload.projectNature,
+        involvementLevel: payload.involvementLevel,
+      };
+      setProjectFactsDraft(nextFacts);
+      lastSavedFactsRef.current = JSON.stringify(nextFacts);
+      setFactsSaveState("saved");
+      setSetupMode(true);
+      setLeftPanel("project");
+    } catch (error) {
+      setCreationGateError(
+        error instanceof Error ? error.message : "锁定失败,请稍后重试"
+      );
+    } finally {
+      setCreationGateSubmitting(false);
+    }
   }
 
   async function persistProjectFacts(
@@ -2708,6 +2766,14 @@ export function ProjectEditorFabricClient({
     <>
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
+      {needsCreationGate ? (
+        <ProjectCreationGate
+          projectName={initialData.name}
+          submitting={creationGateSubmitting}
+          error={creationGateError}
+          onSubmit={handleCreationGateSubmit}
+        />
+      ) : null}
       <EditorScaffold
       objectLabel=""
       objectName={initialData.name}
@@ -2717,15 +2783,16 @@ export function ProjectEditorFabricClient({
       statusMeta=""
       topNote={topStatusLabel}
       primaryAction={
-        <Button
-          className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
-          onClick={() => void handleOpenGenerate()}
-          disabled={generating || diagnosing || setupMode}
-          title={setupMode ? "请先完成项目准备，再生成排版" : undefined}
-        >
-          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          生成排版
-        </Button>
+        setupMode ? null : (
+          <Button
+            className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
+            onClick={() => void handleOpenGenerate()}
+            disabled={generating || diagnosing}
+          >
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            生成排版
+          </Button>
+        )
       }
       secondaryAction={
         <div className="flex items-center gap-2">
@@ -2752,15 +2819,16 @@ export function ProjectEditorFabricClient({
               项目准备
             </EditorChromeButton>
           )}
-          <EditorChromeButton
-            className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/82 hover:bg-white/8 hover:text-white"
-            onClick={() => void handleRunDiagnosis()}
-            disabled={diagnosing || generating || setupMode}
-            title={setupMode ? "请先完成项目准备，再进行诊断" : undefined}
-          >
-            {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
-            项目诊断
-          </EditorChromeButton>
+          {setupMode ? null : (
+            <EditorChromeButton
+              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/82 hover:bg-white/8 hover:text-white"
+              onClick={() => void handleRunDiagnosis()}
+              disabled={diagnosing || generating}
+            >
+              {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+              项目诊断
+            </EditorChromeButton>
+          )}
         </div>
       }
       planSummary={planSummary}
@@ -2843,37 +2911,79 @@ export function ProjectEditorFabricClient({
                           </span>
                         </div>
                       </div>
-                      <div className={cn(editorPanelCardClass, "space-y-1.5 p-3")}>
+                      <div className={cn(editorPanelCardClass, "space-y-2.5 p-3")}>
+                        <div
+                          className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+                          title="这些客观条件一经确定不可更改，如需修改请删除项目后重建"
+                        >
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <span className="text-[10px] uppercase tracking-wider text-white/40">
+                              项目客观条件
+                            </span>
+                            <Lock className="h-3 w-3 text-white/30" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <LockedChip
+                              label="受众"
+                              value={
+                                AUDIENCE_OPTIONS.find(
+                                  (o) => o.value === projectFactsDraft.audience
+                                )?.label ?? "—"
+                              }
+                            />
+                            <LockedChip
+                              label="平台"
+                              value={
+                                PLATFORM_OPTIONS.find(
+                                  (o) => o.value === projectFactsDraft.platform
+                                )?.label ?? "—"
+                              }
+                            />
+                            <LockedChip
+                              label="行业"
+                              value={
+                                INDUSTRY_OPTIONS.find(
+                                  (o) => o.value === projectFactsDraft.industry
+                                )?.label ?? projectFactsDraft.industry ?? "—"
+                              }
+                            />
+                            <LockedChip
+                              label="性质"
+                              value={
+                                PROJECT_NATURE_OPTIONS.find(
+                                  (o) => o.value === projectFactsDraft.projectNature
+                                )?.label ?? "—"
+                              }
+                            />
+                            <LockedChip
+                              className="col-span-2"
+                              label="我的职责"
+                              value={
+                                INVOLVEMENT_OPTIONS.find(
+                                  (o) => o.value === projectFactsDraft.involvementLevel
+                                )?.label ?? "—"
+                              }
+                            />
+                          </div>
+                        </div>
                         <div>
-                          <label className="text-[11px] text-white/42">项目类型</label>
+                          <label className="text-[11px] text-white/42">
+                            项目周期 <span className="text-amber-300/80">*</span>
+                          </label>
                           <Input
-                            value={projectFactsDraft.projectType}
+                            value={projectFactsDraft.timeline}
                             onChange={(event) =>
                               setProjectFactsDraft((current) => ({
                                 ...current,
-                                projectType: event.target.value,
+                                timeline: event.target.value,
                               }))
                             }
-                            placeholder="例如 SaaS 后台、品牌官网、移动端应用"
+                            placeholder="例如 2024 Q1 - Q2、共 3 个月"
                             className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">所属行业</label>
-                          <Input
-                            value={projectFactsDraft.industry}
-                            onChange={(event) =>
-                              setProjectFactsDraft((current) => ({
-                                ...current,
-                                industry: event.target.value,
-                              }))
-                            }
-                            placeholder="例如 AI、教育、金融、消费品"
-                            className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] text-white/42">我的角色</label>
+                          <label className="text-[11px] text-white/42">头衔 / Title</label>
                           <Input
                             value={projectFactsDraft.roleTitle}
                             onChange={(event) =>
@@ -2882,12 +2992,14 @@ export function ProjectEditorFabricClient({
                                 roleTitle: event.target.value,
                               }))
                             }
-                            placeholder="例如 产品设计负责人、全栈开发、独立设计师"
+                            placeholder="例如 高级产品设计师、独立设计师"
                             className="mt-1.5 h-9 rounded-xl border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">背景摘要</label>
+                          <label className="text-[11px] text-white/42">
+                            项目背景 <span className="text-amber-300/80">*</span>
+                          </label>
                           <Textarea
                             value={projectFactsDraft.background}
                             onChange={(event) =>
@@ -2896,12 +3008,42 @@ export function ProjectEditorFabricClient({
                                 background: event.target.value,
                               }))
                             }
-                            placeholder="说明项目背景、业务目标、目标用户、约束和挑战。"
+                            placeholder="说明项目起因、所在业务环境、目标用户和主要约束。"
                             className="mt-1.5 min-h-[96px] rounded-[20px] border-white/8 bg-secondary text-white"
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-white/42">结果摘要</label>
+                          <label className="text-[11px] text-white/42">
+                            业务目标 <span className="text-amber-300/80">*</span>
+                          </label>
+                          <Textarea
+                            value={projectFactsDraft.businessGoal}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                businessGoal: event.target.value,
+                              }))
+                            }
+                            placeholder="这个项目要解决的业务问题、期望达成的结果或核心指标。"
+                            className="mt-1.5 min-h-[80px] rounded-[20px] border-white/8 bg-secondary text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-white/42">最大挑战</label>
+                          <Textarea
+                            value={projectFactsDraft.biggestChallenge}
+                            onChange={(event) =>
+                              setProjectFactsDraft((current) => ({
+                                ...current,
+                                biggestChallenge: event.target.value,
+                              }))
+                            }
+                            placeholder="项目中最棘手的问题、权衡或需要说服的对象。"
+                            className="mt-1.5 min-h-[72px] rounded-[20px] border-white/8 bg-secondary text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-white/42">结果与成果</label>
                           <Textarea
                             value={projectFactsDraft.resultSummary}
                             onChange={(event) =>
@@ -2910,8 +3052,8 @@ export function ProjectEditorFabricClient({
                                 resultSummary: event.target.value,
                               }))
                             }
-                            placeholder="补充最终结果、影响、亮点与可量化成果。"
-                            className="mt-1.5 min-h-[88px] rounded-[20px] border-white/8 bg-secondary text-white"
+                            placeholder="最终上线效果、可量化指标、评价反馈或奖项。"
+                            className="mt-1.5 min-h-[72px] rounded-[20px] border-white/8 bg-secondary text-white"
                           />
                         </div>
                       </div>
@@ -4800,6 +4942,23 @@ export function ProjectEditorFabricClient({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function LockedChip({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-lg bg-white/[0.04] px-2.5 py-1.5", className)}>
+      <div className="text-[10px] text-white/35">{label}</div>
+      <div className="mt-0.5 truncate text-[11px] font-medium text-white/80">{value}</div>
+    </div>
   );
 }
 

@@ -214,6 +214,9 @@ model ProjectFact {
   id                 String            @id @default(cuid())
   projectId          String            @unique
   projectType        String?
+  audience           String?
+  platform           String?
+  projectNature      String?
   industry           String?
   timeline           String?
   stage              String?

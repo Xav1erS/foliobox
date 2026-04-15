@@ -13,24 +13,64 @@ import {
   type ProjectStructureSuggestion,
   ProjectStructureSuggestionSchema,
 } from "@/lib/project-editor-scene";
+import { formatNarrativeTemplateForPrompt } from "@/lib/narrative-templates";
+
+const AUDIENCE_LABELS: Record<string, string> = {
+  TO_C: "To C 大众消费者",
+  TO_B: "To B 企业客户",
+  TO_G: "To G 政务/公共事业",
+  INTERNAL: "内部团队工具",
+};
+const PLATFORM_LABELS: Record<string, string> = {
+  WEB: "Web 端",
+  MOBILE: "移动端",
+  DESKTOP: "桌面客户端",
+  AUTOMOTIVE: "车载/智能座舱",
+  LARGE_SCREEN: "大屏/IoT",
+  CROSS_PLATFORM: "跨端/多端",
+};
+const NATURE_LABELS: Record<string, string> = {
+  NEW_BUILD: "0→1 全新搭建",
+  MAJOR_REDESIGN: "重大改版",
+  ITERATION: "体验优化迭代",
+  DESIGN_SYSTEM: "设计系统建设",
+  CONCEPT: "概念探索/提案",
+};
+const INVOLVEMENT_LABELS: Record<string, string> = {
+  LEAD: "主导设计",
+  CORE: "核心参与",
+  SUPPORT: "协作支持",
+};
 
 function summarizeFacts(
   facts: {
-    projectType?: string | null;
+    audience?: string | null;
+    platform?: string | null;
+    projectNature?: string | null;
+    involvementLevel?: string | null;
     industry?: string | null;
     roleTitle?: string | null;
+    timeline?: string | null;
     background?: string | null;
+    businessGoal?: string | null;
+    biggestChallenge?: string | null;
     resultSummary?: string | null;
   } | null
 ) {
   if (!facts) return "（暂无项目背景资料）";
 
   return [
-    facts.projectType ? `项目类型：${facts.projectType}` : null,
+    facts.audience ? `受众：${AUDIENCE_LABELS[facts.audience] ?? facts.audience}` : null,
+    facts.platform ? `平台：${PLATFORM_LABELS[facts.platform] ?? facts.platform}` : null,
+    facts.projectNature ? `项目性质：${NATURE_LABELS[facts.projectNature] ?? facts.projectNature}` : null,
+    facts.involvementLevel ? `我的职责：${INVOLVEMENT_LABELS[facts.involvementLevel] ?? facts.involvementLevel}` : null,
     facts.industry ? `所属行业：${facts.industry}` : null,
-    facts.roleTitle ? `我的角色：${facts.roleTitle}` : null,
-    facts.background ? `背景摘要：${facts.background}` : null,
-    facts.resultSummary ? `结果摘要：${facts.resultSummary}` : null,
+    facts.roleTitle ? `头衔：${facts.roleTitle}` : null,
+    facts.timeline ? `项目周期：${facts.timeline}` : null,
+    facts.background ? `项目背景：${facts.background}` : null,
+    facts.businessGoal ? `业务目标：${facts.businessGoal}` : null,
+    facts.biggestChallenge ? `最大挑战：${facts.biggestChallenge}` : null,
+    facts.resultSummary ? `结果与成果：${facts.resultSummary}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -66,6 +106,7 @@ function summarizeAssets(
 function buildPrompt(input: {
   projectName: string;
   factsText: string;
+  narrativeTemplate: string;
   assetText: string;
   sceneSummary: string;
   recognitionSummary: string;
@@ -81,23 +122,21 @@ function buildPrompt(input: {
 这里的“结构建议”不是最终文案，也不是逐页精确排版，而是作品集里这个项目应该如何分组、每组要讲什么。
 
 ## 输出风格要求
-1. 优先给出真正适合这个项目的结构，不要机械套模板。
-2. 结构应该接近成熟 UI/UX 作品集的讲法，可以包含：
-- 项目概览 / 封面
-- 背景与问题
-- 研究与洞察
-- 设计策略
-- 方案分组（按阶段、场景、流程或主题）
-- 结果与复盘
+1. 结合下方“叙事模板”给出的推荐方向作为主要骨架，但不要机械照搬；如果素材或背景明显不适合，可以合理偏离，并在 rationale 里说明原因。
+2. 结构应该接近成熟 UI/UX 作品集的讲法，参考叙事弧与推荐分组方向。
 3. 如果素材明显分成多个主题或流程阶段，要把“方案分组”按主题拆开，而不是全部塞进一个大组。
 4. 如果研究证据或结果证据不足，可以保守建议，但要明确指出对应分组应该轻讲。
 5. 语言简洁、专业、能直接给设计师拿来继续搭结构。
+6. 根据“我的职责”调整叙事口吻：LEAD 可强调个人决策，CORE 聚焦具体负责模块，SUPPORT 避免过度抢功。
 
 ## 项目信息
 项目名称：${input.projectName}
 
 ## 项目背景
 ${input.factsText}
+
+## 叙事模板（按项目类型匹配）
+${input.narrativeTemplate}
 
 ## 设计图素材
 ${input.assetText}
@@ -167,10 +206,16 @@ export async function POST(
       packageJson: true,
       facts: {
         select: {
-          projectType: true,
+          audience: true,
+          platform: true,
+          projectNature: true,
+          involvementLevel: true,
           industry: true,
           roleTitle: true,
+          timeline: true,
           background: true,
+          businessGoal: true,
+          biggestChallenge: true,
           resultSummary: true,
         },
       },
@@ -192,10 +237,10 @@ export async function POST(
   }
 
   const hasFacts =
+    Boolean(project.facts?.audience) ||
     Boolean(project.facts?.background?.trim()) ||
-    Boolean(project.facts?.projectType?.trim()) ||
     Boolean(project.facts?.industry?.trim()) ||
-    Boolean(project.facts?.roleTitle?.trim());
+    Boolean(project.facts?.businessGoal?.trim());
 
   if (!hasFacts && project.assets.length === 0) {
     return NextResponse.json(
@@ -213,6 +258,13 @@ export async function POST(
   const prompt = buildPrompt({
     projectName: project.name,
     factsText: summarizeFacts(project.facts),
+    narrativeTemplate: formatNarrativeTemplateForPrompt({
+      audience: (project.facts?.audience ?? null) as Parameters<typeof formatNarrativeTemplateForPrompt>[0]["audience"],
+      platform: (project.facts?.platform ?? null) as Parameters<typeof formatNarrativeTemplateForPrompt>[0]["platform"],
+      projectNature: (project.facts?.projectNature ?? null) as Parameters<typeof formatNarrativeTemplateForPrompt>[0]["projectNature"],
+      involvementLevel: (project.facts?.involvementLevel ?? null) as Parameters<typeof formatNarrativeTemplateForPrompt>[0]["involvementLevel"],
+      industry: project.facts?.industry ?? null,
+    }),
     assetText: summarizeAssets(project.assets),
     sceneSummary: summarizeProjectSceneForAI({
       scene,
