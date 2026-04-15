@@ -2651,6 +2651,39 @@ export function ProjectEditorFabricClient({
     }
   }
 
+  async function handleAssetInlineUpdate(
+    assetId: string,
+    patch: { title?: string | null; note?: string | null }
+  ) {
+    try {
+      const response = await parseJsonResponse<{
+        asset: ProjectEditorInitialData["assets"][number];
+      }>(
+        await fetch(`/api/projects/${initialData.id}/assets/${assetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        })
+      );
+      setAssets((current) =>
+        current.map((asset) => (asset.id === response.asset.id ? response.asset : asset))
+      );
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "保存素材信息失败，请稍后重试",
+      });
+    }
+  }
+
+  async function handleRenameAsset(assetId: string, title: string) {
+    await handleAssetInlineUpdate(assetId, { title: title.trim() || null });
+  }
+
+  async function handleUpdateAssetNote(assetId: string, note: string) {
+    await handleAssetInlineUpdate(assetId, { note: note.trim() || null });
+  }
+
   function deleteSelection() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -2796,17 +2829,8 @@ export function ProjectEditorFabricClient({
       }
       secondaryAction={
         <div className="flex items-center gap-2">
-          {/* 向导模式：返回画布 / 画布模式：查看项目准备 */}
-          {setupMode ? (
-            scene.boards.length > 0 ? (
-              <EditorChromeButton
-                className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
-                onClick={() => { setSetupMode(false); setActionError(""); }}
-              >
-                返回画布
-              </EditorChromeButton>
-            ) : null
-          ) : (
+          {/* 画布模式：查看项目准备 */}
+          {setupMode ? null : (
             <EditorChromeButton
               className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
               onClick={() => {
@@ -2834,10 +2858,12 @@ export function ProjectEditorFabricClient({
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
       rightRailLabel={hasActiveInspector ? "对象属性" : "画板属性"}
-      leftRailWidthClass={leftPanel ? "w-[336px]" : "w-[56px]"}
+      leftRailWidthClass={setupMode ? "w-[240px]" : leftPanel ? "w-[336px]" : "w-[56px]"}
       rightRailWidthClass="w-[288px]"
       hideLeftRailHeader
-      leftRail={
+      leftRail={setupMode ? (
+        <SetupContextSidebar projectName={initialData.name} facts={projectFactsDraft} />
+      ) : (
         <div className="flex h-full min-h-0">
           <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {(setupMode
@@ -3722,13 +3748,24 @@ export function ProjectEditorFabricClient({
             </div>
           ) : null}
         </div>
-      }
+      )}
       center={
         setupMode ? (
           <div className="relative flex h-full w-full flex-col overflow-hidden bg-card">
             <ProjectSetupWizard
               projectName={initialData.name}
-              facts={projectFactsDraft}
+              facts={{
+                timeline: projectFactsDraft.timeline,
+                roleTitle: projectFactsDraft.roleTitle,
+                background: projectFactsDraft.background,
+                businessGoal: projectFactsDraft.businessGoal,
+                biggestChallenge: projectFactsDraft.biggestChallenge,
+                resultSummary: projectFactsDraft.resultSummary,
+              }}
+              onFactsChange={(patch) =>
+                setProjectFactsDraft((current) => ({ ...current, ...patch }))
+              }
+              factsSaveLabel={factsSaveLabel}
               assets={assets}
               materialRecognition={materialRecognition}
               structureDraft={structureDraft}
@@ -3736,12 +3773,14 @@ export function ProjectEditorFabricClient({
               recognizingMaterials={recognizingMaterials}
               suggestingStructure={suggestingStructure}
               confirmingStructure={confirmingStructure}
+              uploadingAssets={uploadingAssets}
               actionError={actionError}
               hasExistingBoards={scene.boards.length > 0}
               onAiUnderstand={() => void handleWizardAiUnderstand()}
               onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
-              onOpenAssetsPanel={() => { setLeftPanel("assets"); }}
-              onOpenProjectPanel={() => { setLeftPanel("project"); }}
+              onUploadAssets={handleOpenAssetUpload}
+              onUpdateAssetTitle={handleRenameAsset}
+              onUpdateAssetNote={handleUpdateAssetNote}
               onReturnToCanvas={() => { setSetupMode(false); setActionError(""); }}
             />
           </div>
@@ -3925,7 +3964,7 @@ export function ProjectEditorFabricClient({
           ) : null}
         </div>
         ) /* end canvas viewport ternary */}
-      rightRail={
+      rightRail={setupMode ? undefined : (
         <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mt-0">
@@ -4546,7 +4585,7 @@ export function ProjectEditorFabricClient({
               </div>
             </div>
         </div>
-      }
+      )}
       bottomStrip={setupMode ? undefined : (
         <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/6 bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
           <div className="shrink-0 px-2.5">
@@ -4958,6 +4997,58 @@ function LockedChip({
     <div className={cn("rounded-lg bg-white/[0.04] px-2.5 py-1.5", className)}>
       <div className="text-[10px] text-white/35">{label}</div>
       <div className="mt-0.5 truncate text-[11px] font-medium text-white/80">{value}</div>
+    </div>
+  );
+}
+
+function SetupContextSidebar({
+  projectName,
+  facts,
+}: {
+  projectName: string;
+  facts: ProjectEditorInitialData["facts"];
+}) {
+  const audienceLabel =
+    AUDIENCE_OPTIONS.find((o) => o.value === facts.audience)?.label ?? "—";
+  const platformLabel =
+    PLATFORM_OPTIONS.find((o) => o.value === facts.platform)?.label ?? "—";
+  const industryLabel =
+    INDUSTRY_OPTIONS.find((o) => o.value === facts.industry)?.label ??
+    facts.industry ??
+    "—";
+  const natureLabel =
+    PROJECT_NATURE_OPTIONS.find((o) => o.value === facts.projectNature)?.label ?? "—";
+  const involvementLabel =
+    INVOLVEMENT_OPTIONS.find((o) => o.value === facts.involvementLevel)?.label ?? "—";
+
+  return (
+    <div className="flex h-full flex-col gap-4 px-4 py-5">
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/30">
+          项目准备阶段
+        </p>
+        <h2 className="mt-1.5 truncate text-[15px] font-semibold text-white/90">
+          {projectName}
+        </h2>
+      </div>
+      <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+            客观条件
+          </span>
+          <Lock className="h-3 w-3 text-white/30" />
+        </div>
+        <div className="space-y-1.5">
+          <LockedChip label="受众" value={audienceLabel} />
+          <LockedChip label="平台" value={platformLabel} />
+          <LockedChip label="行业" value={industryLabel} />
+          <LockedChip label="项目性质" value={natureLabel} />
+          <LockedChip label="我的职责" value={involvementLabel} />
+        </div>
+        <p className="mt-3 text-[10px] leading-relaxed text-white/30">
+          这些条件在创建项目时已锁定，不可更改。
+        </p>
+      </div>
     </div>
   );
 }
