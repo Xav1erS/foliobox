@@ -9,11 +9,15 @@ import {
 } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
+  ChevronDown,
   Check,
   Loader2,
   Plus,
   Sparkles,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -23,8 +27,15 @@ import { resolveProjectAssetMeta } from "@/lib/project-editor-scene";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import type {
   ProjectMaterialRecognition,
+  ProjectStructureGroup,
+  ProjectStructureSection,
   ProjectStructureSuggestion,
 } from "@/lib/project-editor-scene";
+import {
+  computeSetupCompleteness,
+  setupLevelLabel,
+  type SetupCompletenessScore,
+} from "@/lib/setup-completeness-score";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +81,8 @@ export interface ProjectSetupWizardProps {
   onUpdateAssetTitle: (assetId: string, title: string) => void;
   onUpdateAssetNote: (assetId: string, note: string) => void;
   onReturnToCanvas: () => void;
+  onStructureChange?: (next: ProjectStructureSuggestion) => void;
+  onGenerateStructure?: () => void;
 }
 
 type SectionKey = "facts" | "assets" | "ai" | "structure";
@@ -104,6 +117,8 @@ export function ProjectSetupWizard({
   onUpdateAssetTitle,
   onUpdateAssetNote,
   onReturnToCanvas,
+  onStructureChange,
+  onGenerateStructure,
 }: ProjectSetupWizardProps) {
   const [boardsDestroyConfirmOpen, setBoardsDestroyConfirmOpen] = useState(false);
   const [reanalysisConfirmOpen, setReanalysisConfirmOpen] = useState(false);
@@ -125,19 +140,25 @@ export function ProjectSetupWizard({
   const factsComplete = facts.background.trim().length > 0;
   const assetsUploaded = assets.length > 0;
 
-  // Auto-scroll to structure when AI completes
+  const completeness = useMemo(
+    () => computeSetupCompleteness({ facts, assets, materialRecognition }),
+    [facts, assets, materialRecognition],
+  );
+
+  // Auto-scroll to AI section when AI completes, so user sees the summary
+  // and "AI 希望了解更多" card before moving on to structure.
   const prevAiRunning = useRef(false);
   useEffect(() => {
-    if (prevAiRunning.current && !aiRunning && structureReady) {
+    if (prevAiRunning.current && !aiRunning && recognitionDone) {
       setTimeout(() => {
-        sectionRefs.current.structure?.scrollIntoView({
+        sectionRefs.current.ai?.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
       }, 300);
     }
     prevAiRunning.current = aiRunning;
-  }, [aiRunning, structureReady]);
+  }, [aiRunning, recognitionDone]);
 
   // Track active section via scroll
   useEffect(() => {
@@ -400,6 +421,11 @@ export function ProjectSetupWizard({
               title="AI 项目理解"
               hint="AI 会综合项目背景、设计稿和素材描述，理解项目目标与内容，然后给出结构建议。"
             />
+            <SetupCompletenessCard
+              score={completeness}
+              compact={completeness.level === "ready"}
+              className="mb-4"
+            />
             {aiRunning ? (
               <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-white/60" />
@@ -413,7 +439,7 @@ export function ProjectSetupWizard({
                 </div>
               </div>
             ) : recognitionDone && materialRecognition ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
                   <p className="text-xs uppercase tracking-wider text-white/35">
                     AI 理解摘要
@@ -421,29 +447,69 @@ export function ProjectSetupWizard({
                   <p className="mt-2 text-sm leading-relaxed text-white/75">
                     {materialRecognition.summary}
                   </p>
-                  {materialRecognition.missingInfo.length > 0 ? (
-                    <div className="mt-4 rounded-xl bg-amber-500/10 px-4 py-3">
-                      <p className="mb-1.5 text-xs font-medium text-amber-300/80">
-                        AI 希望了解更多
-                      </p>
-                      <ul className="space-y-1">
-                        {materialRecognition.missingInfo.map((item, i) => (
-                          <li key={i} className="text-xs leading-relaxed text-white/55">
-                            · {item}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAiClick}
-                  disabled={!assetsUploaded}
-                  className="text-xs text-white/45 transition-colors hover:text-white/80 disabled:opacity-40"
-                >
-                  如果素材或背景有变化，可以 <span className="underline">重新理解</span>
-                </button>
+                {materialRecognition.missingInfo.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.08] p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-300" />
+                      <p className="text-sm font-semibold text-amber-200">
+                        AI 希望你补充这些信息
+                      </p>
+                    </div>
+                    <p className="mb-3 text-xs leading-relaxed text-amber-100/60">
+                      下面是 AI 觉得现有素材和描述里还不够清楚的地方，补充后再让 AI 重新理解，结构建议会更贴合。
+                    </p>
+                    <ul className="space-y-2">
+                      {materialRecognition.missingInfo.map((item, i) => (
+                        <li
+                          key={i}
+                          className="flex gap-2 rounded-xl bg-amber-500/[0.06] px-3.5 py-2.5 text-sm leading-relaxed text-white/80"
+                        >
+                          <span className="mt-[2px] text-amber-300/90">{i + 1}.</span>
+                          <span className="flex-1">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {completeness.level === "not_ready" && !structureDraft ? (
+                  <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[0.04] p-5">
+                    <p className="text-sm font-semibold text-amber-200">
+                      信息还不够，暂未生成章节结构
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-amber-100/60">
+                      补充上方信息后重新理解，AI 才能给出更贴合的结构建议。也可以选择跳过建议，直接生成。
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleAiClick}
+                        disabled={!assetsUploaded}
+                        className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-neutral-900 transition-all hover:bg-neutral-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        补充后重新理解
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onGenerateStructure?.()}
+                        disabled={suggestingStructure || !onGenerateStructure}
+                        className="text-xs text-white/45 underline transition-colors hover:text-white/70 disabled:opacity-40"
+                      >
+                        跳过建议，仍然生成结构
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAiClick}
+                    disabled={!assetsUploaded}
+                    className="text-xs text-white/45 transition-colors hover:text-white/80 disabled:opacity-40"
+                  >
+                    如果素材或背景有变化，可以 <span className="underline">重新理解</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
@@ -501,31 +567,42 @@ export function ProjectSetupWizard({
                     {structureDraft.summary}
                   </p>
                 )}
+
+                <StructureOverview draft={structureDraft} />
+
                 <div className="space-y-2">
-                  {structureDraft.groups.map((group) => (
-                    <div
+                  {structureDraft.groups.map((group, idx) => (
+                    <StructureGroupCard
                       key={group.id}
-                      className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-white/85">
-                          {group.label}
-                        </span>
-                        <span className="text-xs text-white/35">
-                          {group.sections.length} 页
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {group.sections.map((section) => (
-                          <span
-                            key={section.id}
-                            className="rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs text-white/55"
-                          >
-                            {section.title}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                      group={group}
+                      index={idx}
+                      totalGroups={structureDraft.groups.length}
+                      editable={!isStructureConfirmed && Boolean(onStructureChange)}
+                      onChange={(next) => {
+                        if (!onStructureChange) return;
+                        onStructureChange({
+                          ...structureDraft,
+                          groups: structureDraft.groups.map((g) =>
+                            g.id === group.id ? next : g
+                          ),
+                        });
+                      }}
+                      onMove={(direction) => {
+                        if (!onStructureChange) return;
+                        const target = direction === "up" ? idx - 1 : idx + 1;
+                        if (target < 0 || target >= structureDraft.groups.length) return;
+                        const next = [...structureDraft.groups];
+                        [next[idx], next[target]] = [next[target], next[idx]];
+                        onStructureChange({ ...structureDraft, groups: next });
+                      }}
+                      onDelete={() => {
+                        if (!onStructureChange) return;
+                        onStructureChange({
+                          ...structureDraft,
+                          groups: structureDraft.groups.filter((g) => g.id !== group.id),
+                        });
+                      }}
+                    />
                   ))}
                 </div>
                 {actionError ? (
@@ -695,6 +772,186 @@ function AssetsGrid({
   );
 }
 
+function StructureOverview({ draft }: { draft: ProjectStructureSuggestion }) {
+  const totalPages = draft.groups.reduce((sum, g) => sum + g.sections.length, 0);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-5">
+      <div className="flex items-baseline gap-3">
+        <span className="text-xs uppercase tracking-wider text-white/40">
+          建议总页数
+        </span>
+        <span className="text-2xl font-semibold text-white">{totalPages}</span>
+        <span className="text-sm text-white/40">页 · {draft.groups.length} 个章节</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {draft.groups.map((g, i) => (
+          <span
+            key={g.id}
+            className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-xs text-white/55"
+          >
+            第 {i + 1} 章 · {g.sections.length} 页
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StructureGroupCard({
+  group,
+  index,
+  totalGroups,
+  editable,
+  onChange,
+  onMove,
+  onDelete,
+}: {
+  group: ProjectStructureGroup;
+  index: number;
+  totalGroups: number;
+  editable: boolean;
+  onChange: (next: ProjectStructureGroup) => void;
+  onMove: (direction: "up" | "down") => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [label, setLabel] = useState(group.label);
+  const [editingLabel, setEditingLabel] = useState(false);
+
+  useEffect(() => {
+    setLabel(group.label);
+  }, [group.label]);
+
+  const commitLabel = () => {
+    setEditingLabel(false);
+    const trimmed = label.trim();
+    if (!trimmed || trimmed === group.label) {
+      setLabel(group.label);
+      return;
+    }
+    onChange({ ...group, label: trimmed });
+  };
+
+  const updateSection = (sectionId: string, patch: Partial<ProjectStructureSection>) => {
+    onChange({
+      ...group,
+      sections: group.sections.map((s) => (s.id === sectionId ? { ...s, ...patch } : s)),
+    });
+  };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]">
+      <div className="flex items-center gap-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/5 hover:text-white/90"
+          aria-label={expanded ? "收起" : "展开"}
+        >
+          <ChevronDown
+            className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
+          />
+        </button>
+        <span className="shrink-0 text-xs font-mono text-white/35">
+          第 {index + 1} 章
+        </span>
+        {editingLabel && editable ? (
+          <Input
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitLabel();
+              if (e.key === "Escape") {
+                setLabel(group.label);
+                setEditingLabel(false);
+              }
+            }}
+            className="h-7 flex-1 rounded-lg border-white/10 bg-white/[0.06] px-2 text-sm text-white"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => editable && setEditingLabel(true)}
+            disabled={!editable}
+            className={cn(
+              "flex-1 truncate text-left text-sm font-medium text-white/85",
+              editable && "rounded px-1 hover:bg-white/5"
+            )}
+          >
+            {group.label}
+          </button>
+        )}
+        <span className="shrink-0 text-xs text-white/40">
+          {group.sections.length} 页
+        </span>
+        {editable ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => onMove("up")}
+              disabled={index === 0}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/5 hover:text-white/85 disabled:opacity-25"
+              aria-label="上移"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove("down")}
+              disabled={index === totalGroups - 1}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/5 hover:text-white/85 disabled:opacity-25"
+              aria-label="下移"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={totalGroups <= 1}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-25"
+              aria-label="删除章节"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {expanded ? (
+        <div className="border-t border-white/5 bg-black/15 px-4 py-3">
+          <ul className="space-y-1.5">
+            {group.sections.map((section, sIdx) => (
+              <li
+                key={section.id}
+                className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-white/[0.03]"
+              >
+                <span className="shrink-0 text-xs font-mono text-white/30">
+                  P{sIdx + 1}
+                </span>
+                {editable ? (
+                  <Input
+                    value={section.title}
+                    onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                    className="h-7 flex-1 rounded-md border-white/8 bg-white/[0.04] px-2 text-sm text-white"
+                  />
+                ) : (
+                  <span className="flex-1 text-sm text-white/70">{section.title}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {group.rationale ? (
+            <p className="mt-3 border-l-2 border-white/10 pl-3 text-xs leading-relaxed text-white/40">
+              {group.rationale}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AssetCard({
   asset,
   onUpdateTitle,
@@ -757,6 +1014,110 @@ function AssetCard({
             未描述
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SetupCompletenessCard({
+  score,
+  className,
+  compact,
+}: {
+  score: SetupCompletenessScore;
+  className?: string;
+  compact?: boolean;
+}) {
+  const { totalScore, projectedScore, level, dimensions } = score;
+  const gap = Math.max(0, projectedScore - totalScore);
+  const toneClass =
+    level === "ready"
+      ? "border-emerald-400/25 bg-emerald-500/[0.06]"
+      : level === "needs_improvement"
+        ? "border-white/10 bg-white/[0.03]"
+        : "border-amber-400/20 bg-amber-500/[0.05]";
+  const scoreColorClass =
+    level === "ready"
+      ? "text-emerald-300"
+      : level === "not_ready"
+        ? "text-amber-300"
+        : "text-white";
+  const barColorClass =
+    level === "ready"
+      ? "bg-emerald-400/80"
+      : level === "not_ready"
+        ? "bg-amber-400/80"
+        : "bg-white/70";
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-between gap-4 rounded-2xl border px-5 py-3",
+          toneClass,
+          className,
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <Check className="h-4 w-4 text-emerald-300" />
+          <p className="text-sm text-white/80">{setupLevelLabel(level)}</p>
+        </div>
+        <div className="flex items-baseline gap-1">
+          <span className={cn("text-lg font-semibold", scoreColorClass)}>
+            {totalScore}
+          </span>
+          <span className="text-xs text-white/40">/ 100</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("rounded-2xl border p-5", toneClass, className)}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-white/35">
+            AI 理解完整度
+          </p>
+          <p className="mt-2 text-sm text-white/75">
+            {setupLevelLabel(level)}
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="flex items-baseline gap-1">
+            <span className={cn("text-3xl font-semibold", scoreColorClass)}>
+              {totalScore}
+            </span>
+            <span className="text-sm text-white/40">/ 100</span>
+          </div>
+          {gap > 0 ? (
+            <p className="mt-1 text-xs text-white/45">
+              补充后可达 <span className="text-white/75">{projectedScore}</span> / 100
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+        <div
+          className={cn("h-full transition-all", barColorClass)}
+          style={{ width: `${Math.min(100, totalScore)}%` }}
+        />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {dimensions.map((d) => (
+          <div
+            key={d.key}
+            className="rounded-xl bg-white/[0.03] px-3 py-2.5"
+          >
+            <p className="text-[11px] leading-tight text-white/40">
+              {d.label}
+            </p>
+            <p className="mt-1 text-sm text-white/80">
+              {d.score}
+              <span className="text-white/35"> / {d.maxScore}</span>
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );

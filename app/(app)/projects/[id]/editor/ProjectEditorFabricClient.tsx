@@ -92,6 +92,10 @@ import {
 } from "@/components/editor/ColorPickerPopover";
 import { ProjectSetupWizard } from "@/components/editor/ProjectSetupWizard";
 import {
+  computeSetupCompleteness,
+  SETUP_STRUCTURE_GATE,
+} from "@/lib/setup-completeness-score";
+import {
   ProjectCreationGate,
   AUDIENCE_OPTIONS,
   PLATFORM_OPTIONS,
@@ -1380,6 +1384,7 @@ export function ProjectEditorFabricClient({
 
     // Step 1: 素材识别
     setRecognizingMaterials(true);
+    let latestRecognition: ProjectMaterialRecognition | null = null;
     try {
       await persistCurrentSceneForAction();
       const recData = await parseJsonResponse<{ recognition: ProjectMaterialRecognition }>(
@@ -1388,6 +1393,7 @@ export function ProjectEditorFabricClient({
           headers: { "Content-Type": "application/json" },
         })
       );
+      latestRecognition = recData.recognition;
       setMaterialRecognition(recData.recognition);
       setLayout((current) =>
         mergeProjectLayoutDocument(current, { materialRecognition: recData.recognition }) as LayoutJson
@@ -1398,6 +1404,21 @@ export function ProjectEditorFabricClient({
       return; // 识别失败 → 中止，不执行结构生成
     }
     setRecognizingMaterials(false);
+
+    // Gate: 仅在 Setup 完整度 ≥ 80 时自动继续生成结构（§14.3 Scoring Strategy v3）
+    const completeness = computeSetupCompleteness({
+      facts: {
+        timeline: projectFactsDraft.timeline,
+        roleTitle: projectFactsDraft.roleTitle,
+        background: projectFactsDraft.background,
+        businessGoal: projectFactsDraft.businessGoal,
+        biggestChallenge: projectFactsDraft.biggestChallenge,
+        resultSummary: projectFactsDraft.resultSummary,
+      },
+      assets,
+      materialRecognition: latestRecognition,
+    });
+    if (completeness.totalScore < SETUP_STRUCTURE_GATE) return;
 
     // Step 2: 结构建议（仅在识别成功后执行）
     setSuggestingStructure(true);
@@ -3786,11 +3807,13 @@ export function ProjectEditorFabricClient({
               actionError={actionError}
               hasExistingBoards={scene.boards.length > 0}
               onAiUnderstand={() => void handleWizardAiUnderstand()}
+              onGenerateStructure={() => void handleSuggestStructure()}
               onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
               onUploadAssets={handleOpenAssetUpload}
               onUpdateAssetTitle={handleRenameAsset}
               onUpdateAssetNote={handleUpdateAssetNote}
               onReturnToCanvas={() => { setSetupMode(false); setActionError(""); }}
+              onStructureChange={(next) => mutateStructureDraft(() => next)}
             />
           </div>
         ) : (
@@ -3963,7 +3986,7 @@ export function ProjectEditorFabricClient({
             </div>
           ) : null}
         </div>
-        )} /* end canvas viewport ternary */
+        )}
         </>}
       rightRail={setupMode ? undefined : (
         <div className="flex h-full min-h-0 flex-col">
