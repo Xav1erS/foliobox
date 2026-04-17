@@ -52,20 +52,20 @@ export default function NewPortfolioPage() {
       />
 
       <div className="mt-8">
-        <SectionCard>
+        <SectionCard className="app-panel-elevated">
           <div className="flex flex-col gap-6 p-6">
-            <div className="flex items-center gap-3 border-b border-neutral-200 pb-5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-neutral-200 bg-neutral-50">
-                <BookOpen className="h-5 w-5 text-neutral-500" />
+            <div className="flex items-center gap-3 border-b border-white/8 pb-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
+                <BookOpen className="h-5 w-5 text-white/56" />
               </div>
               <div>
-                <p className="text-sm font-medium text-neutral-900">作品集</p>
-                <p className="text-xs text-neutral-400">可以为一次求职目标单独创建一份</p>
+                <p className="text-sm font-medium text-white">作品集</p>
+                <p className="text-xs text-white/44">可以为一次求职目标单独创建一份</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="portfolio-name" className="text-sm font-medium text-neutral-700">
+              <Label htmlFor="portfolio-name" className="text-sm font-medium text-white/72">
                 作品集名称
               </Label>
               <Input
@@ -76,16 +76,16 @@ export default function NewPortfolioPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && name.trim()) handleCreate();
                 }}
-                className="h-11 border-neutral-300"
+                className="h-11"
                 autoFocus
               />
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-white/42">
                 名称只是你自己看到的标识，不会出现在作品集正文里。
               </p>
             </div>
 
             {error && (
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-400">{error}</p>
             )}
           </div>
         </SectionCard>

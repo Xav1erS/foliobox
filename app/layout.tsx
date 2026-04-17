@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Noto_Sans_SC } from "next/font/google";
 import { getConfiguredAppUrl } from "@/lib/app-url";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const notoSansSC = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ui",
+});
 const configuredAppUrl = getConfiguredAppUrl();
 
 export const metadata: Metadata = {
@@ -20,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} ${inter.variable} ${notoSansSC.variable}`}>{children}</body>
     </html>
   );
 }

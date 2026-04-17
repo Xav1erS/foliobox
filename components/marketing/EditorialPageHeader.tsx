@@ -28,7 +28,7 @@ export function EditorialPageHeader({
           {subtitle}
         </p>
 
-        <div className="mt-10 max-w-3xl border border-white/8 bg-white/3 px-6 py-6 sm:px-7">
+        <div className="marketing-panel mt-10 max-w-3xl border border-white/8 bg-white/3 px-6 py-6 sm:px-7">
           <div className="space-y-4">
             {introParagraphs.map((paragraph) => (
               <p key={paragraph} className="text-base leading-8 text-white/60 sm:text-lg sm:leading-9">

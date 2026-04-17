@@ -3,7 +3,7 @@ import { SectionEyebrow } from "@/components/marketing/SectionEyebrow";
 function UploadMock() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <div className="flex h-12 w-12 items-center justify-center border border-white/10 bg-white/4">
+      <div className="marketing-control flex h-12 w-12 items-center justify-center border border-white/10 bg-white/4">
         <div className="flex flex-col items-center gap-1">
           <div className="h-3 w-px bg-white/30" />
           <div className="h-px w-3 bg-white/30" />
@@ -12,8 +12,8 @@ function UploadMock() {
       <div className="h-2 w-20 bg-white/8" />
       <div className="h-1.5 w-14 bg-white/6" />
       <div className="mt-1 flex gap-1.5">
-        <div className="h-5 w-14 border border-white/6 bg-white/8" />
-        <div className="h-5 w-12 border border-white/10 bg-white/10" />
+        <div className="marketing-control h-5 w-14 border border-white/6 bg-white/8" />
+        <div className="marketing-control h-5 w-12 border border-white/10 bg-white/10" />
       </div>
     </div>
   );
@@ -30,7 +30,7 @@ function FormMock() {
       ].map((f, i) => (
         <div key={i}>
           <div className="mb-1 h-1.5 bg-white/6" style={{ width: f.label }} />
-          <div className="flex h-6 w-full items-center border border-white/8 bg-white/3 px-2">
+          <div className="marketing-control flex h-6 w-full items-center border border-white/8 bg-white/3 px-2">
             <div className="h-1.5 bg-white/8" style={{ width: `${f.value}%` }} />
           </div>
         </div>
@@ -64,7 +64,7 @@ function OutlineMock() {
 function GenerateMock() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-4">
-      <div className="relative flex h-14 w-14 items-center justify-center border border-white/10 bg-white/4">
+      <div className="marketing-control relative flex h-14 w-14 items-center justify-center border border-white/10 bg-white/4">
         <div className="h-3 w-3 bg-white/30" />
         <div className="absolute inset-0 border border-white/6" style={{ transform: "scale(1.3)" }} />
         <div className="absolute inset-0 border border-white/4" style={{ transform: "scale(1.6)" }} />
@@ -85,7 +85,7 @@ function GenerateMock() {
 function ExportMock() {
   return (
     <div className="flex h-full flex-col gap-2 p-4">
-      <div className="flex-1 border border-white/8 bg-white/2 p-2">
+      <div className="marketing-control flex-1 border border-white/8 bg-white/2 p-2">
         <div className="mb-1.5 h-2 w-2/3 bg-white/10" />
         <div className="space-y-1">
           <div className="h-1.5 w-full bg-white/[0.07]" />
@@ -94,10 +94,10 @@ function ExportMock() {
         </div>
       </div>
       <div className="flex gap-1.5">
-        <div className="flex flex-1 items-center justify-center gap-1 border border-white/10 bg-white/4 py-2">
+        <div className="marketing-control flex flex-1 items-center justify-center gap-1 border border-white/10 bg-white/4 py-2">
           <div className="h-1.5 w-8 bg-white/15" />
         </div>
-        <div className="flex flex-1 items-center justify-center gap-1 border border-white/6 bg-white/2 py-2">
+        <div className="marketing-control flex flex-1 items-center justify-center gap-1 border border-white/6 bg-white/2 py-2">
           <div className="h-1.5 w-8 bg-white/8" />
         </div>
       </div>
@@ -183,7 +183,7 @@ export function HowItWorks() {
                   <div>
                     <div className="mb-2 flex items-center gap-3">
                       <h3 className="text-[15px] font-semibold text-white">{item.title}</h3>
-                      <span className="border border-white/10 px-2 py-0.5 text-xs text-white/40">
+                      <span className="marketing-pill border border-white/10 px-2 py-0.5 text-xs text-white/40">
                         {item.tag}
                       </span>
                     </div>
@@ -192,7 +192,7 @@ export function HowItWorks() {
                 </div>
 
                 {/* Thumbnail mock */}
-                <div className="overflow-hidden border border-white/[0.07] bg-white/2" style={{ height: 120 }}>
+                <div className="marketing-panel overflow-hidden border border-white/[0.07] bg-white/2" style={{ height: 120 }}>
                   <item.Mock />
                 </div>
               </div>

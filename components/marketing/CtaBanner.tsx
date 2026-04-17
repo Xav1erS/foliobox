@@ -43,13 +43,13 @@ export function CtaBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
           <Link
             href={primaryAction.href}
-            className="flex h-12 min-w-[200px] items-center justify-center bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            className="marketing-control flex h-12 min-w-[200px] items-center justify-center bg-white px-8 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-12 min-w-[200px] items-center justify-center border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
+            className="marketing-control flex h-12 min-w-[200px] items-center justify-center border border-white/15 px-8 text-sm font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
           >
             {secondaryAction.label}
           </Link>

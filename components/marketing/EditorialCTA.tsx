@@ -5,7 +5,7 @@ import type { EditorialCTA as EditorialCTAModel } from "@/content/editorial/type
 export function EditorialCTA({ cta }: { cta: EditorialCTAModel }) {
   return (
     <section className="px-6 pb-24 pt-6">
-      <div className="mx-auto max-w-4xl border border-white/10 bg-white/4 px-6 py-10 text-center sm:px-10">
+      <div className="marketing-panel mx-auto max-w-4xl border border-white/10 bg-white/4 px-6 py-10 text-center sm:px-10">
         <SectionEyebrow label="继续下一步" className="justify-center" />
         <h2 className="mt-4 font-bold tracking-tight text-white">
           <span className="block text-[2.2rem] leading-[1.02] tracking-[-0.04em] sm:hidden">

@@ -20,7 +20,7 @@ export default async function StyleReferencesPage() {
   });
 
   return (
-    <div className="space-y-6 px-6 py-10">
+    <div className="mx-auto max-w-[1480px] space-y-6 px-6 py-10">
       <PageHeader
         eyebrow="Style References"
         title="风格参考"

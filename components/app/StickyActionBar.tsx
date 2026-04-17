@@ -10,7 +10,7 @@ export function StickyActionBar({
   return (
     <div
       className={cn(
-        "app-sticky-bar sticky bottom-0 px-6 py-4",
+        "app-sticky-bar sticky bottom-0 px-6 py-4 shadow-[0_-18px_40px_-30px_rgba(0,0,0,0.8)]",
         className
       )}
     >

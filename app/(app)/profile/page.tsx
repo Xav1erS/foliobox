@@ -57,7 +57,7 @@ export default async function ProfilePage({
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-6 px-6 py-10">
+    <div className="mx-auto max-w-[1480px] space-y-6 px-6 py-10">
       <PageHeader
         eyebrow="PROFILE"
         title="设计师档案"
@@ -67,7 +67,7 @@ export default async function ProfilePage({
       <Separator className="-mx-6 w-auto" />
 
       {fromScore && (
-        <Card className="border-border/70 bg-card/95 shadow-xs">
+        <Card className="app-panel">
           <CardContent className="p-5">
           <ResumeContextBanner>
             你是从评分结果回到这里的。先补充当前职位、经验年限、擅长方向与目标岗位，再去整理项目，会让后续生成结果更贴近你的求职方向。
@@ -77,7 +77,7 @@ export default async function ProfilePage({
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/70 bg-card/95 shadow-xs">
+        <Card className="app-panel">
           <CardContent className="p-5">
           <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Profile Readiness
@@ -90,7 +90,7 @@ export default async function ProfilePage({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-card/95 shadow-xs">
+        <Card className="app-panel">
           <CardContent className="p-5">
           <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Plan
@@ -103,12 +103,12 @@ export default async function ProfilePage({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-foreground text-background shadow-xs">
+        <Card className="app-panel-highlight text-white shadow-xs">
           <CardContent className="p-5">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-background/45">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/42">
             Why It Matters
           </p>
-          <p className="mt-2 text-base font-medium leading-7">
+          <p className="mt-2 text-base font-medium leading-7 text-white">
             档案越清楚，后续项目和作品集生成就越贴近你真实的投递方向。
           </p>
           </CardContent>
@@ -119,11 +119,11 @@ export default async function ProfilePage({
 
       <Separator className="-mx-6 w-auto" />
 
-      <Card className="border-border/70 bg-card/95 shadow-xs">
+      <Card className="app-panel">
         <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
+                <Badge variant="secondary" className="px-2 py-0.5 font-mono text-xs">
                 当前方案与权益
               </Badge>
             </div>
@@ -155,9 +155,9 @@ export default async function ProfilePage({
               {planDefinition.featureList.map((ability) => (
                 <li
                   key={ability}
-                  className="flex items-center gap-2.5 text-sm text-foreground/88"
+                  className="flex items-center gap-2.5 text-sm text-white/84"
                 >
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" />
+                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
                   {ability}
                 </li>
               ))}
@@ -174,14 +174,14 @@ export default async function ProfilePage({
               {QUOTA_DISPLAY_ORDER.map((key) => {
                 const quota = entitlementSummary.quotas[key];
                 return (
-                  <div key={key} className="rounded-xl border border-border/70 bg-background px-4 py-3">
-                    <p className="text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                   <div key={key} className="rounded-xl border border-border bg-secondary px-4 py-3">
+                     <p className="text-xs font-mono uppercase tracking-[0.12em] text-white/34">
                       {quota.label}
                     </p>
-                    <p className="mt-2 text-sm font-medium text-foreground">
+                     <p className="mt-2 text-sm font-medium text-white/88">
                       {formatQuotaUsageValue(key, quota)}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                     <p className="mt-1 text-xs text-white/42">
                       已用 {quota.used} · 剩余 {quota.remaining}
                     </p>
                   </div>
@@ -192,11 +192,11 @@ export default async function ProfilePage({
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/95 shadow-xs">
+      <Card className="app-panel">
         <CardHeader>
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${quotaStatusClass}`} />
-            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
+            <Badge variant="secondary" className="px-2 py-0.5 font-mono text-xs">
               处理预算
             </Badge>
           </div>
@@ -214,15 +214,15 @@ export default async function ProfilePage({
               {QUOTA_DISPLAY_ORDER.map((key) => {
                 const quota = entitlementSummary.quotas[key];
                 return (
-                  <div key={key} className="rounded-xl border border-border/70 bg-background px-4 py-4">
+                   <div key={key} className="rounded-xl border border-border bg-secondary px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-foreground">{quota.label}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                         <p className="text-sm font-medium text-white/88">{quota.label}</p>
+                         <p className="mt-1 text-xs text-white/42">
                           总额度 {quota.limit} · 已用 {quota.used}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-foreground">
+                       <p className="text-sm font-semibold text-white/92">
                         剩余 {quota.remaining}
                       </p>
                     </div>

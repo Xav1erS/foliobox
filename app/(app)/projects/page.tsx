@@ -45,7 +45,7 @@ export default async function ProjectsPage({
   });
 
   return (
-    <div className="px-6 py-10">
+    <div className="mx-auto max-w-[1480px] px-6 py-10">
       <PageHeader
         eyebrow="Projects"
         title="我的项目"
@@ -66,7 +66,7 @@ export default async function ProjectsPage({
       <div className="mt-6">
         {projects.length === 0 ? (
           <EmptyState
-            icon={<FileText className="h-6 w-6 text-neutral-400" />}
+            icon={<FileText className="h-6 w-6 text-white/44" />}
             title="你还没有项目"
             description="先输入项目名称进入编辑器，再逐步补素材、项目事实和风格参考。后续所有项目都会集中收在这里。"
             action={
@@ -80,16 +80,16 @@ export default async function ProjectsPage({
           />
         ) : (
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-xs">
+            <Card className="app-panel">
               <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
+                    <Badge variant="secondary" className="px-2 py-0.5 font-mono text-xs">
                       全部项目
                     </Badge>
                     <span className="text-sm text-muted-foreground">{projects.length} 个对象</span>
                   </div>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                    <p className="max-w-2xl text-sm leading-6 text-white/52">
                     这里保留完整项目池。项目一旦创建，就会沿着同一条 editor 主链路继续整理，不再拆成旧多步骤页面。
                   </p>
                 </div>

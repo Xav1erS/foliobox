@@ -17,7 +17,7 @@ export function IndexedFeatureGrid({
   className,
 }: IndexedFeatureGridProps) {
   return (
-    <div className={cn("grid border border-white/10 sm:grid-cols-2", className)}>
+    <div className={cn("marketing-panel grid overflow-hidden border border-white/10 sm:grid-cols-2", className)}>
       {items.map((item, index) => (
         <article
           key={`${item.id}-${item.title}`}
@@ -28,7 +28,7 @@ export function IndexedFeatureGrid({
           )}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
+            <span className="marketing-pill border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
               {item.status}
             </span>
             <span className="font-mono text-xs tracking-[0.25em] text-white/20">

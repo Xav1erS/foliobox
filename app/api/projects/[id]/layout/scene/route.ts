@@ -28,6 +28,7 @@ export async function PUT(
 
   const body = (await request.json().catch(() => ({}))) as {
     editorScene?: unknown;
+    markSetupCompleted?: boolean;
   };
   const parsedScene = ProjectEditorSceneSchema.safeParse(body.editorScene);
 
@@ -40,6 +41,9 @@ export async function PUT(
 
   const layoutDocument = mergeProjectLayoutDocument(project.layoutJson, {
     editorScene: parsedScene.data,
+    ...(body.markSetupCompleted
+      ? { setup: { completedAt: new Date().toISOString() } }
+      : {}),
   });
 
   await db.project.update({

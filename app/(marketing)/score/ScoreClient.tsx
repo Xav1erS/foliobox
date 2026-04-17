@@ -334,7 +334,7 @@ export function ScoreClient() {
         </div>
 
         <div
-          className="w-full border border-white/10 bg-white/3"
+          className="marketing-panel w-full overflow-hidden border border-white/10 bg-white/3"
           style={{ maxWidth: 560 }}
         >
           <div className="flex border-b border-white/8">
@@ -372,7 +372,7 @@ export function ScoreClient() {
                   onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                   placeholder="https://your-portfolio.notion.site/..."
                   disabled={loading}
-                  className="h-12 w-full border border-white/10 bg-white/4 px-4 text-sm text-white placeholder:text-white/25 outline-hidden transition-colors focus:border-white/25 focus:bg-white/6 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="marketing-control h-12 w-full border border-white/10 bg-white/4 px-4 text-sm text-white placeholder:text-white/25 outline-hidden transition-colors focus:border-white/25 focus:bg-white/6 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <p className="text-xs text-white/35">
                   支持 Notion、Behance、个人网站、飞书文档等公开链接；系统会优先理解整站结构，而不是只抓首页。
@@ -387,7 +387,7 @@ export function ScoreClient() {
                   onDragOver={handlePdfDragOver}
                   onDragLeave={handlePdfDragLeave}
                   onDrop={handlePdfDrop}
-                  className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed bg-white/2 transition-colors ${
+                  className={`marketing-panel flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed bg-white/2 transition-colors ${
                     isDraggingPdf
                       ? "border-white/45 bg-white/8"
                       : "border-white/15 hover:border-white/25 hover:bg-white/4"
@@ -407,10 +407,10 @@ export function ScoreClient() {
                   />
                 </label>
                 {pdfFile ? (
-                  <div className="border border-white/10 bg-white/3 p-3">
+                  <div className="marketing-control border border-white/10 bg-white/3 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-white/10 bg-white/4">
+                        <div className="marketing-control flex h-10 w-10 shrink-0 items-center justify-center border border-white/10 bg-white/4">
                           <FileText className="h-4 w-4 text-white/50" />
                         </div>
                         <div className="min-w-0">
@@ -422,7 +422,7 @@ export function ScoreClient() {
                         type="button"
                         onClick={removePdfSelection}
                         disabled={loading}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 text-white/45 transition-colors hover:border-white/20 hover:text-white/80"
+                        className="marketing-control inline-flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 text-white/45 transition-colors hover:border-white/20 hover:text-white/80"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -458,7 +458,7 @@ export function ScoreClient() {
             <button
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="mt-5 flex h-12 w-full items-center justify-center gap-2 bg-white text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="marketing-control mt-5 flex h-12 w-full items-center justify-center gap-2 bg-white text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? (
                 <>
@@ -495,8 +495,8 @@ export function ScoreClient() {
             loadingStage === "redirecting" ? "bg-black/92" : "bg-black/85"
           }`}
         >
-          <div className="w-full max-w-md border border-white/10 bg-white/4 p-8 text-center">
-            <div className={`mx-auto flex h-16 w-16 items-center justify-center border ${loadingStageToneClassName}`}>
+          <div className="marketing-panel w-full max-w-md border border-white/10 bg-white/4 p-8 text-center">
+            <div className={`marketing-control mx-auto flex h-16 w-16 items-center justify-center border ${loadingStageToneClassName}`}>
               {loadingStage === "uploading" ? (
                 <CloudUpload className="h-7 w-7 text-sky-100" />
               ) : loadingStage === "redirecting" ? (
@@ -508,11 +508,11 @@ export function ScoreClient() {
             <p className="mt-5 text-xs uppercase tracking-[0.18em] text-white/35">Focus</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">{resolvedLoadingTitle}</h2>
             <p className="mt-3 text-sm leading-6 text-white/55">{resolvedLoadingDescription}</p>
-            <div className="mt-6 border border-white/10 bg-black/20 p-4 text-left">
+            <div className="marketing-control mt-6 border border-white/10 bg-black/20 p-4 text-left">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <p className="text-xs text-white/40">{resolvedInputSummary}</p>
-                <span className={`inline-flex items-center gap-1 border px-2.5 py-1 text-xs font-medium ${loadingStageToneClassName}`}>
-                  <span className={`h-1.5 w-1.5 ${loadingStageAccentClassName}`} />
+                <span className={`marketing-pill inline-flex items-center gap-1 border px-2.5 py-1 text-xs font-medium ${loadingStageToneClassName}`}>
+                  <span className={`marketing-pill h-1.5 w-1.5 ${loadingStageAccentClassName}`} />
                   {loadingStageLabel}
                 </span>
               </div>
@@ -522,13 +522,13 @@ export function ScoreClient() {
                     <div className="h-full w-1/2 animate-pulse bg-sky-300" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-sky-300/40 bg-sky-300/10 text-xs text-sky-100">
+                    <span className="marketing-control flex h-6 w-6 items-center justify-center border border-sky-300/40 bg-sky-300/10 text-xs text-sky-100">
                       1
                     </span>
                     <span className="text-sm text-white/75">上传评分材料</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-white/10 bg-white/3 text-xs text-white/35">
+                    <span className="marketing-control flex h-6 w-6 items-center justify-center border border-white/10 bg-white/3 text-xs text-white/35">
                       2
                     </span>
                     <span className="text-sm text-white/35">上传完成后开始正式评分</span>
@@ -540,21 +540,21 @@ export function ScoreClient() {
                     <div className="h-full w-full bg-emerald-300" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center bg-emerald-300 text-black">
+                    <span className="marketing-control flex h-6 w-6 items-center justify-center bg-emerald-300 text-black">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     </span>
                     <span className="text-sm text-white/75">评分结果已生成</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 items-center justify-center border border-emerald-300/40 bg-emerald-300/10 text-xs text-emerald-100">
+                    <span className="marketing-control flex h-6 w-6 items-center justify-center border border-emerald-300/40 bg-emerald-300/10 text-xs text-emerald-100">
                       <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                     <span className="text-sm text-white/75">正在进入结果页</span>
                   </div>
-                  <div className="border border-emerald-400/15 bg-emerald-400/8 px-3 py-2 text-xs leading-5 text-emerald-100/85">
+                  <div className="marketing-control border border-emerald-400/15 bg-emerald-400/8 px-3 py-2 text-xs leading-5 text-emerald-100/85">
                     不需要再次点击按钮，页面会自动进入这次评分结果。
                   </div>
-                  <div className="border border-white/10 bg-white/3 px-3 py-2 text-left">
+                  <div className="marketing-control border border-white/10 bg-white/3 px-3 py-2 text-left">
                     <p className="text-xs uppercase tracking-[0.16em] text-white/35">接下来</p>
                     <p className="mt-2 text-sm text-white/75">我们会先打开评分结果页，再从结果里引导你进入下一步整理。</p>
                   </div>
@@ -578,7 +578,7 @@ export function ScoreClient() {
                       return (
                         <div key={step} className="flex items-center gap-3">
                           <span
-                            className={`flex h-6 w-6 items-center justify-center text-xs ${
+                            className={`marketing-control flex h-6 w-6 items-center justify-center text-xs ${
                               state === "done"
                                 ? "bg-white text-black"
                                 : state === "active"

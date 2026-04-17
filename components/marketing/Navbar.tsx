@@ -16,6 +16,7 @@ import {
   getNavbarPrimaryAction,
   getNavbarSecondaryAction,
 } from "@/lib/marketing-cta";
+import { BrandLockup } from "@/components/brand/BrandLogo";
 
 type NavbarPage = "home" | "pricing" | "score" | "editorial" | "vision" | "legal";
 
@@ -78,9 +79,12 @@ export function Navbar({
         {/* Logo */}
         <Link
           href="/"
-          className="whitespace-nowrap text-[18px] font-semibold leading-none tracking-tight text-white sm:text-sm"
+          className="transition-opacity hover:opacity-80"
         >
-          集盒FolioBox
+          <BrandLockup
+            titleClassName="text-[18px] leading-none tracking-tight sm:text-sm"
+            markClassName="h-9 w-9 rounded-[11px] sm:h-8 sm:w-8 sm:rounded-[10px]"
+          />
         </Link>
 
         {/* Nav links */}
@@ -112,7 +116,7 @@ export function Navbar({
           )}
           <Link
             href={primaryCta.href}
-            className="flex h-12 min-w-[124px] items-center justify-center bg-white px-5 text-base font-semibold text-black transition-colors hover:bg-white/90 sm:h-auto sm:min-w-0 sm:px-4 sm:py-1.5 sm:text-sm"
+            className="marketing-control flex h-12 min-w-[124px] items-center justify-center bg-white px-5 text-base font-semibold text-black transition-colors hover:bg-white/90 sm:h-auto sm:min-w-0 sm:px-4 sm:py-1.5 sm:text-sm"
           >
             <span className="sm:hidden">{isLoggedIn ? "进入工作台" : "开始评分"}</span>
             <span className="hidden sm:inline">{primaryCta.label} →</span>
@@ -123,7 +127,7 @@ export function Navbar({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-12 w-12 rounded-xl border border-white/10 bg-white/4 text-white hover:bg-white/10 hover:text-white md:hidden"
+                className="marketing-control h-12 w-12 border border-white/10 bg-white/4 text-white hover:bg-white/10 hover:text-white md:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -131,7 +135,10 @@ export function Navbar({
             <DialogContent className="top-0 left-auto right-0 h-screen max-w-[320px] translate-x-0 translate-y-0 rounded-l-3xl border-white/10 bg-neutral-950 p-0 text-white data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
               <DialogHeader className="border-b border-white/10 px-5 py-4 text-left">
                 <DialogTitle className="text-sm font-semibold tracking-tight text-white">
-                  集盒FolioBox
+                  <BrandLockup
+                    titleClassName="text-sm tracking-tight"
+                    markClassName="h-8 w-8 rounded-[10px]"
+                  />
                 </DialogTitle>
               </DialogHeader>
 
@@ -141,7 +148,7 @@ export function Navbar({
                     <DialogClose asChild key={item.key}>
                       <Link
                         href={item.href}
-                        className={`block px-3 py-3 text-sm transition-colors ${
+                        className={`marketing-control block px-3 py-3 text-sm transition-colors ${
                           activePrimaryKey === item.key
                             ? "bg-white/10 text-white"
                             : "text-white/65 hover:bg-white/5 hover:text-white"
@@ -157,7 +164,7 @@ export function Navbar({
                   <DialogClose asChild>
                     <Link
                       href={primaryCta.href}
-                      className="flex h-11 items-center justify-center bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                      className="marketing-control flex h-11 items-center justify-center bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90"
                     >
                       {primaryCta.label}
                     </Link>
@@ -166,7 +173,7 @@ export function Navbar({
                     <DialogClose asChild>
                       <Link
                         href={secondaryCta.href}
-                        className="flex h-11 items-center justify-center border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+                        className="marketing-control flex h-11 items-center justify-center border border-white/15 px-4 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
                       >
                         {secondaryCta.label}
                       </Link>

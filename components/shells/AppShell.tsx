@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { MobileBanner } from "@/components/app/MobileBanner";
+import { BrandLockup } from "@/components/brand/BrandLogo";
 
 export function AppShell({
   children,
@@ -23,7 +24,7 @@ export function AppShell({
   }
 
   return (
-    <div className="app-shell">
+    <div className="dark app-shell">
       <div className="app-shell-grid" />
       <div className="hidden md:flex md:shrink-0">
         <AppSidebar userEmail={userEmail} />
@@ -33,10 +34,13 @@ export function AppShell({
         <MobileBanner />
 
         <div className="app-shell-mobile-bar flex items-center justify-between px-4 py-3 md:hidden">
-          <span className="text-sm font-semibold tracking-tight">集盒FolioBox</span>
+          <BrandLockup
+            titleClassName="text-sm tracking-tight text-white/86"
+            markClassName="h-8 w-8 rounded-[10px]"
+          />
         </div>
 
-        <main className="relative flex-1 overflow-y-auto">{children}</main>
+        <main className="app-shell-main">{children}</main>
       </div>
     </div>
   );

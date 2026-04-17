@@ -22,7 +22,7 @@ export default async function PortfoliosPage() {
   });
 
   return (
-    <div className="px-6 py-10">
+    <div className="mx-auto max-w-[1480px] px-6 py-10">
       <PageHeader
         eyebrow="Portfolios"
         title="我的作品集"
@@ -43,7 +43,7 @@ export default async function PortfoliosPage() {
       <div className="mt-6">
         {portfolios.length === 0 ? (
           <EmptyState
-            icon={<BookOpen className="h-6 w-6 text-neutral-400" />}
+            icon={<BookOpen className="h-6 w-6 text-muted-foreground" />}
             title="还没有作品集"
             description="作品集负责把多个项目收成一个完整输出对象。先准备好项目池，或者直接新建一份空白作品集开始组装。"
             action={
@@ -62,16 +62,16 @@ export default async function PortfoliosPage() {
           />
         ) : (
           <div className="space-y-6">
-            <Card className="border-border/70 bg-card/95 shadow-xs">
+            <Card className="app-panel">
               <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
+                    <Badge variant="secondary" className="px-2 py-0.5 font-mono text-xs">
                       全部作品集
                     </Badge>
                     <span className="text-sm text-muted-foreground">{portfolios.length} 份</span>
                   </div>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                  <p className="max-w-2xl text-sm leading-6 text-white/52">
                     作品集阶段只保留 editor、publish 和 print 主链路。旧的结构兼容页已经退出实际工作流程。
                   </p>
                 </div>
@@ -97,36 +97,36 @@ export default async function PortfoliosPage() {
                 return (
                   <Card
                     key={portfolio.id}
-                    className="group border-border/70 bg-card/95 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md"
+                    className="app-panel group transition-all hover:-translate-y-0.5 hover:border-border"
                   >
                     <CardContent className="space-y-4 p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-semibold text-card-foreground">
+                          <p className="truncate text-base font-semibold text-white/94">
                             {portfolio.name}
                           </p>
-                          <p className="mt-1 text-xs font-mono text-muted-foreground">
+                          <p className="mt-1 text-xs font-mono text-white/36">
                             {portfolio.updatedAt.toLocaleDateString("zh-CN", {
                               month: "short",
                               day: "numeric",
                             })} 更新
                           </p>
                         </div>
-                        <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
+                        <Badge variant="secondary" className="px-2 py-0.5 font-mono text-xs">
                           {statusLabel}
                         </Badge>
                       </div>
 
                       <div className="space-y-2">
                         <div>
-                          <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                          <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/34">
                             项目池
                           </p>
-                          <p className="mt-1 text-sm text-foreground/88">
+                          <p className="mt-1 text-sm text-white/84">
                             {projectCount > 0 ? `已选入 ${projectCount} 个项目` : "尚未选入项目"}
                           </p>
                         </div>
-                        <p className="text-sm leading-6 text-muted-foreground">{continuePath.label}</p>
+                        <p className="text-sm leading-6 text-white/52">{continuePath.label}</p>
                       </div>
                     </CardContent>
 

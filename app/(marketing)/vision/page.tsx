@@ -120,7 +120,7 @@ export default async function VisionPage() {
               </div>
             </div>
 
-            <div className="border border-white/10 bg-white/2 p-4 sm:p-5">
+            <div className="marketing-panel border border-white/10 bg-white/2 p-4 sm:p-5">
               <p className="text-xs font-medium uppercase tracking-[0.3em] text-white/25">
                 结构草图
               </p>
@@ -134,7 +134,7 @@ export default async function VisionPage() {
             </div>
           </div>
 
-          <div className="mt-10 border border-white/10 sm:flex">
+          <div className="marketing-panel mt-10 overflow-hidden border border-white/10 sm:flex">
             {[
               { label: "现在能做", value: "评分、整理项目、补齐关键信息，先把第一版做出来" },
               { label: "以后想补", value: "一致性检查、岗位映射、面试讲述，不只是更多模板" },
@@ -213,7 +213,7 @@ export default async function VisionPage() {
           <IndexedFeatureGrid items={futureDirections} />
 
           {/* Vision diagram */}
-          <div className="mt-8 border border-white/10 p-5 sm:p-7">
+          <div className="marketing-panel mt-8 border border-white/10 p-5 sm:p-7">
             <p className="mb-5 text-xs font-medium uppercase tracking-[0.3em] text-white/25">
               系统结构图
             </p>
@@ -242,7 +242,7 @@ export default async function VisionPage() {
               </h2>
               {/* Callout */}
               <SectionFrame
-                className="mt-8 border border-white/10 bg-black/25"
+                className="marketing-panel mt-8 border border-white/10 bg-black/25"
                 noGrid
                 noCorners
               >
@@ -309,7 +309,7 @@ export default async function VisionPage() {
 
             {/* Right: included / excluded lists */}
             <div className="space-y-5">
-              <div className="border border-white/10">
+              <div className="marketing-panel overflow-hidden border border-white/10">
                 <div className="border-b border-white/[0.07] px-5 py-3">
                   <p className="text-xs font-medium uppercase tracking-[0.25em] text-white/30">
                     默认包含
@@ -328,7 +328,7 @@ export default async function VisionPage() {
                 ))}
               </div>
 
-              <div className="border border-white/10">
+              <div className="marketing-panel overflow-hidden border border-white/10">
                 <div className="border-b border-white/[0.07] px-5 py-3">
                   <p className="text-xs font-medium uppercase tracking-[0.25em] text-white/30">
                     不默认包含

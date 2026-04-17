@@ -51,7 +51,7 @@ export function VisionPreview() {
           </div>
 
           {/* Right: vision diagram in a structural frame */}
-          <div className="border border-white/10 p-5 sm:p-7">
+          <div className="marketing-panel border border-white/10 p-5 sm:p-7">
             <p className="mb-5 text-xs font-medium uppercase tracking-[0.3em] text-white/25">
               系统结构 / 规划方向
             </p>

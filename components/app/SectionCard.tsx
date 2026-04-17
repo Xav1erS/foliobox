@@ -16,14 +16,14 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "app-panel",
+        "app-panel overflow-hidden",
         className
       )}
     >
       {(title || description) && (
         <div className="app-divider-soft app-panel-header border-b px-6 py-5">
-          {title ? <h2 className="app-text-primary text-[15px] font-semibold">{title}</h2> : null}
-          {description ? <p className="app-text-muted mt-1 text-sm leading-5">{description}</p> : null}
+          {title ? <h2 className="app-text-primary text-[15px] font-semibold tracking-[-0.02em]">{title}</h2> : null}
+          {description ? <p className="app-text-muted mt-1 text-sm leading-6">{description}</p> : null}
         </div>
       )}
       <div className={cn("p-6", contentClassName)}>{children}</div>

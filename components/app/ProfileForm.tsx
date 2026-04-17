@@ -285,15 +285,15 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           </CardContent>
         </Card>
 
-        <Card className="border-border/70 bg-foreground text-background shadow-xs">
+        <Card className="app-panel-highlight text-white shadow-xs">
           <CardContent className="p-5">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-background/45">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/42">
               Focus Tags
             </p>
             <p className="mt-2 text-sm font-medium">
               {`${form.specialties?.length ?? 0} 个方向标签 · ${form.strengths?.length ?? 0} 个优势标签`}
             </p>
-            <p className="mt-2 text-sm leading-6 text-background/70">
+            <p className="mt-2 text-sm leading-6 text-white/68">
               方向和优势的选择会共同决定作品集第一版的叙述重心。
             </p>
           </CardContent>
@@ -534,8 +534,8 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
           保存后会在后续生成作品集时作为默认档案上下文使用。
         </div>
         <div className="flex items-center gap-3">
-          {saved ? <span className="text-sm text-emerald-600">已保存 ✓</span> : null}
-          {error ? <span className="text-sm text-red-500">{error}</span> : null}
+          {saved ? <span className="text-sm text-emerald-300">已保存 ✓</span> : null}
+          {error ? <span className="text-sm text-red-300">{error}</span> : null}
           <Button onClick={handleSave} disabled={saving} className="h-11 px-8">
             {saving ? (
               <>

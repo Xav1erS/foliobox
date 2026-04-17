@@ -34,7 +34,7 @@ export default async function PortfolioPublishPage({
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-[1480px] px-6 py-10">
       <PageHeader
         eyebrow={`作品集 · ${portfolio.name}`}
         title="发布与导出"
@@ -52,27 +52,27 @@ export default async function PortfolioPublishPage({
         </InlineTip>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <div className="app-panel px-4 py-4">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
               Projects
             </p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
               {portfolio.projectIds.length}
             </p>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">当前纳入这份作品集的项目数量。</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">当前纳入这份作品集的项目数量。</p>
           </div>
-          <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+          <div className="app-panel px-4 py-4">
+            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
               Packaging
             </p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
               {portfolio.contentJson ? "Ready" : "Pending"}
             </p>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {portfolio.contentJson ? "已生成作品集包装结果，可继续发布与导出。" : "还没有作品集包装结果，建议先回编辑器生成。"}
             </p>
           </div>
-          <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+          <div className="app-panel-highlight px-4 py-4 text-white">
             <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/40">
               Output
             </p>

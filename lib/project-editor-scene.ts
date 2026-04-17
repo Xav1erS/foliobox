@@ -255,6 +255,13 @@ export type ProjectLayoutDocument = Record<string, unknown> & {
   editorScene?: ProjectEditorScene;
   materialRecognition?: ProjectMaterialRecognition;
   structureSuggestion?: ProjectStructureSuggestion;
+  /**
+   * Setup 向导完成信号。只在用户手动点击"进入排版"时写入 completedAt。
+   * 用于控制 setupMode 的初始值（决定退出重进是走向导还是画板）。
+   */
+  setup?: {
+    completedAt?: string | null;
+  };
 };
 
 function createSceneId(prefix: string) {

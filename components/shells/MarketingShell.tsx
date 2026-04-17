@@ -8,7 +8,7 @@ export function MarketingShell({
   className?: string;
 }) {
   return (
-    <div className={cn("min-h-screen bg-black text-white antialiased", className)}>
+    <div className={cn("marketing-shell min-h-screen bg-black text-white antialiased", className)}>
       {children}
     </div>
   );

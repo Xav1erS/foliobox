@@ -111,12 +111,12 @@ export function StyleReferencesClient({
           </p>
           </CardContent>
         </Card>
-        <Card className="border-border/70 bg-foreground text-background shadow-xs">
+        <Card className="app-panel-highlight text-white shadow-xs">
           <CardContent className="p-5">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-background/45">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/42">
             Usage
           </p>
-          <p className="mt-2 text-base font-medium leading-7">
+          <p className="mt-2 text-base font-medium leading-7 text-white">
             风格参考只影响视觉语言、标题层级和版面密度，不会改动项目边界和讲述顺序。
           </p>
           </CardContent>

@@ -141,7 +141,7 @@ export function CaseCard({
   return (
     <Link
       href={`/cases/${slug}`}
-      className="group flex flex-col bg-white/2 transition-all duration-300 hover:bg-white/5 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]"
+      className="marketing-panel group flex flex-col overflow-hidden bg-white/2 transition-all duration-300 hover:bg-white/5 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.4)]"
     >
       {/* Mock preview image */}
       <div className="relative overflow-hidden border-b border-white/6 bg-white/2" style={{ height: 148 }}>
@@ -152,17 +152,17 @@ export function CaseCard({
       <div className="flex flex-1 flex-col p-5">
         {/* Score pill + demo badge */}
         <div className="mb-4 flex items-center gap-2">
-          <span className="border border-white/8 px-2 py-0.5 text-xs text-white/35">
+          <span className="marketing-pill border border-white/8 px-2 py-0.5 text-xs text-white/35">
             演示案例
           </span>
           <span className="h-3 w-px bg-white/8" />
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <span className="bg-white/5 px-2.5 py-1 text-xs tabular-nums text-white/40 line-through">
+          <span className="marketing-pill bg-white/5 px-2.5 py-1 text-xs tabular-nums text-white/40 line-through">
             {scoreBefore}
           </span>
           <ArrowRight className="h-3 w-3 text-white/20" />
-          <span className="bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-400">
+          <span className="marketing-pill bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-400">
             {scoreAfter} 分
           </span>
         </div>
@@ -179,7 +179,7 @@ export function CaseCard({
           {tags.map((tag) => (
             <span
               key={tag}
-              className="border border-white/8 px-2.5 py-0.5 text-xs text-white/45"
+              className="marketing-pill border border-white/8 px-2.5 py-0.5 text-xs text-white/45"
             >
               {tag}
             </span>

@@ -38,7 +38,7 @@ export function IndexedRowList({
                 {item.title}
               </p>
               {item.rightLabel ? (
-                <span className="shrink-0 border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
+                <span className="marketing-pill shrink-0 border border-white/10 px-2.5 py-0.5 text-xs uppercase tracking-[0.15em] text-white/30">
                   {item.rightLabel}
                 </span>
               ) : null}

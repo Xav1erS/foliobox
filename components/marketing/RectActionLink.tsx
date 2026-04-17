@@ -21,7 +21,7 @@ export function RectActionLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center justify-center border px-5 text-sm transition-colors",
+        "marketing-control inline-flex items-center justify-center border px-5 text-sm transition-colors",
         size === "lg" ? "h-12 px-6" : "h-11",
         variant === "solid"
           ? "border-white bg-white font-semibold text-black hover:bg-white/90"

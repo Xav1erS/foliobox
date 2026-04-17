@@ -103,29 +103,29 @@ export function PortfolioPublishClient({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+        <div className="app-panel px-4 py-4">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Status
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             {slug ? "Online" : "Draft"}
           </p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {slug ? "当前公开链接已经可访问，再次发布会更新同一条链接。" : "还没有公开链接，发布后会基于当前 Portfolio 生成公开页。"}
           </p>
         </div>
-        <div className="border border-neutral-300 bg-white px-4 py-4 shadow-[0_20px_50px_-45px_rgba(15,23,42,0.38)]">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+        <div className="app-panel px-4 py-4">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Public URL
           </p>
-          <p className="mt-2 truncate text-sm font-medium text-neutral-900">
+          <p className="mt-2 truncate text-sm font-medium text-foreground">
             {publicUrl ?? "等待发布"}
           </p>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             发布后可直接复制、分享并回看公开版本。
           </p>
         </div>
-        <div className="border border-neutral-300 bg-neutral-950 px-4 py-4 text-white shadow-[0_26px_70px_-48px_rgba(15,23,42,0.65)]">
+        <div className="app-panel-highlight px-4 py-4 text-white">
           <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/40">
             Export
           </p>
@@ -138,27 +138,27 @@ export function PortfolioPublishClient({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="border border-neutral-300 bg-white p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+        <div className="app-panel p-5">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
             Process
           </p>
-          <p className="mt-2 text-lg font-semibold text-neutral-900">发布与导出流程</p>
+          <p className="mt-2 text-lg font-semibold text-foreground">发布与导出流程</p>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-              <p className="text-sm font-medium text-neutral-900">1. 确认包装</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-sm font-medium text-foreground">1. 确认包装</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 当前发布与导出都直接读取 Portfolio 上的包装结果。
               </p>
             </div>
-            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-              <p className="text-sm font-medium text-neutral-900">2. 发布公开页</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-sm font-medium text-foreground">2. 发布公开页</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 生成后可以反复更新同一条公开链接。
               </p>
             </div>
-            <div className="border border-neutral-200 bg-neutral-50 px-4 py-4">
-              <p className="text-sm font-medium text-neutral-900">3. 导出正式 PDF</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-sm font-medium text-foreground">3. 导出正式 PDF</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 当前使用正式 PDF 输出，而不是仅打开打印页。
               </p>
             </div>
@@ -190,27 +190,27 @@ export function PortfolioPublishClient({
           </div>
         </div>
 
-        <div className="border border-neutral-300 bg-[linear-gradient(180deg,rgba(250,250,249,0.96),rgba(245,245,244,0.88))] p-5 shadow-[0_26px_70px_-58px_rgba(15,23,42,0.42)]">
-          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-neutral-400">
+        <div className="app-panel-highlight p-5 text-white">
+          <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/42">
             Current State
           </p>
           <div className="mt-3 space-y-3">
-            <div className="border border-neutral-200 bg-white px-4 py-4">
-              <p className="text-sm font-medium text-neutral-900">公开链接</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4">
+              <p className="text-sm font-medium text-white">公开链接</p>
+              <p className="mt-2 text-sm leading-6 text-white/68">
                 {slug ? "已生成并可继续更新。" : "尚未发布。"}
               </p>
             </div>
-            <div className="border border-neutral-200 bg-white px-4 py-4">
-              <p className="text-sm font-medium text-neutral-900">PDF 导出</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4">
+              <p className="text-sm font-medium text-white">PDF 导出</p>
+              <p className="mt-2 text-sm leading-6 text-white/68">
                 {hasPackaging ? "已满足导出条件。" : "等待作品集包装结果。"}
               </p>
             </div>
             {publicUrl ? (
-              <div className="border border-neutral-200 bg-white px-4 py-4">
-                <p className="text-sm font-medium text-neutral-900">当前链接</p>
-                <p className="mt-2 break-all text-xs font-mono text-neutral-500">{publicUrl}</p>
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4">
+                <p className="text-sm font-medium text-white">当前链接</p>
+                <p className="mt-2 break-all text-xs font-mono text-white/62">{publicUrl}</p>
               </div>
             ) : null}
           </div>
@@ -218,28 +218,28 @@ export function PortfolioPublishClient({
       </div>
 
       {!hasPackaging ? (
-        <div className="border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+        <div className="rounded-[24px] border border-amber-400/18 bg-amber-500/[0.08] px-4 py-4 text-sm text-amber-100">
           <p className="font-medium">当前还没有作品集包装结果。</p>
-          <p className="mt-1 leading-6">先回编辑器生成作品集包装，再来发布或导出。</p>
+          <p className="mt-1 leading-6 text-amber-100/78">先回编辑器生成作品集包装，再来发布或导出。</p>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="border border-amber-200 bg-white/70 px-4 py-3">
-              <p className="font-medium text-amber-900">1. 选项目</p>
-              <p className="mt-1 leading-6 text-amber-800/80">先挑 2-4 个最能代表能力面的项目。</p>
+            <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
+              <p className="font-medium text-amber-50">1. 选项目</p>
+              <p className="mt-1 leading-6 text-amber-100/74">先挑 2-4 个最能代表能力面的项目。</p>
             </div>
-            <div className="border border-amber-200 bg-white/70 px-4 py-3">
-              <p className="font-medium text-amber-900">2. 生成包装</p>
-              <p className="mt-1 leading-6 text-amber-800/80">让系统先给出整份作品集的节奏与固定页建议。</p>
+            <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
+              <p className="font-medium text-amber-50">2. 生成包装</p>
+              <p className="mt-1 leading-6 text-amber-100/74">让系统先给出整份作品集的节奏与固定页建议。</p>
             </div>
-            <div className="border border-amber-200 bg-white/70 px-4 py-3">
-              <p className="font-medium text-amber-900">3. 再来输出</p>
-              <p className="mt-1 leading-6 text-amber-800/80">包装稳定后，再发布公开链接和正式 PDF。</p>
+            <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
+              <p className="font-medium text-amber-50">3. 再来输出</p>
+              <p className="mt-1 leading-6 text-amber-100/74">包装稳定后，再发布公开链接和正式 PDF。</p>
             </div>
           </div>
         </div>
       ) : null}
 
       {message ? (
-        <div className="border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <div className="app-inline-tip px-4 py-3 text-sm text-white/72">
           {message}
         </div>
       ) : null}

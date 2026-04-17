@@ -9,14 +9,14 @@ export function MobileBanner() {
   if (dismissed) return null;
 
   return (
-    <div className="flex items-start gap-3 border-b border-amber-300 bg-amber-50/90 px-4 py-3 md:hidden">
-      <Monitor className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-      <p className="flex-1 text-xs leading-relaxed text-amber-800">
+    <div className="flex items-start gap-3 border-b border-white/8 bg-[#17191d]/95 px-4 py-3 md:hidden">
+      <Monitor className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+      <p className="flex-1 text-xs leading-relaxed text-white/72">
         为获得更稳定和高效的编辑体验，请在桌面端继续完成作品集编辑与导出。
       </p>
       <button
         onClick={() => setDismissed(true)}
-        className="shrink-0 border border-transparent p-0.5 text-amber-600 hover:border-amber-200 hover:bg-amber-100"
+        className="shrink-0 rounded-full border border-transparent p-1 text-white/48 transition-colors hover:border-white/8 hover:bg-white/[0.04] hover:text-white/76"
         aria-label="关闭提示"
       >
         <X className="h-3.5 w-3.5" />

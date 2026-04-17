@@ -71,6 +71,8 @@ export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
   editorScene?: ProjectEditorScene;
   materialRecognition?: ProjectMaterialRecognition;
   structureSuggestion?: ProjectStructureSuggestion;
+  /** Setup 向导完成标记，只在用户点击"进入排版"时写入。 */
+  setup?: { completedAt?: string | null };
 };
 export type LayoutPage = z.infer<typeof LayoutPageSchema>;
 

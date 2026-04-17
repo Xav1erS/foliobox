@@ -88,13 +88,13 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href={primaryAction.href}
-            className="flex h-11 min-w-[200px] items-center justify-center bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+            className="marketing-control flex h-11 min-w-[200px] items-center justify-center bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
           >
             {primaryAction.label}
           </Link>
           <Link
             href={secondaryAction.href}
-            className="flex h-11 min-w-[200px] items-center justify-center border border-white/15 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
+            className="marketing-control flex h-11 min-w-[200px] items-center justify-center border border-white/15 px-6 text-sm text-white/70 transition-colors hover:border-white/30 hover:text-white"
           >
             {secondaryAction.label}
           </Link>
@@ -110,13 +110,13 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         {STAGE_GUIDES.map((item) => (
           <div
             key={item.title}
-            className="border border-white/10 bg-white/3 p-6"
+            className="marketing-panel border border-white/10 bg-white/3 p-6"
           >
             <h2 className="text-lg font-semibold text-white">{item.title}</h2>
             <p className="mt-3 text-sm leading-relaxed text-white/55">{item.body}</p>
             <Link
               href={item.href}
-              className="mt-5 inline-flex h-10 items-center justify-center border border-white/14 px-4 text-sm font-medium text-white/80 transition-colors hover:border-white/28 hover:text-white"
+              className="marketing-control mt-5 inline-flex h-10 items-center justify-center border border-white/14 px-4 text-sm font-medium text-white/80 transition-colors hover:border-white/28 hover:text-white"
             >
               {item.cta}
             </Link>
@@ -141,14 +141,14 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         {PLAN_DEFINITIONS.map((plan) => (
           <div
             key={plan.planType}
-            className={`relative flex flex-col border p-6 ${
+            className={`marketing-panel relative flex flex-col border p-6 ${
               plan.isRecommended
                 ? "border-white/30 bg-white/8"
                 : "border-white/10 bg-white/4"
             }`}
           >
             {plan.highlightTag && (
-              <div className="mb-4 inline-flex self-start bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
+              <div className="marketing-pill mb-4 inline-flex self-start bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
                 {plan.highlightTag}
               </div>
             )}
@@ -176,7 +176,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
                 return (
                   <div
                     key={`${plan.planType}-${key}`}
-                    className="border border-white/10 bg-black/10 px-3 py-2"
+                    className="marketing-control border border-white/10 bg-black/10 px-3 py-2"
                   >
                     <p className="text-eyebrow font-mono uppercase tracking-[0.16em] text-white/35">
                       {quota.label}
@@ -202,14 +202,14 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
               {plan.planType === "free" ? (
                 <Link
                   href="/score"
-                  className="flex h-10 w-full items-center justify-center border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
+                  className="marketing-control flex h-10 w-full items-center justify-center border border-white/15 text-sm text-white/60 transition-colors hover:border-white/30 hover:text-white"
                 >
                   {isLoggedIn ? "继续回到评分结果" : "先给我的作品集打分"}
                 </Link>
               ) : !isLoggedIn ? (
                 <Link
                   href="/login?next=/pricing"
-                  className={`flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
+                  className={`marketing-control flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
                     plan.isRecommended
                       ? "bg-white text-black hover:bg-white/90"
                       : "border border-white/15 text-white hover:border-white/30"
@@ -220,7 +220,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
               ) : (
                 <button
                   onClick={() => handleBuy(plan.planType as "pro" | "sprint")}
-                  className={`flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
+                  className={`marketing-control flex h-10 w-full items-center justify-center text-sm font-medium transition-colors ${
                     plan.isRecommended
                       ? "bg-white text-black hover:bg-white/90"
                       : "border border-white/15 text-white hover:border-white/30"
@@ -234,7 +234,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         ))}
       </div>
 
-      <div className="mb-8 border border-white/10 bg-white/3 px-6 py-5">
+      <div className="marketing-panel mb-8 border border-white/10 bg-white/3 px-6 py-5">
         <p className="text-sm leading-relaxed text-white/55">
           如果你现在还在犹豫，其实最稳的顺序通常是：
           <span className="text-white/78"> 先评分 </span>
@@ -246,7 +246,7 @@ export function PricingClient({ isLoggedIn = false }: { isLoggedIn?: boolean }) 
         </p>
       </div>
 
-      <div className="mb-14 overflow-hidden border border-white/10">
+      <div className="marketing-panel mb-14 overflow-hidden border border-white/10">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10 bg-white/3">

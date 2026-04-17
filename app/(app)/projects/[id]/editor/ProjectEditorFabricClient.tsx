@@ -420,9 +420,13 @@ export function ProjectEditorFabricClient({
   const [recognizingIncremental, setRecognizingIncremental] = useState(false);
   const [suggestingStructure, setSuggestingStructure] = useState(false);
   // 向导模式：项目未完成准备阶段时展示引导，而不是画布
-  const [setupMode, setSetupMode] = useState(
-    () => scene.boards.length === 0 && !initialData.layout?.structureSuggestion?.confirmedAt
-  );
+  // 判定依据：setup.completedAt（新口径，只有向导"进入排版"会写入）
+  // 兼容老项目：若 structureSuggestion.confirmedAt 已存在视为已完成
+  const [setupMode, setSetupMode] = useState(() => {
+    const setupCompleted = Boolean(initialData.layout?.setup?.completedAt);
+    const legacyConfirmed = Boolean(initialData.layout?.structureSuggestion?.confirmedAt);
+    return !(setupCompleted || legacyConfirmed);
+  });
   const [confirmingStructure, setConfirmingStructure] = useState(false);
   const [surfaceScale, setSurfaceScale] = useState(1);
   const [liveThumbnails, setLiveThumbnails] = useState<Record<string, string>>({});
@@ -471,7 +475,12 @@ export function ProjectEditorFabricClient({
     tone: "info" | "error";
     text: string;
   } | null>(null);
-  const [leftPanel, setLeftPanel] = useState<LeftPanelKey | null>("project");
+  // 排版阶段左侧栏不再包含 project tab；直接进排版时默认落在画板面板
+  const [leftPanel, setLeftPanel] = useState<LeftPanelKey | null>(() => {
+    const setupCompleted = Boolean(initialData.layout?.setup?.completedAt);
+    const legacyConfirmed = Boolean(initialData.layout?.structureSuggestion?.confirmedAt);
+    return setupCompleted || legacyConfirmed ? "boards" : "project";
+  });
   const [layerItems, setLayerItems] = useState<LayerItem[]>([]);
   const [selectedLayerIds, setSelectedLayerIds] = useState<string[]>([]);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
@@ -1120,9 +1129,13 @@ export function ProjectEditorFabricClient({
     syncActiveBoardFromCanvas();
   }
 
-  async function persistScene(sceneToSave: ProjectEditorScene, force = false) {
+  async function persistScene(
+    sceneToSave: ProjectEditorScene,
+    force = false,
+    options: { markSetupCompleted?: boolean } = {}
+  ) {
     const serialized = JSON.stringify(sceneToSave);
-    if (!force && serialized === lastSavedSceneRef.current) {
+    if (!force && serialized === lastSavedSceneRef.current && !options.markSetupCompleted) {
       setSaveState("saved");
       return;
     }
@@ -1131,7 +1144,10 @@ export function ProjectEditorFabricClient({
     const response = await fetch(`/api/projects/${initialData.id}/layout/scene`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ editorScene: sceneToSave }),
+      body: JSON.stringify({
+        editorScene: sceneToSave,
+        ...(options.markSetupCompleted ? { markSetupCompleted: true } : {}),
+      }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -1140,7 +1156,12 @@ export function ProjectEditorFabricClient({
 
     lastSavedSceneRef.current = serialized;
     setLayout((current) =>
-      mergeProjectLayoutDocument(current, { editorScene: sceneToSave }) as LayoutJson
+      mergeProjectLayoutDocument(current, {
+        editorScene: sceneToSave,
+        ...(options.markSetupCompleted
+          ? { setup: { completedAt: new Date().toISOString() } }
+          : {}),
+      }) as LayoutJson
     );
     setSaveState("saved");
   }
@@ -1465,7 +1486,8 @@ export function ProjectEditorFabricClient({
       });
       setScene(nextScene);
       lastSavedSceneRef.current = JSON.stringify(nextScene);
-      await persistScene(nextScene, true);
+      // 持久化画板 + 标记 setup 已完成（退出重进将跳过向导）
+      await persistScene(nextScene, true, { markSetupCompleted: true });
 
       // 3. 进入画布编辑模式
       setSetupMode(false);
@@ -2608,13 +2630,17 @@ export function ProjectEditorFabricClient({
 
       const nextAssets = await refreshAssets();
       const newlyUploaded = nextAssets.filter((asset) => !existingIds.has(asset.id));
+      // 排版阶段上传的素材不自动重跑 AI 理解，避免影响已生成的结构建议
+      const layoutNote = !setupMode
+        ? "（不影响已生成的结构建议，如需让 AI 重新理解项目请回到项目准备）"
+        : "";
       if (newlyUploaded.length === 1) {
         await addAssetToCanvas(newlyUploaded[0].id);
-        setActionMessage({ tone: "info", text: "图片已上传并插入当前画板" });
+        setActionMessage({ tone: "info", text: `图片已上传并插入当前画板${layoutNote}` });
       } else {
         setActionMessage({
           tone: "info",
-          text: `已上传 ${newlyUploaded.length || files.length} 张图片，可继续插入到当前画板`,
+          text: `已上传 ${newlyUploaded.length || files.length} 张图片，可继续插入到当前画板${layoutNote}`,
         });
       }
     } catch (error) {
@@ -2889,7 +2915,8 @@ export function ProjectEditorFabricClient({
           <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {(setupMode
               ? LEFT_PANEL_ITEMS.filter((i) => i.key === "project" || i.key === "assets")
-              : LEFT_PANEL_ITEMS
+              : // 排版阶段：项目背景改由顶部"项目准备"按钮承载，不在左侧常驻
+                LEFT_PANEL_ITEMS.filter((i) => i.key !== "project")
             ).map((item) => {
               const Icon = item.icon;
               const active = leftPanel === item.key;

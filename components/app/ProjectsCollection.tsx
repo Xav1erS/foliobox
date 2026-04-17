@@ -62,9 +62,9 @@ export function ProjectsCollection({
         return (
           <Card
             key={project.id}
-            className="group overflow-hidden border-border/70 bg-card/95 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="app-panel group overflow-hidden transition-all hover:-translate-y-0.5 hover:border-border"
           >
-            <div className="relative h-40 overflow-hidden border-b border-neutral-200 bg-neutral-100">
+            <div className="relative h-40 overflow-hidden border-b border-border bg-secondary">
               {project.coverImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -74,7 +74,7 @@ export function ProjectsCollection({
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
-                  <span className="text-4xl font-semibold text-neutral-200">
+                  <span className="text-4xl font-semibold text-white/10">
                     {project.name.charAt(0)}
                   </span>
                 </div>
@@ -84,27 +84,27 @@ export function ProjectsCollection({
             <CardContent className="space-y-4 p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold leading-snug text-card-foreground">
+                  <p className="truncate text-base font-semibold leading-snug text-white/94">
                     {project.name}
                   </p>
-                  <p className="mt-1 text-xs font-mono text-muted-foreground">{project.updatedAt}</p>
+                  <p className="mt-1 text-xs tabular-nums text-white/40">{project.updatedAt}</p>
                 </div>
-                <Badge variant="secondary" className="shrink-0 rounded-md px-2 py-0.5 font-mono text-xs">
+                <Badge variant="secondary" className="shrink-0 px-2 py-0.5 text-xs font-medium">
                   {status.label}
                 </Badge>
               </div>
 
               <div className="space-y-2">
                 <div>
-                  <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="text-[11px] font-medium text-white/40">
                     下一步
                   </p>
-                  <p className="mt-1 text-sm text-foreground/88">
+                  <p className="mt-1 text-sm text-white/84">
                     {project.nextStep.label}
                   </p>
                 </div>
                 {project.stageSummary ? (
-                  <p className="text-sm leading-6 text-muted-foreground">{project.stageSummary}</p>
+                  <p className="text-sm leading-6 text-white/52">{project.stageSummary}</p>
                 ) : null}
               </div>
             </CardContent>
@@ -112,7 +112,7 @@ export function ProjectsCollection({
             <Separator />
 
             <CardFooter className="flex items-center justify-between p-4">
-              <Button asChild variant="ghost" className="h-9 px-0 text-sm font-medium text-foreground hover:bg-transparent hover:text-foreground">
+              <Button asChild variant="ghost" className="h-9 px-0 text-sm font-medium text-white/84 hover:bg-transparent hover:text-white">
                 <Link href={project.nextStep.href}>
                   继续编辑
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -122,7 +122,7 @@ export function ProjectsCollection({
                 type="button"
                 disabled={deleting}
                 onClick={() => handleDelete(project.id, project.name)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary text-white/54 transition-colors hover:bg-accent hover:text-white/80 disabled:opacity-40"
               >
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </button>

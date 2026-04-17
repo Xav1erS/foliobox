@@ -40,8 +40,8 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       {/* Above-fold content */}
       <div className="relative flex min-h-[calc(100vh-72px)] flex-col items-center justify-start px-5 pb-12 pt-[72px] text-center sm:min-h-[calc(100vh-56px)] sm:px-6 sm:pt-20 md:justify-center md:pt-0">
         {/* Badge */}
-        <div className="mb-7 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/6 px-4 py-2 text-xs text-white/70 sm:mb-8 sm:px-4 sm:py-1.5 sm:text-xs">
-          <span className="h-1.5 w-1.5 bg-emerald-400" />
+        <div className="marketing-pill mb-7 inline-flex max-w-full items-center gap-2 border border-white/10 bg-white/6 px-4 py-2 text-xs text-white/70 sm:mb-8 sm:px-4 sm:py-1.5 sm:text-xs">
+          <span className="marketing-pill h-1.5 w-1.5 bg-emerald-400" />
           <span className="whitespace-nowrap">集盒FolioBox · 从作品集整理开始</span>
         </div>
 
@@ -91,14 +91,14 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         <div className="mt-10 flex w-full max-w-[360px] flex-col items-center gap-5 sm:mt-10 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
           <Link
             href={primaryAction.href}
-            className="flex h-14 w-full touch-manipulation items-center justify-center bg-white px-8 text-base font-semibold text-black transition-colors hover:bg-white/90 active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
+            className="marketing-control flex h-14 w-full touch-manipulation items-center justify-center bg-white px-8 text-base font-semibold text-black transition-colors hover:bg-white/90 active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
           >
             {primaryAction.label}
           </Link>
           {!isLoggedIn && (
             <Link
               href={secondaryAction.href}
-              className="flex h-14 w-full touch-manipulation items-center justify-center border border-white/15 px-8 text-base font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
+              className="marketing-control flex h-14 w-full touch-manipulation items-center justify-center border border-white/15 px-8 text-base font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white active:scale-[0.99] sm:h-12 sm:min-w-[200px] sm:w-auto sm:text-sm"
             >
               {secondaryAction.label}
             </Link>
@@ -123,7 +123,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         >
           {/* Main mock: portfolio preview */}
           <div
-            className="relative overflow-hidden border border-white/10 bg-neutral-950"
+            className="marketing-panel relative overflow-hidden border border-white/10 bg-neutral-950"
             style={{
               transform: "rotateX(5deg)",
               transformOrigin: "top center",
@@ -134,10 +134,13 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             <div className="flex items-center gap-3 border-b border-white/6 bg-white/2 px-4 py-3">
               <div className="flex gap-1.5">
                 <div className="h-3 w-3 bg-white/10" />
-                <div className="h-3 w-3 bg-white/10" />
-                <div className="h-3 w-3 bg-white/10" />
+                <div className="marketing-pill h-3 w-3 bg-white/10" />
+                <div className="marketing-pill h-3 w-3 bg-white/10" />
               </div>
-              <div className="bg-white/5 px-4 py-1 text-center text-xs text-white/20" style={{ width: 260 }}>
+              <div
+                className="marketing-control bg-white/5 px-4 py-1 text-center text-xs text-white/20"
+                style={{ width: 260 }}
+              >
                 foliobox.art/portfolio/preview
               </div>
             </div>
@@ -155,7 +158,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                   ].map((item) => (
                     <div
                       key={item.label}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 ${
+                      className={`marketing-control flex items-center gap-2.5 px-3 py-2.5 ${
                         item.active
                           ? "bg-white/8 border border-white/10"
                           : "border border-transparent"
@@ -172,10 +175,10 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <div className="mt-6 border-t border-white/6 pt-5">
                   <p className="mb-3 text-xs uppercase tracking-widest text-white/20">导出</p>
                   <div className="space-y-2">
-                    <div className="flex h-7 items-center justify-center border border-white/10 bg-white/8 text-xs text-white/50">
+                    <div className="marketing-control flex h-7 items-center justify-center border border-white/10 bg-white/8 text-xs text-white/50">
                       分享链接
                     </div>
-                    <div className="flex h-7 items-center justify-center border border-white/6 text-xs text-white/30">
+                    <div className="marketing-control flex h-7 items-center justify-center border border-white/6 text-xs text-white/30">
                       导出 PDF
                     </div>
                   </div>
@@ -186,11 +189,11 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               <div className="p-6 sm:p-8">
                 {/* Project header */}
                 <div className="mb-6 border-b border-white/6 pb-6">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">
+                <div className="mb-3 flex items-center gap-2">
+                    <span className="marketing-pill border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">
                       B 端 · 数据可视化
                     </span>
-                    <span className="border border-white/8 px-2.5 py-0.5 text-xs text-white/35">
+                    <span className="marketing-pill border border-white/8 px-2.5 py-0.5 text-xs text-white/35">
                       UX 设计师
                     </span>
                   </div>
@@ -231,7 +234,7 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
           {/* Score overlay card — bottom right */}
           <div
-            className="absolute bottom-6 right-4 sm:right-8 overflow-hidden border border-white/10 bg-neutral-950/95 backdrop-blur-xs"
+            className="marketing-panel absolute bottom-6 right-4 overflow-hidden border border-white/10 bg-neutral-950/95 backdrop-blur-xs sm:right-8"
             style={{
               width: 200,
               boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
@@ -245,8 +248,8 @@ export function Hero({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 <span className="text-3xl font-bold tabular-nums text-white">72</span>
                 <span className="mb-1 text-xs text-white/30">/ 100</span>
               </div>
-              <div className="mb-3 inline-flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-400">
-                <span className="h-1 w-1 bg-amber-400" />
+              <div className="marketing-pill mb-3 inline-flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-400">
+                <span className="marketing-pill h-1 w-1 bg-amber-400" />
                 具备投递价值，但建议局部优化
               </div>
               <div className="space-y-2">
