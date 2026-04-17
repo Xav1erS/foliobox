@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { resolveProjectAssetMeta } from "@/lib/project-editor-scene";
+import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import type {
   ProjectMaterialRecognition,
   ProjectStructureSuggestion,
@@ -704,6 +705,10 @@ function AssetCard({
   onUpdateNote: (id: string, note: string) => void;
 }) {
   const meta = useMemo(() => resolveProjectAssetMeta(asset.metaJson), [asset.metaJson]);
+  const resolvedImageUrl = useMemo(
+    () => buildPrivateBlobProxyUrl(asset.imageUrl),
+    [asset.imageUrl]
+  );
   const [title, setTitle] = useState(asset.title ?? "");
   const [note, setNote] = useState(meta.note ?? "");
 
@@ -722,7 +727,7 @@ function AssetCard({
       <div className="aspect-[4/3] overflow-hidden bg-black/30">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={asset.imageUrl}
+          src={resolvedImageUrl}
           alt={asset.title ?? "素材"}
           className="h-full w-full object-cover"
         />
@@ -756,4 +761,3 @@ function AssetCard({
     </div>
   );
 }
-

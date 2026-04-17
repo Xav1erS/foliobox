@@ -2858,7 +2858,7 @@ export function ProjectEditorFabricClient({
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
       rightRailLabel={hasActiveInspector ? "对象属性" : "画板属性"}
-      leftRailWidthClass={setupMode ? "w-[240px]" : leftPanel ? "w-[336px]" : "w-[56px]"}
+      leftRailWidthClass={setupMode ? "w-[272px]" : leftPanel ? "w-[336px]" : "w-[56px]"}
       rightRailWidthClass="w-[288px]"
       hideLeftRailHeader
       leftRail={setupMode ? (
@@ -4995,9 +4995,14 @@ function LockedChip({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-lg bg-white/[0.04] px-2.5 py-1.5", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-white/6 bg-white/[0.04] px-3.5 py-2.5",
+        className
+      )}
+    >
       <div className="text-xs text-white/35">{label}</div>
-      <div className="mt-0.5 truncate text-xs font-medium text-white/80">{value}</div>
+      <div className="mt-1 truncate text-sm font-medium text-white/84">{value}</div>
     </div>
   );
 }
@@ -5023,30 +5028,30 @@ function SetupContextSidebar({
     INVOLVEMENT_OPTIONS.find((o) => o.value === facts.involvementLevel)?.label ?? "—";
 
   return (
-    <div className="flex h-full flex-col gap-4 px-4 py-5">
+    <div className="flex h-full flex-col gap-5 px-5 py-6">
       <div>
         <p className="text-xs uppercase tracking-[0.18em] text-white/30">
           项目准备阶段
         </p>
-        <h2 className="mt-1.5 truncate text-[15px] font-semibold text-white/90">
+        <h2 className="mt-2 text-[17px] font-semibold leading-tight text-white/92">
           {projectName}
         </h2>
       </div>
-      <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-4">
+        <div className="mb-3 flex items-center justify-between">
           <span className="text-xs uppercase tracking-[0.14em] text-white/40">
             客观条件
           </span>
           <Lock className="h-3 w-3 text-white/30" />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <LockedChip label="受众" value={audienceLabel} />
           <LockedChip label="平台" value={platformLabel} />
           <LockedChip label="行业" value={industryLabel} />
           <LockedChip label="项目性质" value={natureLabel} />
           <LockedChip label="我的职责" value={involvementLabel} />
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-white/30">
+        <p className="mt-4 text-xs leading-relaxed text-white/30">
           这些条件在创建项目时已锁定，不可更改。
         </p>
       </div>
