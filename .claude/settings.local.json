@@ -41,7 +41,13 @@
       "Read(//c/Users/admin//**)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(npx --no-install tsc --noEmit)"
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(git -C .claude/worktrees/agent-a77a0537 status --short)",
+      "Bash(git -C .claude/worktrees/agent-aeee0faa status --short)",
+      "Bash(git -C .claude/worktrees/agent-aeee0faa log --oneline -5)",
+      "Bash(git -C .claude/worktrees/agent-aeee0faa branch --show-current)",
+      "Bash(git -C .claude/worktrees/agent-aeee0faa diff --stat)",
+      "Bash(git worktree *)"
     ]
   }
 }

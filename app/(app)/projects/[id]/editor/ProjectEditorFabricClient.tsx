@@ -2524,6 +2524,26 @@ export function ProjectEditorFabricClient({
     await handleAssetInlineUpdate(assetId, { note: note.trim() || null });
   }
 
+  async function handleDeleteAsset(assetId: string) {
+    try {
+      const response = await fetch(
+        `/api/projects/${initialData.id}/assets/${assetId}`,
+        { method: "DELETE" }
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || "删除素材失败");
+      }
+      await refreshAssets();
+      setActionMessage({ tone: "info", text: "素材已删除" });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "删除素材失败，请稍后重试",
+      });
+    }
+  }
+
   function deleteSelection() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -3649,13 +3669,17 @@ export function ProjectEditorFabricClient({
               confirmingStructure={confirmingStructure}
               uploadingAssets={uploadingAssets}
               actionError={actionError}
-              hasExistingBoards={scene.boards.length > 0}
+              hasExistingBoards={
+                scene.boards.length > 1 ||
+                scene.boards.some((board) => board.nodes.length > 0)
+              }
               onAiUnderstand={() => void handleWizardAiUnderstand()}
               onGenerateStructure={() => void handleSuggestStructure()}
               onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
               onUploadAssets={handleOpenAssetUpload}
               onUpdateAssetTitle={handleRenameAsset}
               onUpdateAssetNote={handleUpdateAssetNote}
+              onDeleteAsset={(assetId) => void handleDeleteAsset(assetId)}
               onReturnToCanvas={() => { setSetupMode(false); setActionError(""); }}
               onStructureChange={(next) => mutateStructureDraft(() => next)}
             />

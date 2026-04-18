@@ -83,3 +83,33 @@ export async function PATCH(
 
   return NextResponse.json({ asset: updated });
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string; assetId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id, assetId } = await params;
+  const project = await db.project.findFirst({
+    where: { id, userId: session.user.id },
+    select: { id: true },
+  });
+
+  if (!project) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const deleted = await db.projectAsset.deleteMany({
+    where: { id: assetId, projectId: id },
+  });
+
+  if (deleted.count === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

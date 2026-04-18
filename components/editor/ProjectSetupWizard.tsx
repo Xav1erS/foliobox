@@ -80,6 +80,7 @@ export interface ProjectSetupWizardProps {
   onUploadAssets: () => void;
   onUpdateAssetTitle: (assetId: string, title: string) => void;
   onUpdateAssetNote: (assetId: string, note: string) => void;
+  onDeleteAsset?: (assetId: string) => void;
   onReturnToCanvas: () => void;
   onStructureChange?: (next: ProjectStructureSuggestion) => void;
   onGenerateStructure?: () => void;
@@ -116,6 +117,7 @@ export function ProjectSetupWizard({
   onUploadAssets,
   onUpdateAssetTitle,
   onUpdateAssetNote,
+  onDeleteAsset,
   onReturnToCanvas,
   onStructureChange,
   onGenerateStructure,
@@ -407,6 +409,7 @@ export function ProjectSetupWizard({
               onUpload={onUploadAssets}
               onUpdateTitle={onUpdateAssetTitle}
               onUpdateNote={onUpdateAssetNote}
+              onDelete={onDeleteAsset}
             />
           </section>
 
@@ -421,11 +424,13 @@ export function ProjectSetupWizard({
               title="AI 项目理解"
               hint="AI 会综合项目背景、设计稿和素材描述，理解项目目标与内容，然后给出结构建议。"
             />
-            <SetupCompletenessCard
-              score={completeness}
-              compact={completeness.level === "ready"}
-              className="mb-4"
-            />
+            {recognitionDone ? (
+              <SetupCompletenessCard
+                score={completeness}
+                compact={completeness.level === "ready"}
+                className="mb-4"
+              />
+            ) : null}
             {aiRunning ? (
               <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-white/60" />
@@ -610,6 +615,23 @@ export function ProjectSetupWizard({
                     {actionError}
                   </div>
                 ) : null}
+                {!isStructureConfirmed && onGenerateStructure ? (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onGenerateStructure()}
+                      disabled={suggestingStructure || aiRunning}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {suggestingStructure ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      重新生成结构
+                    </button>
+                  </div>
+                ) : null}
                 {isStructureConfirmed ? (
                   <button
                     type="button"
@@ -713,12 +735,14 @@ function AssetsGrid({
   onUpload,
   onUpdateTitle,
   onUpdateNote,
+  onDelete,
 }: {
   assets: ProjectAsset[];
   uploadingAssets: boolean;
   onUpload: () => void;
   onUpdateTitle: (id: string, title: string) => void;
   onUpdateNote: (id: string, note: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   if (assets.length === 0) {
     return (
@@ -751,6 +775,7 @@ function AssetsGrid({
           asset={asset}
           onUpdateTitle={onUpdateTitle}
           onUpdateNote={onUpdateNote}
+          onDelete={onDelete}
         />
       ))}
       <button
@@ -956,10 +981,12 @@ function AssetCard({
   asset,
   onUpdateTitle,
   onUpdateNote,
+  onDelete,
 }: {
   asset: ProjectAsset;
   onUpdateTitle: (id: string, title: string) => void;
   onUpdateNote: (id: string, note: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const meta = useMemo(() => resolveProjectAssetMeta(asset.metaJson), [asset.metaJson]);
   const resolvedImageUrl = useMemo(
@@ -980,14 +1007,28 @@ function AssetCard({
   const noteChanged = note !== (meta.note ?? "");
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]">
-      <div className="aspect-[4/3] overflow-hidden bg-black/30">
+    <div className="group/asset relative flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-black/30">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={resolvedImageUrl}
           alt={asset.title ?? "素材"}
           className="h-full w-full object-cover"
         />
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("确定删除这张素材？删除后不可恢复。")) {
+                onDelete(asset.id);
+              }
+            }}
+            aria-label="删除素材"
+            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/80 opacity-0 backdrop-blur-sm transition-opacity hover:bg-red-500/80 hover:text-white group-hover/asset:opacity-100"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
       </div>
       <div className="flex flex-col gap-2 p-3">
         <Input
