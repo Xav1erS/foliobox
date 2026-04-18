@@ -232,7 +232,6 @@ export type ProjectEditorInitialData = {
   packageRecommendation: PackageRecommendation | null;
   layout: LayoutJson | null;
   actionSummary: {
-    diagnoses: ObjectActionQuota;
     layoutGenerations: ObjectActionQuota;
     layoutRegenerations: ObjectActionQuota;
   };

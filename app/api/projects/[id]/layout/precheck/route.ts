@@ -75,8 +75,7 @@ export async function POST(
     ? projectActionSummary.layoutRegenerations
     : projectActionSummary.layoutGenerations;
   const isProjectActivated =
-    projectActionSummary.diagnoses.used +
-      projectActionSummary.layoutGenerations.used +
+    projectActionSummary.layoutGenerations.used +
       projectActionSummary.layoutRegenerations.used >
     0;
 

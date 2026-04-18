@@ -2,6 +2,14 @@ import { z } from "zod";
 
 export const PROJECT_BOARD_WIDTH = 1920;
 export const PROJECT_BOARD_HEIGHT = 1080;
+/**
+ * 当前版本单个 Project 的画板数量硬上限。
+ * 参见 spec-system-v3/04 §4.5 与 spec-system-v3/09：
+ * - 用户手动新建达到上限时按钮置灰并显示剩余数
+ * - Setup 阶段 AI 建议的章节数不得超过该上限
+ * - 服务端生成 / 落板必须校验该上限
+ */
+export const MAX_PROJECT_BOARDS = 12;
 export const DEFAULT_BOARD_BACKGROUND = "#ffffff";
 export const DEFAULT_TEXT_COLOR = "#111111";
 const LEGACY_EMPTY_BOARD_BACKGROUND = "#17191d";
@@ -153,6 +161,8 @@ export const ProjectBoardSchema = z.object({
   }),
   // AI 生成的内容建议（来自结构建议的 recommendedContent），不放画布上，显示在 Inspector
   contentSuggestions: z.array(z.string()).optional().default([]),
+  // 画板锁定：开启后该画板不参与任何 AI 写操作（生成排版 / 更新排版 / 重新生成 / 局部改写）
+  locked: z.boolean().optional().default(false),
 });
 
 export type ProjectBoard = z.infer<typeof ProjectBoardSchema>;
@@ -178,6 +188,12 @@ export const ProjectStructureSectionSchema = z.object({
   purpose: z.string(),
   recommendedContent: z.array(z.string()),
   suggestedAssets: z.array(z.string()),
+  /**
+   * 免费层对 3+ 章节做细节锁定（参见 spec-system-v3/05 §6.1）：
+   * 章节标题仍可见；但 purpose / recommendedContent / suggestedAssets 被服务端清空，
+   * 客户端据此渲染升级锁定态。
+   */
+  locked: z.boolean().optional(),
 });
 
 export const ProjectStructureGroupSchema = z.object({
@@ -195,6 +211,13 @@ export const ProjectStructureSuggestionSchema = z.object({
   status: z.enum(["draft", "confirmed"]).optional().default("draft"),
   confirmedAt: z.string().nullable().optional().default(null),
   groups: z.array(ProjectStructureGroupSchema),
+  /**
+   * 当前查看者在此结构中能完整使用的章节数。
+   * - null / undefined：不做限制（付费层）
+   * - 数值：免费层只有前 N 章可见细节 / 可一键落板
+   * 参见 spec-system-v3/05 §6.1。
+   */
+  unlockedChapterLimit: z.number().int().nullable().optional(),
 });
 
 export type ProjectStructureSection = z.infer<typeof ProjectStructureSectionSchema>;
@@ -425,6 +448,7 @@ export function createProjectBoard(
     nodes: patch?.nodes ?? [],
     aiMarkers: patch?.aiMarkers ?? { hasAnalysis: false, hasPendingSuggestion: false },
     contentSuggestions: patch?.contentSuggestions ?? [],
+    locked: patch?.locked ?? false,
   };
 }
 
@@ -492,8 +516,19 @@ export function buildProjectSceneFromStructureSuggestion(params: {
   const usedAssetIds = new Set<string>();
   const boards: ProjectBoard[] = [];
 
+  // 免费层：仅落地前 N 章；锁定章节跳过（参见 spec-system-v3/05 §6.1）。
+  const unlockedLimit =
+    typeof suggestion.unlockedChapterLimit === "number"
+      ? suggestion.unlockedChapterLimit
+      : null;
+  let flatSectionCursor = 0;
+
   suggestion.groups.forEach((group) => {
     group.sections.forEach((section, sectionIndex) => {
+      const currentSectionIndex = flatSectionCursor;
+      flatSectionCursor += 1;
+      if (section.locked) return;
+      if (unlockedLimit !== null && currentSectionIndex >= unlockedLimit) return;
       const matchedAssetId = matchAssetIdForStructureSection({
         section,
         assets,
@@ -757,8 +792,27 @@ export function getGenerationScopeBoardIds(scene: ProjectEditorScene) {
   return scene.activeBoardId ? [scene.activeBoardId] : [];
 }
 
+/** 用户意图 scope 中被锁定、因此将从本次 AI 写操作中跳过的画板 id。 */
+export function getLockedBoardIdsInScope(scene: ProjectEditorScene) {
+  const scopeIds = getGenerationScopeBoardIds(scene);
+  return scopeIds.filter((boardId) => {
+    const board = getSceneBoardById(scene, boardId);
+    return Boolean(board?.locked);
+  });
+}
+
+/** 实际参与 AI 写操作的画板 id（意图 scope 去除锁定画板）。 */
+export function getEffectiveGenerationBoardIds(scene: ProjectEditorScene) {
+  const scopeIds = getGenerationScopeBoardIds(scene);
+  return scopeIds.filter((boardId) => {
+    const board = getSceneBoardById(scene, boardId);
+    return Boolean(board) && !board?.locked;
+  });
+}
+
 export function serializeSceneForHash(scene: ProjectEditorScene) {
-  const boardIds = getGenerationScopeBoardIds(scene);
+  // hash 只关心实际参与生成的画板；锁定画板必须排除。
+  const boardIds = getEffectiveGenerationBoardIds(scene);
   return boardIds.map((boardId) => {
     const board = getSceneBoardById(scene, boardId);
     if (!board) return null;
@@ -830,7 +884,7 @@ export function summarizeProjectSceneForAI({
     ])
   );
 
-  const boardIds =
+  const rawBoardIds =
     scope?.mode === "all"
       ? scene.boardOrder
       : scope?.mode === "selected"
@@ -838,6 +892,12 @@ export function summarizeProjectSceneForAI({
         : scope?.mode === "current"
           ? scope.boardIds.slice(0, 1)
           : getGenerationScopeBoardIds(scene);
+
+  // 锁定画板从 AI 写操作的 scene 摘要中排除。
+  const boardIds = rawBoardIds.filter((boardId) => {
+    const board = getSceneBoardById(scene, boardId);
+    return Boolean(board) && !board?.locked;
+  });
 
   if (boardIds.length === 0) {
     return "（当前没有可分析的画板）";

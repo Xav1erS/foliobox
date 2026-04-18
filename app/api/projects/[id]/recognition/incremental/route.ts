@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getProjectActionSummary } from "@/lib/entitlement";
 import { llmLite } from "@/lib/llm";
 import {
   mergeProjectLayoutDocument,
@@ -194,6 +195,18 @@ export async function POST(
     return NextResponse.json({ error: "没有找到对应的新增素材。" }, { status: 400 });
   }
 
+  // 项目准备 · AI 项目理解 配额（含增量识别）。参见 spec-system-v3/05 §6.1。
+  const projectActionSummary = await getProjectActionSummary(userId, projectId);
+  if (projectActionSummary.projectUnderstandings.remaining <= 0) {
+    return NextResponse.json(
+      {
+        error: "quota_exceeded",
+        quota: projectActionSummary.projectUnderstandings,
+      },
+      { status: 403 }
+    );
+  }
+
   const scene = resolveProjectEditorScene(project.layoutJson, {
     assets: project.assets,
     projectName: project.name,
@@ -257,6 +270,21 @@ export async function POST(
       where: { id: projectId },
       data: {
         layoutJson: nextLayout as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    // 计入 项目准备 · AI 项目理解 配额（增量识别与全量识别共用 quota）。
+    await db.generationTask.create({
+      data: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_material_recognition",
+        usageClass: "low_cost",
+        status: "done",
+        wasSuccessful: true,
+        countedToBudget: true,
+        provider: "openai",
       },
     });
 

@@ -25,7 +25,10 @@ import type {
 } from "@/lib/project-editor-scene";
 import {
   GenerationScopeSchema,
+  getEffectiveGenerationBoardIds,
+  MAX_PROJECT_BOARDS,
   getGenerationScopeBoardIds,
+  getLockedBoardIdsInScope,
   hasGeneratedLayoutData,
   markBoardsAfterGeneration,
   mergeProjectLayoutDocument,
@@ -219,7 +222,27 @@ export async function POST(
     ...scene,
     generationScope,
   };
+  // 用户选定范围（含锁定画板）。
   const scopedBoardIds = getGenerationScopeBoardIds(scopedScene);
+  // 锁定画板必须从 AI 写操作中显式跳过（参见 spec-system-v3/11 §9.4）。
+  const lockedBoardIdsInScope = getLockedBoardIdsInScope(scopedScene);
+  // 实际参与生成的画板（不含锁定画板）。
+  const effectiveBoardIds = getEffectiveGenerationBoardIds(scopedScene);
+  if (effectiveBoardIds.length === 0) {
+    return NextResponse.json(
+      { error: "本次范围内所有画板都已锁定，没有可参与生成的画板" },
+      { status: 400 }
+    );
+  }
+  // 单 Project 画板硬上限（参见 spec-system-v3/04 §4.5 与 spec-system-v3/09）。
+  if (scopedScene.boards.length > MAX_PROJECT_BOARDS) {
+    return NextResponse.json(
+      {
+        error: `单个项目的画板数量不能超过 ${MAX_PROJECT_BOARDS} 个，请先删减画板`,
+      },
+      { status: 400 }
+    );
+  }
   const isRegeneration = hasGeneratedLayoutData(project.layoutJson);
   const actionType = isRegeneration
     ? "project_layout_regeneration"
@@ -228,8 +251,7 @@ export async function POST(
     ? projectActionSummary.layoutRegenerations
     : projectActionSummary.layoutGenerations;
   const isProjectActivated =
-    projectActionSummary.diagnoses.used +
-      projectActionSummary.layoutGenerations.used +
+    projectActionSummary.layoutGenerations.used +
       projectActionSummary.layoutRegenerations.used >
     0;
 
@@ -305,7 +327,7 @@ export async function POST(
 
     const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
       ...(reusable.draft.contentJson as LayoutJson),
-      editorScene: markBoardsAfterGeneration(scene, scopedBoardIds),
+      editorScene: markBoardsAfterGeneration(scene, effectiveBoardIds),
     }) as LayoutJson;
     await db.project.update({
       where: { id: projectId },
@@ -382,9 +404,13 @@ export async function POST(
         : "（暂无结构建议，请基于项目事实和素材自行推导）",
       scopeLabel:
         generationScope.mode === "all"
-          ? "全部画板"
+          ? lockedBoardIdsInScope.length > 0
+            ? `全部画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板）`
+            : "全部画板"
           : generationScope.mode === "selected"
-            ? `已选择的 ${scopedBoardIds.length} 个画板`
+            ? lockedBoardIdsInScope.length > 0
+              ? `已选择的 ${effectiveBoardIds.length} 个画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板）`
+              : `已选择的 ${effectiveBoardIds.length} 个画板`
             : "当前画板",
     });
 
@@ -396,7 +422,7 @@ export async function POST(
     const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
       ...generatedLayout,
       styleProfile,
-      editorScene: markBoardsAfterGeneration(scene, scopedBoardIds),
+      editorScene: markBoardsAfterGeneration(scene, effectiveBoardIds),
     }) as LayoutJson;
 
     // Persist layout JSON to project

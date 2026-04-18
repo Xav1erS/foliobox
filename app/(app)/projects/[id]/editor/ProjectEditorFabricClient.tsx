@@ -105,16 +105,13 @@ import {
   type ProjectCreationGatePayload,
 } from "@/components/editor/ProjectCreationGate";
 import type { PlanSummaryCopy } from "@/lib/entitlement";
-import type { BoundaryAnalysis } from "@/app/api/projects/[id]/boundary/analyze/route";
-import type { CompletenessAnalysis } from "@/app/api/projects/[id]/completeness/analyze/route";
-import type { PackageRecommendation } from "@/app/api/projects/[id]/package/recommend/route";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
   buildProjectSceneFromStructureSuggestion,
   createProjectBoard,
   createProjectImageNode,
+  MAX_PROJECT_BOARDS,
   markBoardsAfterGeneration,
-  markBoardsAsAnalyzed,
   createProjectShapeNode,
   createProjectTextNode,
   getGenerationScopeBoardIds,
@@ -299,7 +296,8 @@ const SMILEY_SANS_URL =
   "https://cdn.jsdelivr.net/gh/atelier-anchor/smiley-sans@1.1.1/demo/SmileySans-Oblique.woff2";
 const ALIBABA_PUHUITI_URL =
   "https://puhuiti.oss-cn-hangzhou.aliyuncs.com/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-55-Regular/AlibabaPuHuiTi-2-55-Regular.woff2";
-const PROJECT_BOARD_MAX = 10;
+// 画板数量硬上限：see spec-system-v3/04 §4.5。
+const PROJECT_BOARD_MAX = MAX_PROJECT_BOARDS;
 const editorPanelCardClass =
   "rounded-[20px] border border-white/8 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const editorPanelMutedCardClass =
@@ -310,13 +308,6 @@ const editorPopupSurfaceClass =
   "rounded-[20px] border border-white/8 bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
 const editorPopupItemClass =
   "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
-
-function packageModeLabel(mode: string | null) {
-  if (mode === "DEEP") return "深讲";
-  if (mode === "LIGHT") return "浅讲";
-  if (mode === "SUPPORTIVE") return "补充展示";
-  return "待判断";
-}
 
 function isEditableCanvasTarget(target: FabricObject | null | undefined) {
   if (!target) return false;
@@ -341,44 +332,6 @@ function getBoardThumbnailAssetId(board: ProjectBoard) {
   return imageNode?.assetId ?? null;
 }
 
-function getNextStepConclusion(params: {
-  boundaryAnalysis: BoundaryAnalysis | null;
-  completenessAnalysis: CompletenessAnalysis | null;
-  layout: LayoutJson | null;
-  packageMode: string | null;
-  packageRecommendation: PackageRecommendation | null;
-  selectedAssetCount: number;
-}) {
-  const {
-    boundaryAnalysis,
-    completenessAnalysis,
-    layout,
-    packageMode,
-    packageRecommendation,
-    selectedAssetCount,
-  } = params;
-
-  if (layout?.pages?.length) {
-    return "当前项目已经拿到排版建议。继续细调单画板内容，再决定要不要发起新一轮生成。";
-  }
-  if (selectedAssetCount === 0) {
-    return "先上传并插入几张关键素材，再运行项目诊断，让系统理解当前项目。";
-  }
-  if (!boundaryAnalysis || !completenessAnalysis || !packageRecommendation) {
-    return "先运行项目诊断，让系统基于当前画板上下文补齐边界、完整度和包装模式判断。";
-  }
-  if (!completenessAnalysis.canProceed) {
-    return (
-      completenessAnalysis.prioritySuggestions[0] ??
-      "先把当前画板里的关键信息补齐，再继续排版。"
-    );
-  }
-  if (!packageMode) {
-    return `建议先确认“${packageModeLabel(packageRecommendation.recommendedMode)}”模式，再生成排版建议。`;
-  }
-  return "当前信息已经够用，可以直接以当前画板范围继续生成排版建议。";
-}
-
 export function ProjectEditorFabricClient({
   initialData,
   planSummary,
@@ -395,13 +348,6 @@ export function ProjectEditorFabricClient({
   );
   const [stage, setStage] = useState(initialData.stage);
   const [packageMode, setPackageMode] = useState(initialData.packageMode);
-  const [boundaryAnalysis, setBoundaryAnalysis] = useState(initialData.boundaryAnalysis);
-  const [completenessAnalysis, setCompletenessAnalysis] = useState(
-    initialData.completenessAnalysis
-  );
-  const [packageRecommendation, setPackageRecommendation] = useState(
-    initialData.packageRecommendation
-  );
   const [layout, setLayout] = useState<LayoutJson | null>(initialData.layout);
   const [materialRecognition, setMaterialRecognition] =
     useState<ProjectMaterialRecognition | null>(initialData.layout?.materialRecognition ?? null);
@@ -449,8 +395,6 @@ export function ProjectEditorFabricClient({
     "saved" | "saving" | "dirty" | "error"
   >("saved");
   const [applyingStructure, setApplyingStructure] = useState(false);
-  const [diagnosisDrawerOpen, setDiagnosisDrawerOpen] = useState(false);
-  const [diagnosing, setDiagnosing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
@@ -549,6 +493,16 @@ export function ProjectEditorFabricClient({
     );
   }, [assetMap, scene.boards, liveThumbnails]);
   const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
+  // 生成确认面板需要显式列出被锁定、将从本次 AI 写操作中跳过的画板。
+  const skippedLockedBoardsInScope = useMemo(
+    () =>
+      generationBoardIds
+        .map((boardId) => scene.boards.find((board) => board.id === boardId))
+        .filter(
+          (board): board is ProjectBoard => Boolean(board) && Boolean(board?.locked)
+        ),
+    [generationBoardIds, scene.boards]
+  );
   const selectedAssets = useMemo(() => assets.filter((asset) => asset.selected), [assets]);
   const recognizedAssetIdSet = useMemo(
     () => new Set(materialRecognition?.recognizedAssetIds ?? []),
@@ -557,73 +511,6 @@ export function ProjectEditorFabricClient({
   const pendingRecognitionAssets = useMemo(
     () => selectedAssets.filter((asset) => !recognizedAssetIdSet.has(asset.id)),
     [recognizedAssetIdSet, selectedAssets]
-  );
-  const aiHistory = useMemo(
-    () =>
-      [
-        boundaryAnalysis
-          ? { key: "boundary", label: "边界分析", summary: boundaryAnalysis.projectSummary }
-          : null,
-        completenessAnalysis
-          ? {
-              key: "completeness",
-              label: "完整度检查",
-              summary: completenessAnalysis.overallComment,
-            }
-          : null,
-        packageRecommendation
-          ? {
-              key: "package",
-              label: "包装模式推荐",
-              summary: packageRecommendation.reasoning,
-            }
-          : null,
-        layout?.narrativeSummary
-          ? {
-              key: "layout",
-              label: "排版结果",
-              summary: layout.narrativeSummary,
-            }
-          : null,
-      ].filter(Boolean) as Array<{ key: string; label: string; summary: string }>,
-    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
-  );
-  const currentConclusion = useMemo(
-    () =>
-      layout?.narrativeSummary ??
-      packageRecommendation?.reasoning ??
-      completenessAnalysis?.overallComment ??
-      boundaryAnalysis?.projectSummary ??
-      "先运行项目诊断，系统会基于当前画板上下文返回边界、完整度和包装模式建议。",
-    [boundaryAnalysis, completenessAnalysis, layout, packageRecommendation]
-  );
-  const nextStepConclusion = useMemo(
-    () =>
-      getNextStepConclusion({
-        boundaryAnalysis,
-        completenessAnalysis,
-        layout,
-        packageMode,
-        packageRecommendation,
-        selectedAssetCount: selectedAssets.length,
-      }),
-    [boundaryAnalysis, completenessAnalysis, layout, packageMode, packageRecommendation, selectedAssets.length]
-  );
-  const aiHighlights = useMemo(
-    () =>
-      [
-        ...(boundaryAnalysis?.suggestions ?? []),
-        ...(packageRecommendation?.reasoning ? [packageRecommendation.reasoning] : []),
-      ].slice(0, 3),
-    [boundaryAnalysis?.suggestions, packageRecommendation?.reasoning]
-  );
-  const aiIssues = useMemo(
-    () =>
-      [
-        ...(boundaryAnalysis?.risks ?? []),
-        ...(completenessAnalysis?.prioritySuggestions ?? []),
-      ].slice(0, 4),
-    [boundaryAnalysis?.risks, completenessAnalysis?.prioritySuggestions]
   );
   const hasActiveInspector = activeMeta.kind !== "none";
   const activeBoardNodeStats = useMemo(() => {
@@ -638,7 +525,7 @@ export function ProjectEditorFabricClient({
       { text: 0, image: 0, shape: 0 }
     );
   }, [activeBoard]);
-  function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent">> & {
+  function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent" | "locked">> & {
     frameBackground?: string;
   }) {
     setScene((current) =>
@@ -650,6 +537,7 @@ export function ProjectEditorFabricClient({
                 ...board,
                 ...(patch.name !== undefined ? { name: patch.name } : {}),
                 ...(patch.intent !== undefined ? { intent: patch.intent } : {}),
+                ...(patch.locked !== undefined ? { locked: patch.locked } : {}),
                 ...(patch.frameBackground !== undefined
                   ? { frame: { ...board.frame, background: patch.frameBackground } }
                   : {}),
@@ -1275,97 +1163,6 @@ export function ProjectEditorFabricClient({
     }
   }
 
-  async function handleRunDiagnosis() {
-    if (!activeBoard || diagnosing) return;
-    setDiagnosing(true);
-    setDiagnosisDrawerOpen(true);
-    setActionError("");
-    setActionMessage(null);
-
-    try {
-      await persistCurrentSceneForAction();
-      const generationScope = scene.generationScope;
-      const payload = JSON.stringify({ generationScope });
-      const [boundaryResult, completenessResult, packageResult] = await Promise.allSettled([
-        parseJsonResponse<{ analysis: BoundaryAnalysis }>(
-          await fetch(`/api/projects/${initialData.id}/boundary/analyze`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload,
-          })
-        ),
-        parseJsonResponse<{ analysis: CompletenessAnalysis }>(
-          await fetch(`/api/projects/${initialData.id}/completeness/analyze`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload,
-          })
-        ),
-        parseJsonResponse<{ recommendation: PackageRecommendation }>(
-          await fetch(`/api/projects/${initialData.id}/package/recommend`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload,
-          })
-        ),
-      ]);
-
-      const failures: string[] = [];
-      let successCount = 0;
-      let nextCompleteness: CompletenessAnalysis | null = null;
-      let nextBoundary: BoundaryAnalysis | null = null;
-
-      if (boundaryResult.status === "fulfilled") {
-        nextBoundary = boundaryResult.value.analysis;
-        setBoundaryAnalysis(nextBoundary);
-        successCount += 1;
-      } else {
-        failures.push(
-          `边界分析：${boundaryResult.reason instanceof Error ? boundaryResult.reason.message : "失败"}`
-        );
-      }
-
-      if (completenessResult.status === "fulfilled") {
-        nextCompleteness = completenessResult.value.analysis;
-        setCompletenessAnalysis(nextCompleteness);
-        successCount += 1;
-      } else {
-        failures.push(
-          `完整度检查：${completenessResult.reason instanceof Error ? completenessResult.reason.message : "失败"}`
-        );
-      }
-
-      if (packageResult.status === "fulfilled") {
-        setPackageRecommendation(packageResult.value.recommendation);
-        successCount += 1;
-      } else {
-        failures.push(
-          `包装模式推荐：${packageResult.reason instanceof Error ? packageResult.reason.message : "失败"}`
-        );
-      }
-
-      if (successCount > 0) {
-        const nextStatus =
-          nextCompleteness?.canProceed === false || nextBoundary?.isBoundaryClean === false
-            ? "needs_attention"
-            : "analyzed";
-        setScene((current) => markBoardsAsAnalyzed(current, generationBoardIds, nextStatus));
-      }
-
-      if (failures.length > 0) {
-        setActionError(
-          successCount > 0 ? `部分诊断已完成；${failures.join("；")}` : failures.join("；")
-        );
-      } else {
-        setActionMessage({ tone: "info", text: "项目诊断已完成" });
-      }
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "项目诊断失败，请稍后重试");
-    } finally {
-      setDiagnosing(false);
-    }
-  }
-
   async function handleSuggestStructure() {
     if (suggestingStructure) return;
 
@@ -1802,11 +1599,8 @@ export function ProjectEditorFabricClient({
     setActionMessage(null);
 
     try {
-      const resolvedMode = packageMode ?? packageRecommendation?.recommendedMode ?? null;
-      if (!resolvedMode) {
-        setActionError("请先运行项目诊断，拿到包装模式建议后再生成排版。");
-        return;
-      }
+      // 项目准备 阶段完成后由骨架流程写入 packageMode；若尚未写入，默认走 DEEP。
+      const resolvedMode = packageMode ?? "DEEP";
 
       await persistCurrentSceneForAction();
       if (!packageMode) {
@@ -1862,7 +1656,6 @@ export function ProjectEditorFabricClient({
         setActionMessage({ tone: "info", text: "排版建议已生成，可继续结合单画板细调。" });
       }
       setGenerateOpen(false);
-      setDiagnosisDrawerOpen(true);
       router.refresh();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "生成排版失败，请稍后重试");
@@ -2867,7 +2660,7 @@ export function ProjectEditorFabricClient({
           <Button
             className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
             onClick={() => void handleOpenGenerate()}
-            disabled={generating || diagnosing}
+            disabled={generating}
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             生成排版
@@ -2888,16 +2681,6 @@ export function ProjectEditorFabricClient({
               }}
             >
               项目准备
-            </EditorChromeButton>
-          )}
-          {setupMode ? null : (
-            <EditorChromeButton
-              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/82 hover:bg-white/8 hover:text-white"
-              onClick={() => void handleRunDiagnosis()}
-              disabled={diagnosing || generating}
-            >
-              {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
-              项目诊断
             </EditorChromeButton>
           )}
         </div>
@@ -2970,7 +2753,7 @@ export function ProjectEditorFabricClient({
                           <div>
                             <p className="text-sm font-medium text-white">输入项目背景</p>
                             <p className="mt-0.5 text-xs text-white/38">
-                              这里的内容会直接作为诊断和排版生成的上下文。
+                              这里的内容会直接作为项目准备与排版生成的上下文。
                             </p>
                           </div>
                           <span
@@ -3511,6 +3294,13 @@ export function ProjectEditorFabricClient({
                             <span className="text-xs text-white/34">{structureSaveLabel}</span>
                           </div>
 
+                          {typeof structureDraft.unlockedChapterLimit === "number" ? (
+                            <p className="flex items-start gap-1.5 rounded-[14px] border border-white/6 bg-white/3 px-3 py-2 text-xs leading-5 text-white/60">
+                              <Lock className="mt-0.5 h-3 w-3 flex-none" />
+                              免费层仅落地前 {structureDraft.unlockedChapterLimit} 章对应的画板；升级后可一键补齐剩余章节，不再消耗次数。
+                            </p>
+                          ) : null}
+
                           <p className="text-xs text-white/30">
                             更新于{" "}
                             {structureDraft.generatedAt
@@ -3609,14 +3399,30 @@ export function ProjectEditorFabricClient({
                               </div>
 
                               <div className="mt-4 space-y-2.5">
-                                {group.sections.map((section) => (
+                                {group.sections.map((section) => {
+                                  const isLocked = Boolean(section.locked);
+                                  return (
                                   <div
                                     key={section.id}
-                                    className="rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3"
+                                    className={cn(
+                                      "rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3",
+                                      isLocked && "opacity-80"
+                                    )}
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0 flex-1">
-                                        <label className="text-xs text-white/34">小节标题</label>
+                                        <div className="flex items-center gap-2">
+                                          <label className="text-xs text-white/34">小节标题</label>
+                                          {isLocked ? (
+                                            <Badge
+                                              variant="outline"
+                                              className="h-5 gap-1 rounded-full border-white/10 bg-white/5 px-2 text-[10px] text-white/70"
+                                            >
+                                              <Lock className="h-3 w-3" />
+                                              升级查看细节
+                                            </Badge>
+                                          ) : null}
+                                        </div>
                                         <Input
                                           value={section.title}
                                           onChange={(event) =>
@@ -3624,6 +3430,7 @@ export function ProjectEditorFabricClient({
                                               title: event.target.value,
                                             })
                                           }
+                                          disabled={isLocked}
                                           className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
                                         />
                                       </div>
@@ -3632,57 +3439,67 @@ export function ProjectEditorFabricClient({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => deleteStructureSection(group.id, section.id)}
+                                        disabled={isLocked}
                                         className="mt-5 h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
-                                    <div className="mt-3">
-                                      <label className="text-xs text-white/34">这一小节要讲什么</label>
-                                      <Textarea
-                                        value={section.purpose}
-                                        onChange={(event) =>
-                                          updateStructureSection(group.id, section.id, {
-                                            purpose: event.target.value,
-                                          })
-                                        }
-                                        className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
-                                      />
-                                    </div>
-                                    <div className="mt-3">
-                                      <label className="text-xs text-white/34">建议内容点</label>
-                                      <Textarea
-                                        value={section.recommendedContent.join("\n")}
-                                        onChange={(event) =>
-                                          updateStructureSection(group.id, section.id, {
-                                            recommendedContent: event.target.value
-                                              .split("\n")
-                                              .map((item) => item.trim())
-                                              .filter(Boolean),
-                                          })
-                                        }
-                                        placeholder="每行一条建议内容点"
-                                        className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
-                                      />
-                                    </div>
-                                    <div className="mt-3">
-                                      <label className="text-xs text-white/34">建议素材</label>
-                                      <Input
-                                        value={section.suggestedAssets.join("、")}
-                                        onChange={(event) =>
-                                          updateStructureSection(group.id, section.id, {
-                                            suggestedAssets: event.target.value
-                                              .split(/[,，]/)
-                                              .map((item) => item.trim())
-                                              .filter(Boolean),
-                                          })
-                                        }
-                                        placeholder="用逗号分隔建议素材标题或类型"
-                                        className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
-                                      />
-                                    </div>
+                                    {isLocked ? (
+                                      <p className="mt-3 rounded-[14px] border border-white/6 bg-white/3 px-3 py-2 text-xs leading-5 text-white/60">
+                                        免费层仅解锁前 {structureDraft.unlockedChapterLimit ?? 2} 章的细节与落板。升级后可查看本章内容指导并一键补齐剩余章节。
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <div className="mt-3">
+                                          <label className="text-xs text-white/34">这一小节要讲什么</label>
+                                          <Textarea
+                                            value={section.purpose}
+                                            onChange={(event) =>
+                                              updateStructureSection(group.id, section.id, {
+                                                purpose: event.target.value,
+                                              })
+                                            }
+                                            className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
+                                          />
+                                        </div>
+                                        <div className="mt-3">
+                                          <label className="text-xs text-white/34">建议内容点</label>
+                                          <Textarea
+                                            value={section.recommendedContent.join("\n")}
+                                            onChange={(event) =>
+                                              updateStructureSection(group.id, section.id, {
+                                                recommendedContent: event.target.value
+                                                  .split("\n")
+                                                  .map((item) => item.trim())
+                                                  .filter(Boolean),
+                                              })
+                                            }
+                                            placeholder="每行一条建议内容点"
+                                            className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
+                                          />
+                                        </div>
+                                        <div className="mt-3">
+                                          <label className="text-xs text-white/34">建议素材</label>
+                                          <Input
+                                            value={section.suggestedAssets.join("、")}
+                                            onChange={(event) =>
+                                              updateStructureSection(group.id, section.id, {
+                                                suggestedAssets: event.target.value
+                                                  .split(/[,，]/)
+                                                  .map((item) => item.trim())
+                                                  .filter(Boolean),
+                                              })
+                                            }
+                                            placeholder="用逗号分隔建议素材标题或类型"
+                                            className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
+                                          />
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -4601,6 +4418,44 @@ export function ProjectEditorFabricClient({
                         </span>
                       </div>
 
+                      {/* 画板锁定：开启后不参与任何 AI 写操作 */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateActiveBoard({ locked: !activeBoard.locked })
+                        }
+                        aria-pressed={Boolean(activeBoard.locked)}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                          activeBoard.locked
+                            ? "border-white/14 bg-white/8 text-white"
+                            : "border-white/6 bg-white/2 text-white/70 hover:bg-white/4 hover:text-white"
+                        )}
+                      >
+                        <span className="flex items-center gap-2 text-sm">
+                          <Lock className="h-3.5 w-3.5" />
+                          画板锁定
+                        </span>
+                        <span
+                          className={cn(
+                            "relative h-5 w-9 rounded-full border transition-colors",
+                            activeBoard.locked
+                              ? "border-white/20 bg-white/80"
+                              : "border-white/10 bg-white/8"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all",
+                              activeBoard.locked ? "left-[18px]" : "left-[2px]"
+                            )}
+                          />
+                        </span>
+                      </button>
+                      <p className="-mt-2 text-xs leading-relaxed text-white/36">
+                        锁定后，该画板不参与生成排版 / 更新排版 / 重新生成等任何 AI 写操作。
+                      </p>
+
                       {/* AI 内容建议（来自结构建议的 purpose + recommendedContent） */}
                       {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
                         <div className="rounded-xl border border-white/6 bg-white/2.5 p-3">
@@ -4697,159 +4552,6 @@ export function ProjectEditorFabricClient({
         </div>
       ) : null}
 
-      {/* 诊断结果 Drawer */}
-      {diagnosisDrawerOpen ? (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setDiagnosisDrawerOpen(false)}
-        >
-          <div
-            className="absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-white/6 bg-card shadow-[-24px_0_64px_-20px_rgba(0,0,0,0.72)] animate-in slide-in-from-right-4 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 头部 */}
-            <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-white/90">项目诊断</p>
-                <p className="mt-0.5 text-xs text-white/36">
-                  {diagnosing ? "正在分析…" : "基于当前画板范围的诊断结论"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDiagnosisDrawerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/3 text-white/44 transition-colors hover:bg-white/8 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* 内容 */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {diagnosing ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-5 w-5 animate-spin text-white/36" />
-                </div>
-              ) : (
-                <>
-                  <EditorRailSection title="现状">
-                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                      <CardContent className="p-4 text-sm leading-7 text-white/84">
-                        {currentConclusion}
-                      </CardContent>
-                    </Card>
-                  </EditorRailSection>
-
-                  <EditorRailSection title="亮点">
-                    <div className="space-y-2">
-                      {aiHighlights.length > 0 ? (
-                        aiHighlights.map((point) => (
-                          <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                            <CardContent className="p-4 text-sm leading-7 text-white/84">
-                              {point}
-                            </CardContent>
-                          </Card>
-                        ))
-                      ) : (
-                        <EditorEmptyState>先运行项目诊断，系统会返回当前亮点和可讲的重点。</EditorEmptyState>
-                      )}
-                    </div>
-                  </EditorRailSection>
-
-                  <EditorRailSection title="问题">
-                    <div className="space-y-2">
-                      {aiIssues.length > 0 ? (
-                        aiIssues.map((point) => (
-                          <Card key={point} className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                            <CardContent className="p-4 text-sm leading-7 text-white/84">
-                              {point}
-                            </CardContent>
-                          </Card>
-                        ))
-                      ) : (
-                        <EditorEmptyState>当前还没有明确问题项，或者你还没跑过诊断。</EditorEmptyState>
-                      )}
-                    </div>
-                  </EditorRailSection>
-
-                  <EditorRailSection title="下一步">
-                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                      <CardContent className="p-4 text-sm leading-7 text-white/84">
-                        {nextStepConclusion}
-                      </CardContent>
-                    </Card>
-                  </EditorRailSection>
-
-                  <EditorRailSection title="生成判断">
-                    <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                      <CardContent className="flex items-center justify-between gap-3 p-4">
-                        <div>
-                          <p className="text-sm font-medium text-white">
-                            {layout?.pages?.length
-                              ? "已有排版建议"
-                              : completenessAnalysis?.canProceed
-                                ? "可以继续"
-                                : "建议先补强"}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-white/56">
-                            {layout?.pages?.length
-                              ? `当前已有 ${layout.totalPages} 页排版建议，可继续结合单画板细调。`
-                              : completenessAnalysis?.canProceed
-                                ? "当前材料和事实已经够用，可以继续生成。"
-                                : "先补足问题链、角色事实或结果证据，再发起下一轮生成更稳。"}
-                          </p>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "shrink-0 rounded-full border-white/10 px-3 py-1 text-white",
-                            (layout?.pages?.length || completenessAnalysis?.canProceed) &&
-                              "border-white/18 bg-white/8 text-white"
-                          )}
-                        >
-                          {layout?.pages?.length
-                            ? "可继续"
-                            : completenessAnalysis?.canProceed
-                              ? "可生成"
-                              : "待补强"}
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  </EditorRailSection>
-
-                  {aiHistory.length > 1 ? (
-                    <EditorRailSection title="历史">
-                      <Card className={cn(editorPanelCardClass, "text-white shadow-none")}>
-                        <CardContent className="p-4 text-sm leading-7 text-white/84">
-                          已累计 {aiHistory.length} 条诊断记录，当前展示最新一次结果。
-                        </CardContent>
-                      </Card>
-                    </EditorRailSection>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            {/* 底部操作 */}
-            <div className="border-t border-white/5 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => void handleRunDiagnosis()}
-                disabled={diagnosing}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-white/8 bg-white/4 text-sm text-white/72 transition-colors hover:bg-white/8 hover:text-white disabled:pointer-events-none disabled:opacity-50"
-              >
-                {diagnosing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                重新诊断
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
         <DialogContent className="max-w-2xl border-white/8 bg-card text-white">
           <DialogHeader>
@@ -4903,6 +4605,17 @@ export function ProjectEditorFabricClient({
                     </button>
                   ))}
                 </div>
+                {skippedLockedBoardsInScope.length > 0 ? (
+                  <div className="rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-xs leading-5 text-white/70">
+                    <div className="flex items-center gap-1.5 text-white/82">
+                      <Lock className="h-3 w-3" />
+                      <span>将跳过 {skippedLockedBoardsInScope.length} 个锁定画板</span>
+                    </div>
+                    <p className="mt-1 text-white/50">
+                      {skippedLockedBoardsInScope.map((b) => b.name).join("、")}
+                    </p>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -5021,8 +4734,7 @@ export function ProjectEditorFabricClient({
               disabled={
                 generating ||
                 checkingPrecheck ||
-                generatePrecheck?.suggestedMode === "block" ||
-                (!packageMode && !packageRecommendation)
+                generatePrecheck?.suggestedMode === "block"
               }
             >
               {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

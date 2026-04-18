@@ -132,11 +132,10 @@ describe("entitlement contracts", () => {
       planType: "SPRINT",
       expiresAt: null,
     });
-    mockDb.generationTask.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+    mockDb.generationTask.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
 
     const summary = await getProjectActionSummary("user-1", "project-1");
 
-    expect(summary.diagnoses).toMatchObject({ limit: 3, used: 1, remaining: 2 });
     expect(summary.layoutGenerations).toMatchObject({ limit: 3, used: 2, remaining: 1 });
     expect(summary.layoutRegenerations).toMatchObject({ limit: 3, used: 1, remaining: 2 });
   });

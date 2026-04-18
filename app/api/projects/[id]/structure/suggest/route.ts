@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  FREE_STRUCTURE_CHAPTER_PREVIEW_LIMIT,
+  getProjectActionSummary,
+  getUserPlan,
+} from "@/lib/entitlement";
 import { llmLite } from "@/lib/llm";
 import {
   mergeProjectLayoutDocument,
@@ -12,6 +17,7 @@ import {
   summarizeProjectSceneForAI,
   type ProjectStructureSuggestion,
   ProjectStructureSuggestionSchema,
+  MAX_PROJECT_BOARDS,
 } from "@/lib/project-editor-scene";
 import { formatNarrativeTemplateForPrompt } from "@/lib/narrative-templates";
 
@@ -179,6 +185,7 @@ ${input.recognitionSummary}
 要求：
 - groups 至少 4 组，至多 8 组
 - 每组至少 1 个 section
+- 所有 groups 下的 sections 合计不得超过 ${MAX_PROJECT_BOARDS} 个（与画板上限对齐）
 - sections 的标题要能直接用于作品集结构搭建
 - 不要输出 markdown，只输出 JSON`;
 }
@@ -249,6 +256,21 @@ export async function POST(
     );
   }
 
+  // 项目准备 · 生成章节结构 配额（参见 spec-system-v3/05 §6.1）
+  const [planType, projectActionSummary] = await Promise.all([
+    getUserPlan(userId),
+    getProjectActionSummary(userId, projectId),
+  ]);
+  if (projectActionSummary.structureSuggestions.remaining <= 0) {
+    return NextResponse.json(
+      {
+        error: "quota_exceeded",
+        quota: projectActionSummary.structureSuggestions,
+      },
+      { status: 403 }
+    );
+  }
+
   const scene = resolveProjectEditorScene(project.layoutJson, {
     assets: project.assets,
     projectName: project.name,
@@ -303,8 +325,46 @@ export async function POST(
       }
     );
 
+    // 章节总数硬上限：与单 Project 画板上限对齐
+    // 参见 spec-system-v3/04 §4.5 与 spec-system-v3/09
+    const cappedGroups: typeof suggestion.groups = [];
+    let remainingSlots = MAX_PROJECT_BOARDS;
+    for (const group of suggestion.groups) {
+      if (remainingSlots <= 0) break;
+      const sections = group.sections.slice(0, remainingSlots);
+      if (sections.length === 0) continue;
+      cappedGroups.push({ ...group, sections });
+      remainingSlots -= sections.length;
+    }
+
+    // 免费层：前 N 章完整可见，其余章节保留标题但清空细节并打 locked。
+    // 参见 spec-system-v3/05 §6.1。
+    const isFreePlan = planType === "FREE";
+    const unlockedLimit = isFreePlan ? FREE_STRUCTURE_CHAPTER_PREVIEW_LIMIT : null;
+    let flatSectionIndex = 0;
+    const gatedGroups = cappedGroups.map((group) => ({
+      ...group,
+      sections: group.sections.map((section) => {
+        const shouldLock =
+          unlockedLimit !== null && flatSectionIndex >= unlockedLimit;
+        flatSectionIndex += 1;
+        if (!shouldLock) {
+          return { ...section, locked: false };
+        }
+        return {
+          ...section,
+          purpose: "",
+          recommendedContent: [],
+          suggestedAssets: [],
+          locked: true,
+        };
+      }),
+    }));
+
     const normalizedSuggestion: ProjectStructureSuggestion = {
       ...suggestion,
+      groups: gatedGroups,
+      unlockedChapterLimit: unlockedLimit,
       generatedAt: suggestion.generatedAt || new Date().toISOString(),
       status: suggestion.status ?? "draft",
       confirmedAt: suggestion.confirmedAt ?? null,
@@ -317,6 +377,21 @@ export async function POST(
       where: { id: projectId },
       data: {
         layoutJson: nextLayout as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    // 计入 项目准备 · 生成章节结构 配额。
+    await db.generationTask.create({
+      data: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_structure_suggestion",
+        usageClass: "low_cost",
+        status: "done",
+        wasSuccessful: true,
+        countedToBudget: true,
+        provider: "openai",
       },
     });
 

@@ -170,27 +170,39 @@ export const PLAN_QUOTAS: Record<
 const PROJECT_ACTION_LIMITS: Record<
   PlanType,
   {
-    diagnoses: number;
     layoutGenerations: number;
     layoutRegenerations: number;
+    // 项目准备 · AI 项目理解（参见 spec-system-v3/05 §6.1）
+    projectUnderstandings: number;
+    // 项目准备 · 生成章节结构（参见 spec-system-v3/05 §6.1）
+    structureSuggestions: number;
   }
 > = {
   FREE: {
-    diagnoses: 0,
     layoutGenerations: 0,
     layoutRegenerations: 0,
+    projectUnderstandings: 2,
+    structureSuggestions: 1,
   },
   PRO: {
-    diagnoses: 1,
     layoutGenerations: 1,
     layoutRegenerations: 1,
+    projectUnderstandings: Number.POSITIVE_INFINITY,
+    structureSuggestions: Number.POSITIVE_INFINITY,
   },
   SPRINT: {
-    diagnoses: 3,
     layoutGenerations: 3,
     layoutRegenerations: 3,
+    projectUnderstandings: Number.POSITIVE_INFINITY,
+    structureSuggestions: Number.POSITIVE_INFINITY,
   },
 };
+
+/**
+ * 免费层在 `项目准备 · 生成章节结构` 仅可见 / 落地的章节数。
+ * 参见 spec-system-v3/05 §6.1。
+ */
+export const FREE_STRUCTURE_CHAPTER_PREVIEW_LIMIT = 2;
 
 const PORTFOLIO_ACTION_LIMITS: Record<
   PlanType,
@@ -396,16 +408,12 @@ export async function getEntitlementSummary(userId: string): Promise<Entitlement
 
 export async function getProjectActionSummary(userId: string, projectId: string) {
   const planType = await getUserPlan(userId);
-  const [diagnosesUsed, layoutGenerationsUsed, layoutRegenerationsUsed] = await Promise.all([
-    db.generationTask.count({
-      where: {
-        userId,
-        objectType: "project",
-        objectId: projectId,
-        actionType: "project_diagnosis",
-        countedToBudget: true,
-      },
-    }),
+  const [
+    layoutGenerationsUsed,
+    layoutRegenerationsUsed,
+    projectUnderstandingsUsed,
+    structureSuggestionsUsed,
+  ] = await Promise.all([
     db.generationTask.count({
       where: {
         userId,
@@ -424,11 +432,28 @@ export async function getProjectActionSummary(userId: string, projectId: string)
         countedToBudget: true,
       },
     }),
+    db.generationTask.count({
+      where: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_material_recognition",
+        countedToBudget: true,
+      },
+    }),
+    db.generationTask.count({
+      where: {
+        userId,
+        objectType: "project",
+        objectId: projectId,
+        actionType: "project_structure_suggestion",
+        countedToBudget: true,
+      },
+    }),
   ]);
 
   const limits = PROJECT_ACTION_LIMITS[planType];
   return {
-    diagnoses: buildObjectActionQuota("项目诊断", limits.diagnoses, diagnosesUsed),
     layoutGenerations: buildObjectActionQuota(
       "生成排版",
       limits.layoutGenerations,
@@ -438,6 +463,16 @@ export async function getProjectActionSummary(userId: string, projectId: string)
       "重新生成",
       limits.layoutRegenerations,
       layoutRegenerationsUsed
+    ),
+    projectUnderstandings: buildObjectActionQuota(
+      "AI 项目理解",
+      limits.projectUnderstandings,
+      projectUnderstandingsUsed
+    ),
+    structureSuggestions: buildObjectActionQuota(
+      "生成章节结构",
+      limits.structureSuggestions,
+      structureSuggestionsUsed
     ),
   };
 }
