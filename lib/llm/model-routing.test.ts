@@ -5,6 +5,14 @@ import {
   resolveOpenAIModel,
 } from "./model-routing";
 
+function makeEnv(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    NODE_ENV: process.env.NODE_ENV ?? "test",
+    ...overrides,
+  };
+}
+
 describe("getModelTierForTask", () => {
   it("routes outline-solid generation to primary tier", () => {
     expect(getModelTierForTask("outline_generation")).toBe("primary");
@@ -23,7 +31,7 @@ describe("getModelTierForTask", () => {
 
 describe("getOpenAIModelConfig", () => {
   it("uses defaults when env is empty", () => {
-    expect(getOpenAIModelConfig({} as NodeJS.ProcessEnv)).toEqual({
+    expect(getOpenAIModelConfig(makeEnv())).toEqual({
       primary: "gpt-5.4-mini",
       lite: "gpt-5.4-nano",
       vision: "gpt-5.4-mini",
@@ -32,10 +40,10 @@ describe("getOpenAIModelConfig", () => {
 
   it("supports env overrides and vision fallback", () => {
     expect(
-      getOpenAIModelConfig({
+      getOpenAIModelConfig(makeEnv({
         OPENAI_MODEL_PRIMARY: "gpt-4.1",
         OPENAI_MODEL_LITE: "gpt-4.1-mini",
-      } as NodeJS.ProcessEnv)
+      }))
     ).toEqual({
       primary: "gpt-4.1",
       lite: "gpt-4.1-mini",
