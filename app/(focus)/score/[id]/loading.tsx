@@ -1,5 +1,7 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse bg-white/6 ${className}`} />;
+  return <Skeleton variant="inverse" className={className} />;
 }
 
 export default function ScoreResultLoading() {

@@ -8,7 +8,7 @@ export function PublicViewerShell({
   className?: string;
 }) {
   return (
-    <div className={cn("min-h-screen bg-white text-neutral-900", className)}>
+    <div className={cn("min-h-screen bg-neutral-950 text-white", className)}>
       {children}
     </div>
   );

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildProjectSceneFromStructureSuggestion,
   createEmptyProjectEditorScene,
+  getSceneBoardGroupRuns,
   hasGeneratedLayoutData,
   mergeProjectAssetMeta,
   mergeProjectLayoutDocument,
+  normalizeProjectEditorScene,
   PROJECT_BOARD_HEIGHT,
   PROJECT_BOARD_WIDTH,
   resolveProjectEditorScene,
@@ -204,6 +206,8 @@ describe("project editor scene", () => {
         riskyAssetIds: [],
         missingInfo: [],
         suggestedNextStep: "确认结构并落板。",
+        recognizedAssetIds: ["asset-cover", "asset-flow"],
+        lastIncrementalDiff: null,
       },
       assets: [
         {
@@ -227,7 +231,94 @@ describe("project editor scene", () => {
     expect(scene.boardOrder).toHaveLength(2);
     expect(scene.generationScope.mode).toBe("all");
     expect(scene.boards[0].name).toContain("项目概览");
+    expect(scene.boards[0].structureSource).toMatchObject({
+      groupId: "group-overview",
+      groupLabel: "项目概览",
+      sectionId: "section-cover",
+      sectionTitle: "项目封面",
+    });
     expect(scene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
+  });
+
+  it("groups ordered boards by structure source runs", () => {
+    const scene = normalizeProjectEditorScene({
+      version: 1,
+      activeBoardId: "board-a",
+      boardOrder: ["board-a", "board-b", "board-c", "board-d"],
+      boards: [
+        {
+          ...createEmptyProjectEditorScene().boards[0],
+          id: "board-a",
+          name: "概览",
+          structureSource: {
+            groupId: "group-overview",
+            groupLabel: "项目概览",
+            groupIndex: 0,
+            sectionId: "section-cover",
+            sectionTitle: "封面",
+            sectionIndex: 0,
+          },
+        },
+        {
+          ...createEmptyProjectEditorScene().boards[0],
+          id: "board-b",
+          name: "过程 1",
+          structureSource: {
+            groupId: "group-process",
+            groupLabel: "设计过程",
+            groupIndex: 1,
+            sectionId: "section-flow",
+            sectionTitle: "流程",
+            sectionIndex: 0,
+          },
+        },
+        {
+          ...createEmptyProjectEditorScene().boards[0],
+          id: "board-c",
+          name: "过程 2",
+          structureSource: {
+            groupId: "group-process",
+            groupLabel: "设计过程",
+            groupIndex: 1,
+            sectionId: "section-ui",
+            sectionTitle: "界面",
+            sectionIndex: 1,
+          },
+        },
+        {
+          ...createEmptyProjectEditorScene().boards[0],
+          id: "board-d",
+          name: "补充页",
+          structureSource: null,
+        },
+      ],
+      generationScope: { mode: "all", boardIds: ["board-a", "board-b", "board-c", "board-d"] },
+      viewport: { zoom: 1, panX: 0, panY: 0 },
+    });
+
+    expect(getSceneBoardGroupRuns(scene)).toEqual([
+      {
+        key: "group:group-overview",
+        label: "项目概览",
+        structureGroupId: "group-overview",
+        boards: [scene.boards.find((board) => board.id === "board-a")],
+      },
+      {
+        key: "group:group-process",
+        label: "设计过程",
+        structureGroupId: "group-process",
+        boards: [
+          scene.boards.find((board) => board.id === "board-b"),
+          scene.boards.find((board) => board.id === "board-c"),
+        ],
+      },
+      {
+        key: "manual:1",
+        label: null,
+        structureGroupId: null,
+        boards: [scene.boards.find((board) => board.id === "board-d")],
+      },
+    ]);
   });
 
   it("seeds boards from generated layout pages", () => {
@@ -274,7 +365,7 @@ describe("project editor scene", () => {
   });
 
   it("summarizes text and asset notes for AI", () => {
-    const scene = resolveProjectEditorScene(
+    const baseScene = resolveProjectEditorScene(
       {
         packageMode: "LIGHT",
         totalPages: 1,
@@ -302,6 +393,20 @@ describe("project editor scene", () => {
         ],
       }
     );
+    const scene = normalizeProjectEditorScene({
+      ...baseScene,
+      boards: baseScene.boards.map((board) => ({
+        ...board,
+        structureSource: {
+          groupId: "group-overview",
+          groupLabel: "项目概览",
+          groupIndex: 0,
+          sectionId: "section-cover",
+          sectionTitle: "封面",
+          sectionIndex: 0,
+        },
+      })),
+    });
 
     const summary = summarizeProjectSceneForAI({
       scene,
@@ -315,6 +420,7 @@ describe("project editor scene", () => {
     });
 
     expect(summary).toContain("名称：封面");
+    expect(summary).toContain("结构分组：项目概览");
     expect(summary).toContain("主图【main】：最终结果图");
   });
 

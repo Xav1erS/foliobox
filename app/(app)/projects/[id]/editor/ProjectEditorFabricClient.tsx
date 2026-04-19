@@ -110,6 +110,7 @@ import {
   buildProjectSceneFromStructureSuggestion,
   createProjectBoard,
   createProjectImageNode,
+  getSceneBoardGroupRuns,
   MAX_PROJECT_BOARDS,
   markBoardsAfterGeneration,
   createProjectShapeNode,
@@ -120,12 +121,15 @@ import {
   normalizeProjectEditorScene,
   PROJECT_BOARD_HEIGHT,
   PROJECT_BOARD_WIDTH,
+  PROJECT_IMAGE_ROLE_TAGS,
   PROJECT_SHAPE_TYPES,
   resolveProjectEditorScene,
   resolveProjectAssetMeta,
   type GenerationScope,
   type ProjectBoard,
+  type ProjectBoardGroupRun,
   type ProjectBoardImageNode,
+  type ProjectImageRoleTag,
   type ProjectMaterialRecognition,
   type ProjectBoardNode,
   type ProjectStructureGroup,
@@ -145,6 +149,7 @@ import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import type { ProjectEditorInitialData } from "./ProjectEditorClient";
 
 type FabricModule = typeof import("fabric");
+type BottomStripView = "filmstrip" | "outline";
 
 type ActiveObjectMeta =
   | { kind: "none" }
@@ -169,6 +174,12 @@ type ActiveObjectMeta =
       kind: "image";
       id: string;
       assetId: string | null;
+      fit: "fill" | "fit";
+      crop: {
+        x: number;
+        y: number;
+        scale: number;
+      };
       opacity: number;
       x: number;
       y: number;
@@ -213,14 +224,26 @@ type LeftPanelKey = "project" | "assets" | "structure" | "layers" | "boards";
 type GeneratePrecheck = {
   actionType: string;
   styleProfile: StyleProfile;
+  isHighCostAction: boolean;
+  actionLabel: string;
   suggestedMode: "continue" | "reuse" | "block";
+  blockReason: "active_project_limit" | "action_quota_exhausted" | null;
   consumesQuota: boolean;
   failureCounts: boolean;
+  projectActivated: boolean;
   activeProjectRemaining: number;
   actionRemaining: number;
+  remainingAfterAction: number;
   reusableDraftId: string | null;
   reusableTaskId?: string | null;
   generationScope?: GenerationScope;
+};
+
+const PROJECT_IMAGE_ROLE_LABELS: Record<ProjectImageRoleTag, string> = {
+  main: "主讲",
+  support: "补充",
+  decorative: "装饰",
+  risk: "风险",
 };
 
 const SHAPE_LABELS: Record<ProjectShapeType, string> = {
@@ -249,6 +272,14 @@ type FabricSceneObject = FabricObject & {
     nodeId?: string;
     nodeType?: "text" | "image" | "shape";
     assetId?: string;
+    fit?: "fill" | "fit";
+    frameWidth?: number;
+    frameHeight?: number;
+    crop?: {
+      x: number;
+      y: number;
+      scale: number;
+    };
     shapeType?: ProjectShapeType;
     role?: ProjectBoardTextNode["role"];
   };
@@ -332,6 +363,48 @@ function getBoardThumbnailAssetId(board: ProjectBoard) {
   return imageNode?.assetId ?? null;
 }
 
+function getBoardGroupRunLabel(
+  run: ProjectBoardGroupRun,
+  options: { showUngrouped: boolean }
+) {
+  if (run.label) return run.label;
+  return options.showUngrouped ? "未分组" : null;
+}
+
+function getImageFrameMeta(object: FabricSceneObject) {
+  const scaledWidth =
+    typeof object.getScaledWidth === "function" ? object.getScaledWidth() : object.width ?? 0;
+  const scaledHeight =
+    typeof object.getScaledHeight === "function" ? object.getScaledHeight() : object.height ?? 0;
+  const fit = object.data?.fit ?? "fill";
+  const frameWidth =
+    typeof object.data?.frameWidth === "number" ? object.data.frameWidth : scaledWidth;
+  const frameHeight =
+    typeof object.data?.frameHeight === "number" ? object.data.frameHeight : scaledHeight;
+  const frameX =
+    fit === "fit" ? (object.left ?? 0) - Math.max(frameWidth - scaledWidth, 0) / 2 : object.left ?? 0;
+  const frameY =
+    fit === "fit" ? (object.top ?? 0) - Math.max(frameHeight - scaledHeight, 0) / 2 : object.top ?? 0;
+
+  return {
+    fit,
+    frameWidth,
+    frameHeight,
+    frameX,
+    frameY,
+    scaledWidth,
+    scaledHeight,
+  };
+}
+
+function getImageCropMeta(object: FabricSceneObject) {
+  return object.data?.crop ?? { x: 0.5, y: 0.5, scale: 1 };
+}
+
+function approximatelyEqual(a: number, b: number, tolerance = 0.5) {
+  return Math.abs(a - b) <= tolerance;
+}
+
 export function ProjectEditorFabricClient({
   initialData,
   planSummary,
@@ -397,6 +470,7 @@ export function ProjectEditorFabricClient({
   const [applyingStructure, setApplyingStructure] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [bottomStripView, setBottomStripView] = useState<BottomStripView>("filmstrip");
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
   const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
   const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
@@ -449,7 +523,15 @@ export function ProjectEditorFabricClient({
   const didHydrateSceneRef = useRef(false);
   const didHydrateFactsRef = useRef(false);
 
-  const [imageDetailsDraft, setImageDetailsDraft] = useState({ title: "", note: "" });
+  const [imageDetailsDraft, setImageDetailsDraft] = useState<{
+    title: string;
+    note: string;
+    roleTag: ProjectImageRoleTag | "none";
+  }>({
+    title: "",
+    note: "",
+    roleTag: "none",
+  });
   const assetMap = useMemo(
     () => new Map(assets.map((asset) => [asset.id, asset])),
     [assets]
@@ -492,7 +574,25 @@ export function ProjectEditorFabricClient({
       })
     );
   }, [assetMap, scene.boards, liveThumbnails]);
+  const boardGroupRuns = useMemo(() => getSceneBoardGroupRuns(scene), [scene]);
+  const showBoardGroupHeaders = useMemo(
+    () =>
+      boardGroupRuns.length > 1 ||
+      boardGroupRuns.some((run) => Boolean(run.structureGroupId)),
+    [boardGroupRuns]
+  );
   const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
+  const selectedGenerationBoardIds = useMemo(
+    () =>
+      scene.generationScope.mode === "selected"
+        ? scene.generationScope.boardIds.filter((boardId) => scene.boardOrder.includes(boardId))
+        : [],
+    [scene]
+  );
+  const selectedGenerationBoardIdSet = useMemo(
+    () => new Set(selectedGenerationBoardIds),
+    [selectedGenerationBoardIds]
+  );
   // 生成确认面板需要显式列出被锁定、将从本次 AI 写操作中跳过的画板。
   const skippedLockedBoardsInScope = useMemo(
     () =>
@@ -748,6 +848,29 @@ export function ProjectEditorFabricClient({
     });
   }
 
+  function toggleBoardInGenerationScope(boardId: string) {
+    setScene((current) => {
+      const baseIds =
+        current.generationScope.mode === "selected" && current.generationScope.boardIds.length > 0
+          ? current.generationScope.boardIds.filter((id) => current.boardOrder.includes(id))
+          : [current.activeBoardId];
+      const nextSelected = new Set(baseIds);
+      if (nextSelected.has(boardId)) {
+        nextSelected.delete(boardId);
+      } else {
+        nextSelected.add(boardId);
+      }
+      const nextBoardIds = current.boardOrder.filter((id) => nextSelected.has(id));
+      return normalizeProjectEditorScene({
+        ...current,
+        generationScope:
+          nextBoardIds.length > 0
+            ? { mode: "selected", boardIds: nextBoardIds }
+            : { mode: "current", boardIds: [current.activeBoardId] },
+      });
+    });
+  }
+
   async function ensureLayoutStage(mode: string) {
     let currentStage = stage;
     let guard = 0;
@@ -821,6 +944,15 @@ export function ProjectEditorFabricClient({
   async function handleOpenGenerate() {
     setGenerateOpen(true);
     await refreshGeneratePrecheck();
+  }
+
+  function closeGenerateDialog() {
+    setGenerateOpen(false);
+  }
+
+  function openGenerateFollowup(path: string) {
+    setGenerateOpen(false);
+    router.push(path);
   }
 
   function getLayerItemsFromCanvas(canvas: FabricCanvas) {
@@ -916,11 +1048,158 @@ export function ProjectEditorFabricClient({
     updateSelectionSummary(canvas);
   }
 
+  function applyImagePresentation(
+    image: FabricSceneObject,
+    options: {
+      fit: "fill" | "fit";
+      frameWidth: number;
+      frameHeight: number;
+      frameX: number;
+      frameY: number;
+      crop: {
+        x: number;
+        y: number;
+        scale: number;
+      };
+    }
+  ) {
+    const naturalWidth = image.width || 1;
+    const naturalHeight = image.height || 1;
+    const frameWidth = Math.max(1, options.frameWidth);
+    const frameHeight = Math.max(1, options.frameHeight);
+    const crop = {
+      x: Math.min(Math.max(options.crop.x, 0), 1),
+      y: Math.min(Math.max(options.crop.y, 0), 1),
+      scale: Math.min(Math.max(options.crop.scale, 1), 4),
+    };
+
+    if (!image.data) {
+      image.data = {};
+    }
+    image.data.fit = options.fit;
+    image.data.frameWidth = frameWidth;
+    image.data.frameHeight = frameHeight;
+    image.data.crop = crop;
+
+    if (options.fit === "fit") {
+      const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+      const renderWidth = naturalWidth * scale;
+      const renderHeight = naturalHeight * scale;
+      image.set({
+        left: options.frameX + (frameWidth - renderWidth) / 2,
+        top: options.frameY + (frameHeight - renderHeight) / 2,
+        width: naturalWidth,
+        height: naturalHeight,
+        cropX: 0,
+        cropY: 0,
+        scaleX: scale,
+        scaleY: scale,
+      });
+      return;
+    }
+
+    const baseScale = Math.max(frameWidth / naturalWidth, frameHeight / naturalHeight);
+    const visibleWidth = Math.min(
+      naturalWidth,
+      frameWidth / (baseScale * crop.scale)
+    );
+    const visibleHeight = Math.min(
+      naturalHeight,
+      frameHeight / (baseScale * crop.scale)
+    );
+    const cropX = Math.min(
+      Math.max(naturalWidth * crop.x - visibleWidth / 2, 0),
+      Math.max(naturalWidth - visibleWidth, 0)
+    );
+    const cropY = Math.min(
+      Math.max(naturalHeight * crop.y - visibleHeight / 2, 0),
+      Math.max(naturalHeight - visibleHeight, 0)
+    );
+
+    image.set({
+      left: options.frameX,
+      top: options.frameY,
+      width: visibleWidth,
+      height: visibleHeight,
+      cropX,
+      cropY,
+      scaleX: frameWidth / visibleWidth,
+      scaleY: frameHeight / visibleHeight,
+    });
+  }
+
+  function normalizeImageObjectAfterTransform(image: FabricSceneObject) {
+    const fit = image.data?.fit ?? "fill";
+    const crop = getImageCropMeta(image);
+    const naturalWidth = image.width || 1;
+    const naturalHeight = image.height || 1;
+    const actualWidth =
+      typeof image.getScaledWidth === "function" ? image.getScaledWidth() : image.width ?? 0;
+    const actualHeight =
+      typeof image.getScaledHeight === "function" ? image.getScaledHeight() : image.height ?? 0;
+    const storedFrameWidth =
+      typeof image.data?.frameWidth === "number" ? image.data.frameWidth : actualWidth;
+    const storedFrameHeight =
+      typeof image.data?.frameHeight === "number" ? image.data.frameHeight : actualHeight;
+
+    if (fit === "fill") {
+      applyImagePresentation(image, {
+        fit,
+        frameX: image.left ?? 0,
+        frameY: image.top ?? 0,
+        frameWidth: actualWidth,
+        frameHeight: actualHeight,
+        crop,
+      });
+      image.setCoords();
+      return;
+    }
+
+    const storedScale = Math.min(storedFrameWidth / naturalWidth, storedFrameHeight / naturalHeight);
+    const expectedRenderWidth = naturalWidth * storedScale;
+    const expectedRenderHeight = naturalHeight * storedScale;
+    const scaleRatioX = actualWidth / Math.max(expectedRenderWidth, 1);
+    const scaleRatioY = actualHeight / Math.max(expectedRenderHeight, 1);
+    const movedOnly =
+      approximatelyEqual(actualWidth, expectedRenderWidth) &&
+      approximatelyEqual(actualHeight, expectedRenderHeight);
+    const nextRatio = movedOnly ? 1 : Math.max(0.05, (scaleRatioX + scaleRatioY) / 2);
+    const nextFrameWidth = storedFrameWidth * nextRatio;
+    const nextFrameHeight = storedFrameHeight * nextRatio;
+
+    applyImagePresentation(image, {
+      fit,
+      frameX: (image.left ?? 0) - Math.max(nextFrameWidth - actualWidth, 0) / 2,
+      frameY: (image.top ?? 0) - Math.max(nextFrameHeight - actualHeight, 0) / 2,
+      frameWidth: nextFrameWidth,
+      frameHeight: nextFrameHeight,
+      crop,
+    });
+    image.setCoords();
+  }
+
   function updateActiveDimensions(patch: { x?: number; y?: number; width?: number; height?: number }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const activeObject = canvas.getActiveObject() as FabricObject | null;
+    const activeObject = canvas.getActiveObject() as FabricSceneObject | null;
     if (!activeObject || activeObject.type === "activeSelection") return;
+
+    if (activeObject.data?.nodeType === "image") {
+      const frame = getImageFrameMeta(activeObject);
+      applyImagePresentation(activeObject, {
+        fit: frame.fit,
+        frameX: patch.x ?? frame.frameX,
+        frameY: patch.y ?? frame.frameY,
+        frameWidth: patch.width ?? frame.frameWidth,
+        frameHeight: patch.height ?? frame.frameHeight,
+        crop: getImageCropMeta(activeObject),
+      });
+      activeObject.setCoords();
+      canvas.requestRenderAll();
+      syncActiveBoardFromCanvas();
+      updateSelectionSummary(canvas);
+      return;
+    }
 
     const updates: Record<string, number> = {};
     if (patch.x !== undefined) updates.left = patch.x;
@@ -1695,6 +1974,7 @@ export function ProjectEditorFabricClient({
     setImageDetailsDraft({
       title: selectedImageAsset.title ?? "",
       note: meta.note ?? "",
+      roleTag: meta.roleTag ?? "none",
     });
   }, [selectedImageAsset]);
 
@@ -1737,15 +2017,18 @@ export function ProjectEditorFabricClient({
     const objY = current.top ?? 0;
 
     if (data?.nodeType === "image") {
+      const frame = getImageFrameMeta(current);
       setActiveMeta({
         kind: "image",
         id: data.nodeId ?? "image",
         assetId: data.assetId ?? null,
+        fit: frame.fit,
+        crop: getImageCropMeta(current),
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
-        x: Math.round(objX),
-        y: Math.round(objY),
-        width: Math.round(scaledW),
-        height: Math.round(scaledH),
+        x: Math.round(frame.frameX),
+        y: Math.round(frame.frameY),
+        width: Math.round(frame.frameWidth),
+        height: Math.round(frame.frameHeight),
       });
       return;
     }
@@ -1874,13 +2157,20 @@ export function ProjectEditorFabricClient({
         typeof object.getScaledHeight === "function" ? object.getScaledHeight() : object.height ?? 0;
 
       if (data?.nodeType === "image" && data.assetId) {
+        const frame = getImageFrameMeta(object);
+        const asset = assetMap.get(data.assetId);
+        const meta = asset ? resolveProjectAssetMeta(asset.metaJson) : { note: null, roleTag: null };
         acc.push(
           createProjectImageNode(data.assetId, {
             id: data.nodeId ?? newNodeId("image"),
-            x: Math.round(left),
-            y: Math.round(top),
-            width: Math.round(width),
-            height: Math.round(height),
+            x: Math.round(frame.frameX),
+            y: Math.round(frame.frameY),
+            width: Math.round(frame.frameWidth),
+            height: Math.round(frame.frameHeight),
+            fit: frame.fit,
+            crop: getImageCropMeta(object),
+            note: meta.note ?? null,
+            roleTag: meta.roleTag ?? null,
             zIndex: index + 1,
           })
         );
@@ -2066,19 +2356,23 @@ export function ProjectEditorFabricClient({
       const image = (await fabric.FabricImage.fromURL(buildPrivateBlobProxyUrl(asset.imageUrl))) as FabricSceneObject;
       if (token !== boardLoadTokenRef.current) return;
 
-      const naturalWidth = image.width || node.width;
-      const naturalHeight = image.height || node.height;
-      image.set({
-        left: node.x,
-        top: node.y,
-        scaleX: node.width / naturalWidth,
-        scaleY: node.height / naturalHeight,
-      });
       image.data = {
         nodeId: node.id,
         nodeType: "image",
         assetId: node.assetId,
+        fit: node.fit,
+        frameWidth: node.width,
+        frameHeight: node.height,
+        crop: node.crop,
       };
+      applyImagePresentation(image, {
+        fit: node.fit,
+        frameWidth: node.width,
+        frameHeight: node.height,
+        frameX: node.x,
+        frameY: node.y,
+        crop: node.crop,
+      });
       applyObjectChrome(image);
       canvas.add(image);
     }
@@ -2150,7 +2444,11 @@ export function ProjectEditorFabricClient({
       canvas.on("selection:created", () => updateSelectionSummary(canvas));
       canvas.on("selection:updated", () => updateSelectionSummary(canvas));
       canvas.on("selection:cleared", () => updateSelectionSummary(canvas));
-      canvas.on("object:modified", () => {
+      canvas.on("object:modified", (event) => {
+        const target = event.target as FabricSceneObject | undefined;
+        if (target?.data?.nodeType === "image" && target.type !== "activeSelection") {
+          normalizeImageObjectAfterTransform(target);
+        }
         syncActiveBoardFromCanvas();
         refreshLayerState(canvas);
         scheduleThumbnailCapture();
@@ -2404,6 +2702,10 @@ export function ProjectEditorFabricClient({
       nodeId: newNodeId("image"),
       nodeType: "image",
       assetId,
+      fit: "fill",
+      frameWidth: naturalWidth * scale,
+      frameHeight: naturalHeight * scale,
+      crop: { x: 0.5, y: 0.5, scale: 1 },
     };
     applyObjectChrome(image);
     canvas.add(image);
@@ -2412,6 +2714,106 @@ export function ProjectEditorFabricClient({
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
     setActionMessage({ tone: "info", text: "图片已插入当前画板" });
+  }
+
+  function updateActiveImageFit(nextFit: "fill" | "fit") {
+    const canvas = canvasRef.current;
+    const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
+    if (!canvas || !activeObject || activeObject.type === "activeSelection") return;
+    if (activeObject.data?.nodeType !== "image") return;
+
+    const frame = getImageFrameMeta(activeObject);
+    applyImagePresentation(activeObject, {
+      fit: nextFit,
+      frameWidth: frame.frameWidth,
+      frameHeight: frame.frameHeight,
+      frameX: frame.frameX,
+      frameY: frame.frameY,
+      crop: getImageCropMeta(activeObject),
+    });
+    activeObject.setCoords();
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
+  function updateActiveImageCrop(
+    patch: Partial<{
+      x: number;
+      y: number;
+      scale: number;
+    }>
+  ) {
+    const canvas = canvasRef.current;
+    const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
+    if (!canvas || !activeObject || activeObject.type === "activeSelection") return;
+    if (activeObject.data?.nodeType !== "image") return;
+
+    const frame = getImageFrameMeta(activeObject);
+    const crop = getImageCropMeta(activeObject);
+    applyImagePresentation(activeObject, {
+      fit: frame.fit,
+      frameWidth: frame.frameWidth,
+      frameHeight: frame.frameHeight,
+      frameX: frame.frameX,
+      frameY: frame.frameY,
+      crop: {
+        x: patch.x ?? crop.x,
+        y: patch.y ?? crop.y,
+        scale: patch.scale ?? crop.scale,
+      },
+    });
+    activeObject.setCoords();
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+  }
+
+  async function replaceActiveImageAsset(nextAssetId: string) {
+    const fabric = fabricRef.current;
+    const canvas = canvasRef.current;
+    const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
+    const nextAsset = assetMap.get(nextAssetId);
+    if (!fabric || !canvas || !activeObject || !nextAsset) return;
+    if (activeObject.type === "activeSelection" || activeObject.data?.nodeType !== "image") return;
+    if (activeObject.data.assetId === nextAssetId) return;
+
+    const frame = getImageFrameMeta(activeObject);
+    const objects = canvas.getObjects();
+    const currentIndex = objects.indexOf(activeObject);
+    const replacement = (await fabric.FabricImage.fromURL(
+      buildPrivateBlobProxyUrl(nextAsset.imageUrl)
+    )) as FabricSceneObject;
+
+    replacement.data = {
+      ...activeObject.data,
+      assetId: nextAssetId,
+      fit: frame.fit,
+      frameWidth: frame.frameWidth,
+      frameHeight: frame.frameHeight,
+      crop: getImageCropMeta(activeObject),
+    };
+    applyImagePresentation(replacement, {
+      fit: frame.fit,
+      frameWidth: frame.frameWidth,
+      frameHeight: frame.frameHeight,
+      frameX: frame.frameX,
+      frameY: frame.frameY,
+      crop: getImageCropMeta(activeObject),
+    });
+    applyObjectChrome(replacement);
+
+    canvas.remove(activeObject);
+    canvas.add(replacement);
+    if (currentIndex >= 0) {
+      const mover = replacement as unknown as { moveTo: (value: number) => void };
+      mover.moveTo(currentIndex);
+    }
+    canvas.setActiveObject(replacement);
+    canvas.requestRenderAll();
+    syncActiveBoardFromCanvas();
+    updateSelectionSummary(canvas);
+    setActionMessage({ tone: "info", text: "已替换当前图片素材" });
   }
 
   async function refreshAssets() {
@@ -2496,6 +2898,7 @@ export function ProjectEditorFabricClient({
           body: JSON.stringify({
             title: imageDetailsDraft.title.trim() || null,
             note: imageDetailsDraft.note.trim() || null,
+            roleTag: imageDetailsDraft.roleTag === "none" ? null : imageDetailsDraft.roleTag,
           }),
         })
       );
@@ -3049,6 +3452,13 @@ export function ProjectEditorFabricClient({
                               <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
                                 {asset.title ?? "未命名素材"}
                               </p>
+                              {resolveProjectAssetMeta(asset.metaJson).roleTag ? (
+                                <p className="mt-1 text-[11px] text-white/44">
+                                  {PROJECT_IMAGE_ROLE_LABELS[
+                                    resolveProjectAssetMeta(asset.metaJson).roleTag as ProjectImageRoleTag
+                                  ]}
+                                </p>
+                              ) : null}
                             </div>
                           </button>
                         ))}
@@ -3077,6 +3487,13 @@ export function ProjectEditorFabricClient({
                             <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
                               {asset.title ?? "未命名素材"}
                             </p>
+                            {resolveProjectAssetMeta(asset.metaJson).roleTag ? (
+                              <p className="mt-1 text-[11px] text-white/44">
+                                {PROJECT_IMAGE_ROLE_LABELS[
+                                  resolveProjectAssetMeta(asset.metaJson).roleTag as ProjectImageRoleTag
+                                ]}
+                              </p>
+                            ) : null}
                           </div>
                         </button>
                       ))}
@@ -3627,26 +4044,43 @@ export function ProjectEditorFabricClient({
                         items={scene.boardOrder}
                         strategy={verticalListSortingStrategy}
                       >
-                        <div className="space-y-2">
-                          {scene.boardOrder.map((boardId, index) => {
-                            const board = scene.boards.find((item) => item.id === boardId);
-                            if (!board) return null;
-                            const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
-                            const isLive = Boolean(liveThumbnails[board.id]);
-                            return (
-                              <SortableBoardRow
-                                key={board.id}
-                                board={board}
-                                index={index}
-                                thumbnailUrl={thumbnailUrl}
-                                isLive={isLive}
-                                active={scene.activeBoardId === board.id}
-                                canDelete={scene.boards.length > 1}
-                                onSelect={() => selectBoard(board.id)}
-                                onDelete={() => deleteBoard(board.id)}
-                              />
-                            );
-                          })}
+                        <div className="space-y-3">
+                          {boardGroupRuns.map((run) => (
+                            <div key={run.key} className="space-y-2">
+                              {getBoardGroupRunLabel(run, {
+                                showUngrouped: showBoardGroupHeaders,
+                              }) ? (
+                                <div className="flex items-center gap-2 px-1">
+                                  <p className="text-[11px] font-medium tracking-[0.16em] text-white/38">
+                                    {getBoardGroupRunLabel(run, {
+                                      showUngrouped: showBoardGroupHeaders,
+                                    })}
+                                  </p>
+                                  <div className="h-px flex-1 bg-white/8" />
+                                </div>
+                              ) : null}
+                              <div className="space-y-2">
+                                {run.boards.map((board) => {
+                                  const index = scene.boardOrder.indexOf(board.id);
+                                  const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                                  const isLive = Boolean(liveThumbnails[board.id]);
+                                  return (
+                                    <SortableBoardRow
+                                      key={board.id}
+                                      board={board}
+                                      index={index}
+                                      thumbnailUrl={thumbnailUrl}
+                                      isLive={isLive}
+                                      active={scene.activeBoardId === board.id}
+                                      canDelete={scene.boards.length > 1}
+                                      onSelect={() => selectBoard(board.id)}
+                                      onDelete={() => deleteBoard(board.id)}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </SortableContext>
                     </DndContext>
@@ -4146,6 +4580,61 @@ export function ProjectEditorFabricClient({
                                     placeholder="描述这张图的内容、用途或希望 AI 理解的重点"
                                     className="mt-2 min-h-[96px] rounded-xl border-white/8 bg-secondary text-white"
                                   />
+                                  <label className="mt-3 block text-xs text-white/50">素材角色</label>
+                                  <Select
+                                    value={imageDetailsDraft.roleTag}
+                                    onValueChange={(value) =>
+                                      setImageDetailsDraft((current) => ({
+                                        ...current,
+                                        roleTag: value as ProjectImageRoleTag | "none",
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
+                                      <SelectValue placeholder="选择这张图在项目讲述中的角色" />
+                                    </SelectTrigger>
+                                  <SelectContent className="border-white/8 bg-card text-white">
+                                      <SelectItem
+                                        value="none"
+                                        className="focus:bg-white/[0.07] focus:text-white"
+                                      >
+                                        未指定
+                                      </SelectItem>
+                                      {PROJECT_IMAGE_ROLE_TAGS.map((role) => (
+                                        <SelectItem
+                                          key={role}
+                                          value={role}
+                                          className="focus:bg-white/[0.07] focus:text-white"
+                                        >
+                                          {PROJECT_IMAGE_ROLE_LABELS[role]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <label className="mt-3 block text-xs text-white/50">替换图片</label>
+                                  <Select
+                                    value={selectedImageAsset.id}
+                                    onValueChange={(value) => {
+                                      if (value !== selectedImageAsset.id) {
+                                        void replaceActiveImageAsset(value);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
+                                      <SelectValue placeholder="从当前项目素材库替换" />
+                                    </SelectTrigger>
+                                    <SelectContent className="border-white/8 bg-card text-white">
+                                      {assets.map((asset) => (
+                                        <SelectItem
+                                          key={asset.id}
+                                          value={asset.id}
+                                          className="focus:bg-white/[0.07] focus:text-white"
+                                        >
+                                          {asset.title ?? "未命名素材"}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                   <Button
                                     type="button"
                                     onClick={() => void saveSelectedImageDetails()}
@@ -4163,7 +4652,101 @@ export function ProjectEditorFabricClient({
                               ) : null}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-xs tracking-[0.16em] text-white/34">显示</p>
-                                <label className="text-xs text-white/50">透明度</label>
+                                <label className="text-xs text-white/50">填充方式</label>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                  {[
+                                    { key: "fill", label: "Fill" },
+                                    { key: "fit", label: "Fit" },
+                                  ].map((item) => (
+                                    <button
+                                      key={item.key}
+                                      type="button"
+                                      onClick={() =>
+                                        updateActiveImageFit(item.key as "fill" | "fit")
+                                      }
+                                      className={cn(
+                                        "rounded-xl border px-3 py-2 text-sm transition-colors",
+                                        activeMeta.fit === item.key
+                                          ? "border-white/16 bg-white/10 text-white"
+                                          : "border-white/8 bg-background text-white/64 hover:bg-white/5"
+                                      )}
+                                    >
+                                      {item.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                {activeMeta.fit === "fill" ? (
+                                  <div className="mt-3 space-y-3">
+                                    <div>
+                                      <label className="text-xs text-white/50">裁切缩放</label>
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <Input
+                                          type="range"
+                                          min={1}
+                                          max={3}
+                                          step={0.01}
+                                          value={activeMeta.crop.scale}
+                                          onChange={(event) =>
+                                            updateActiveImageCrop({
+                                              scale: Number(event.target.value),
+                                            })
+                                          }
+                                          className="h-8 flex-1"
+                                        />
+                                        <span className="w-12 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                          {activeMeta.crop.scale.toFixed(2)}x
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-white/50">水平焦点</label>
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <Input
+                                          type="range"
+                                          min={0}
+                                          max={1}
+                                          step={0.01}
+                                          value={activeMeta.crop.x}
+                                          onChange={(event) =>
+                                            updateActiveImageCrop({
+                                              x: Number(event.target.value),
+                                            })
+                                          }
+                                          className="h-8 flex-1"
+                                        />
+                                        <span className="w-10 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                          {Math.round(activeMeta.crop.x * 100)}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-white/50">垂直焦点</label>
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <Input
+                                          type="range"
+                                          min={0}
+                                          max={1}
+                                          step={0.01}
+                                          value={activeMeta.crop.y}
+                                          onChange={(event) =>
+                                            updateActiveImageCrop({
+                                              y: Number(event.target.value),
+                                            })
+                                          }
+                                          className="h-8 flex-1"
+                                        />
+                                        <span className="w-10 shrink-0 text-right text-sm tabular-nums text-white/60">
+                                          {Math.round(activeMeta.crop.y * 100)}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="mt-3 text-xs leading-5 text-white/42">
+                                    当前是 Fit 模式，切到 Fill 后可裁切并调整焦点。
+                                  </p>
+                                )}
+                                <label className="mt-3 block text-xs text-white/50">透明度</label>
                                 <div className="mt-2 flex items-center gap-2">
                                   <Input
                                     type="range"
@@ -4571,37 +5154,102 @@ export function ProjectEditorFabricClient({
         </div>
       )}
       bottomStrip={setupMode ? undefined : (
-        <div className="mx-auto flex w-[calc(100%-40px)] items-center gap-1.5 overflow-x-auto rounded-[22px] border border-white/6 bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+        <div className="mx-auto flex w-[calc(100%-40px)] items-stretch gap-2 overflow-x-auto rounded-[22px] border border-white/6 bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+          <div className="flex shrink-0 flex-col justify-between rounded-[16px] border border-white/8 bg-white/3 px-2.5 py-2">
+            <div className="inline-flex rounded-[12px] border border-white/8 bg-white/4 p-1">
+              {[
+                { key: "filmstrip", label: "页条" },
+                { key: "outline", label: "大纲" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setBottomStripView(item.key as BottomStripView)}
+                  className={cn(
+                    "rounded-[10px] px-2.5 py-1.5 text-xs transition-colors",
+                    bottomStripView === item.key
+                      ? "bg-white text-neutral-950"
+                      : "text-white/56 hover:text-white"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1 px-0.5 pt-3 text-[11px] leading-5 text-white/42">
+              <p>
+                {scene.generationScope.mode === "selected"
+                  ? `已选 ${selectedGenerationBoardIds.length} 张`
+                  : "勾选底部卡片可切到部分生成"}
+              </p>
+              <p>{showBoardGroupHeaders ? "底部分组已按结构来源聚合" : "当前画板顺序用于生成范围"}</p>
+            </div>
+          </div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleBoardDragEnd}
           >
             <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
-              <div className="flex items-center gap-1.5">
-                {scene.boardOrder.map((boardId, index) => {
-                  const board = scene.boards.find((item) => item.id === boardId);
-                  if (!board) return null;
-                  const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
-                  const isLive = Boolean(liveThumbnails[board.id]);
-                  return (
-                    <SortableFilmstripCard
-                      key={board.id}
-                      board={board}
-                      index={index}
-                      thumbnailUrl={thumbnailUrl}
-                      isLive={isLive}
-                      active={scene.activeBoardId === board.id}
-                      canDelete={scene.boards.length > 1}
-                      onSelect={() =>
-                        setScene((current) =>
-                          normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
-                        )
-                      }
-                      onDelete={() => deleteBoard(board.id)}
-                    />
-                  );
-                })}
+              <div className="flex items-stretch gap-2">
+                {boardGroupRuns.map((run) => (
+                  <div key={run.key} className="flex shrink-0 flex-col gap-1.5">
+                    {getBoardGroupRunLabel(run, {
+                      showUngrouped: showBoardGroupHeaders,
+                    }) ? (
+                      <div className="px-1">
+                        <p className="truncate text-[11px] font-medium tracking-[0.16em] text-white/36">
+                          {getBoardGroupRunLabel(run, {
+                            showUngrouped: showBoardGroupHeaders,
+                          })}
+                        </p>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center gap-1.5">
+                      {run.boards.map((board) => {
+                        const index = scene.boardOrder.indexOf(board.id);
+                        const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                        const isLive = Boolean(liveThumbnails[board.id]);
+                        const selectedForGeneration = selectedGenerationBoardIdSet.has(board.id);
+                        return bottomStripView === "outline" ? (
+                          <SortableOutlineCard
+                            key={board.id}
+                            board={board}
+                            index={index}
+                            active={scene.activeBoardId === board.id}
+                            selectedForGeneration={selectedForGeneration}
+                            canDelete={scene.boards.length > 1}
+                            onSelect={() =>
+                              setScene((current) =>
+                                normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
+                              )
+                            }
+                            onDelete={() => deleteBoard(board.id)}
+                            onToggleSelected={() => toggleBoardInGenerationScope(board.id)}
+                          />
+                        ) : (
+                          <SortableFilmstripCard
+                            key={board.id}
+                            board={board}
+                            index={index}
+                            thumbnailUrl={thumbnailUrl}
+                            isLive={isLive}
+                            active={scene.activeBoardId === board.id}
+                            selectedForGeneration={selectedForGeneration}
+                            canDelete={scene.boards.length > 1}
+                            onSelect={() =>
+                              setScene((current) =>
+                                normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
+                              )
+                            }
+                            onDelete={() => deleteBoard(board.id)}
+                            onToggleSelected={() => toggleBoardInGenerationScope(board.id)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </SortableContext>
           </DndContext>
@@ -4692,14 +5340,18 @@ export function ProjectEditorFabricClient({
             </Card>
 
             <Card className="border-white/8 bg-white/3 shadow-none">
-              <CardContent className="space-y-2 p-4">
+              <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
                     预检
                   </Badge>
-                  {generatePrecheck?.suggestedMode === "reuse" ? (
+                  {generatePrecheck ? (
                     <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
-                      可复用
+                      {generatePrecheck.suggestedMode === "reuse"
+                        ? "可复用"
+                        : generatePrecheck.suggestedMode === "block"
+                          ? "当前受限"
+                          : "可继续"}
                     </Badge>
                   ) : null}
                 </div>
@@ -4709,14 +5361,74 @@ export function ProjectEditorFabricClient({
                     正在检查当前输入是否可复用、是否会计次。
                   </div>
                 ) : generatePrecheck ? (
-                  <>
-                    <p>
-                      {generatePrecheck.suggestedMode === "reuse"
-                        ? "当前命中了可复用排版结果，这次继续生成不会额外计次。"
-                        : `本次会消耗：${generatePrecheck.actionRemaining > 0 ? "当前项目排版 1 次" : "当前项目排版额度已用完"}`}
-                    </p>
-                    <p>若失败，不计次。</p>
-                  </>
+                  <div className="space-y-3">
+                    <div
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-sm leading-6",
+                        generatePrecheck.suggestedMode === "block"
+                          ? "border-amber-300/14 bg-amber-400/8 text-amber-50"
+                          : "border-white/8 bg-background text-white/76"
+                      )}
+                    >
+                      <p className="font-medium text-white">
+                        {generatePrecheck.suggestedMode === "reuse"
+                          ? "当前命中了可复用排版结果。"
+                          : generatePrecheck.suggestedMode === "block"
+                            ? generatePrecheck.blockReason === "active_project_limit"
+                              ? "当前账期可激活 Project 已用完。"
+                              : "当前 Project 的排版次数已用完。"
+                            : `本次属于高成本动作：${generatePrecheck.actionLabel}`}
+                      </p>
+                      <p className="mt-1 text-white/58">
+                        {generatePrecheck.suggestedMode === "reuse"
+                          ? "系统会优先回到上一版可复用结果，本次不会额外计次。"
+                          : generatePrecheck.suggestedMode === "block"
+                            ? generatePrecheck.blockReason === "active_project_limit"
+                              ? "需要先补充可激活项目额度，才能正式执行排版生成。"
+                              : "需要先补充当前 Project 的排版额度，或先继续手动整理。"
+                            : "若继续执行，系统会基于当前范围、当前风格和项目上下文生成新的排版建议。"}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="rounded-xl border border-white/8 bg-background px-3 py-3">
+                        <p className="text-xs text-white/38">本次会消耗</p>
+                        <p className="mt-1 text-sm font-medium text-white">
+                          {generatePrecheck.consumesQuota
+                            ? `${generatePrecheck.actionLabel} 1 次`
+                            : "命中复用，不额外计次"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-background px-3 py-3">
+                        <p className="text-xs text-white/38">执行后剩余</p>
+                        <p className="mt-1 text-sm font-medium text-white">
+                          {generatePrecheck.remainingAfterAction} 次
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-background px-3 py-3">
+                        <p className="text-xs text-white/38">失败是否计次</p>
+                        <p className="mt-1 text-sm font-medium text-white">
+                          {generatePrecheck.failureCounts ? "失败也计次" : "失败不计次"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-background px-3 py-3">
+                        <p className="text-xs text-white/38">
+                          {generatePrecheck.projectActivated ? "当前 Project 剩余" : "当前账期剩余可激活 Project"}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-white">
+                          {generatePrecheck.projectActivated
+                            ? `${generatePrecheck.actionRemaining} 次`
+                            : `${generatePrecheck.activeProjectRemaining} 个`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {generatePrecheck.reusableDraftId ? (
+                      <p className="text-xs leading-5 text-white/46">
+                        已找到一版可复用结果。点击主按钮时，系统会优先复用，而不是盲目重跑。
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
                   <p>打开弹窗后会自动做一次预检。</p>
                 )}
@@ -4796,10 +5508,26 @@ export function ProjectEditorFabricClient({
             <Button
               variant="outline"
               className="rounded-full border-white/8 bg-white/3 text-white hover:bg-white/8"
-              onClick={() => setGenerateOpen(false)}
+              onClick={() => closeGenerateDialog()}
             >
-              取消
+              先继续手动整理
             </Button>
+            <Button
+              variant="outline"
+              className="rounded-full border-white/8 bg-white/3 text-white hover:bg-white/8"
+              onClick={() => openGenerateFollowup(planSummary.href)}
+            >
+              {planSummary.ctaLabel}
+            </Button>
+            {generatePrecheck?.suggestedMode === "block" ? (
+              <Button
+                variant="outline"
+                className="rounded-full border-white/8 bg-white/3 text-white hover:bg-white/8"
+                onClick={() => openGenerateFollowup("/pricing")}
+              >
+                去补充 / 升级
+              </Button>
+            ) : null}
             <Button
               className="rounded-full bg-white text-neutral-950 hover:bg-neutral-100"
               onClick={() => void handleGenerateLayout()}
@@ -4810,7 +5538,9 @@ export function ProjectEditorFabricClient({
               }
             >
               {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              开始生成
+              {generatePrecheck?.suggestedMode === "reuse"
+                ? "复用结果"
+                : generatePrecheck?.actionLabel ?? "开始生成"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4930,6 +5660,39 @@ function BoardThumbnailPlaceholder({
   );
 }
 
+function getBoardStatusLabel(status: ProjectBoard["status"]) {
+  switch (status) {
+    case "ready":
+      return "已就绪";
+    case "analyzed":
+      return "已分析";
+    case "needs_attention":
+      return "待处理";
+    case "draft":
+      return "草稿";
+    default:
+      return "空白";
+  }
+}
+
+function BoardStatusBadge({ board }: { board: ProjectBoard }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] leading-none",
+        board.status === "ready"
+          ? "border-emerald-300/18 bg-emerald-400/10 text-emerald-100"
+          : board.status === "needs_attention"
+            ? "border-amber-300/18 bg-amber-400/10 text-amber-100"
+            : "border-white/8 bg-white/6 text-white/52"
+      )}
+    >
+      {board.aiMarkers.hasPendingSuggestion ? <Sparkles className="h-2.5 w-2.5" /> : null}
+      {getBoardStatusLabel(board.status)}
+    </span>
+  );
+}
+
 function SortableBoardRow({
   board,
   index,
@@ -5043,18 +5806,22 @@ function SortableFilmstripCard({
   thumbnailUrl,
   isLive,
   active,
+  selectedForGeneration,
   canDelete,
   onSelect,
   onDelete,
+  onToggleSelected,
 }: {
   board: ProjectBoard;
   index: number;
   thumbnailUrl: string | null;
   isLive: boolean;
   active: boolean;
+  selectedForGeneration: boolean;
   canDelete: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onToggleSelected: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: board.id });
@@ -5083,7 +5850,8 @@ function SortableFilmstripCard({
         active={active}
         className={cn(
           "relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
-          active && "-translate-y-px shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]"
+          active && "-translate-y-px shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]",
+          selectedForGeneration && "ring-1 ring-white/12"
         )}
         onClick={onSelect}
       >
@@ -5092,7 +5860,9 @@ function SortableFilmstripCard({
             "overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
               ? "border-white/18 shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
-              : "border-white/8 group-hover:border-white/12"
+              : selectedForGeneration
+                ? "border-white/16"
+                : "border-white/8 group-hover:border-white/12"
           )}
         >
           {resolvedThumb ? (
@@ -5111,10 +5881,32 @@ function SortableFilmstripCard({
           )}
         </div>
         <p className="mt-1 truncate text-xs text-white/46">{index + 1}</p>
+        {selectedForGeneration ? (
+          <div className="pointer-events-none absolute inset-x-4 top-2 rounded-full bg-white/86 px-1.5 py-0.5 text-[10px] font-medium text-neutral-950">
+            已选
+          </div>
+        ) : null}
         {active ? (
           <div className="pointer-events-none absolute inset-x-5 bottom-4 h-[2px] rounded-full bg-white/70" />
         ) : null}
       </EditorStripButton>
+      <button
+        type="button"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleSelected();
+        }}
+        className={cn(
+          "absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border bg-background/95 text-white/60 transition-all duration-150",
+          selectedForGeneration
+            ? "border-white/20 text-white"
+            : "border-white/12 opacity-0 group-hover:opacity-100 hover:border-white/24 hover:text-white"
+        )}
+        aria-label={selectedForGeneration ? "取消选中画板" : "选中画板加入生成范围"}
+      >
+        <Check className="h-3 w-3" />
+      </button>
       {canDelete ? (
         <button
           type="button"
@@ -5129,6 +5921,109 @@ function SortableFilmstripCard({
           <X className="h-3 w-3" />
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function SortableOutlineCard({
+  board,
+  index,
+  active,
+  selectedForGeneration,
+  canDelete,
+  onSelect,
+  onDelete,
+  onToggleSelected,
+}: {
+  board: ProjectBoard;
+  index: number;
+  active: boolean;
+  selectedForGeneration: boolean;
+  canDelete: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onToggleSelected: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: board.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group relative shrink-0 cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-80"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex min-h-[88px] w-[172px] flex-col justify-between rounded-[16px] border px-3 py-3 text-left transition-all duration-200",
+          active
+            ? "border-white/16 bg-white/9 text-white shadow-[0_14px_26px_-20px_rgba(255,255,255,0.14)]"
+            : selectedForGeneration
+              ? "border-white/14 bg-white/6 text-white"
+              : "border-white/8 bg-white/3 text-white/72 hover:border-white/12 hover:bg-white/5"
+        )}
+      >
+        <div className="min-w-0 pr-7">
+          <p className="text-[11px] tracking-[0.14em] text-white/34">{index + 1}</p>
+          <p className="mt-1 line-clamp-2 text-sm font-medium text-white">{board.name}</p>
+        </div>
+        <p className="line-clamp-2 text-xs leading-5 text-white/48">
+          {board.intent || "未填写意图"}
+        </p>
+        <div className="flex items-center justify-between gap-2">
+          <BoardStatusBadge board={board} />
+          <span className="w-6" />
+        </div>
+      </button>
+      <button
+        type="button"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleSelected();
+        }}
+        className={cn(
+          "absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border transition-colors",
+          selectedForGeneration
+            ? "border-white/18 bg-white text-neutral-950"
+            : "border-white/12 bg-white/6 text-white/60 hover:border-white/24 hover:text-white"
+        )}
+        aria-label={selectedForGeneration ? "取消选中画板" : "选中画板加入生成范围"}
+      >
+        <Check className="h-3.5 w-3.5" />
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="absolute bottom-2 left-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/4 text-white/52 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
+          aria-label="删除画板"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-background/92 text-white/56 opacity-0 transition-all duration-150 hover:border-white/20 hover:text-white group-hover:opacity-100"
+        {...attributes}
+        {...listeners}
+        aria-label="拖拽排序"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

@@ -143,6 +143,19 @@ export type ProjectBoardTextNode = z.infer<typeof ProjectBoardTextNodeSchema>;
 export type ProjectBoardImageNode = z.infer<typeof ProjectBoardImageNodeSchema>;
 export type ProjectBoardShapeNode = z.infer<typeof ProjectBoardShapeNodeSchema>;
 
+export const ProjectBoardStructureSourceSchema = z.object({
+  groupId: z.string().nullable().optional().default(null),
+  groupLabel: z.string().nullable().optional().default(null),
+  groupIndex: z.number().int().nullable().optional().default(null),
+  sectionId: z.string().nullable().optional().default(null),
+  sectionTitle: z.string().nullable().optional().default(null),
+  sectionIndex: z.number().int().nullable().optional().default(null),
+});
+
+export type ProjectBoardStructureSource = z.infer<
+  typeof ProjectBoardStructureSourceSchema
+>;
+
 export const ProjectBoardSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -155,6 +168,7 @@ export const ProjectBoardSchema = z.object({
   }),
   thumbnailAssetId: z.string().nullable(),
   nodes: z.array(ProjectBoardNodeSchema),
+  structureSource: ProjectBoardStructureSourceSchema.nullable().optional().default(null),
   aiMarkers: z.object({
     hasAnalysis: z.boolean(),
     hasPendingSuggestion: z.boolean(),
@@ -166,6 +180,13 @@ export const ProjectBoardSchema = z.object({
 });
 
 export type ProjectBoard = z.infer<typeof ProjectBoardSchema>;
+
+export type ProjectBoardGroupRun = {
+  key: string;
+  label: string | null;
+  structureGroupId: string | null;
+  boards: ProjectBoard[];
+};
 
 export const ProjectEditorSceneSchema = z.object({
   version: z.literal(1),
@@ -446,6 +467,7 @@ export function createProjectBoard(
     },
     thumbnailAssetId: patch?.thumbnailAssetId ?? null,
     nodes: patch?.nodes ?? [],
+    structureSource: patch?.structureSource ?? null,
     aiMarkers: patch?.aiMarkers ?? { hasAnalysis: false, hasPendingSuggestion: false },
     contentSuggestions: patch?.contentSuggestions ?? [],
     locked: patch?.locked ?? false,
@@ -523,7 +545,7 @@ export function buildProjectSceneFromStructureSuggestion(params: {
       : null;
   let flatSectionCursor = 0;
 
-  suggestion.groups.forEach((group) => {
+  suggestion.groups.forEach((group, groupIndex) => {
     group.sections.forEach((section, sectionIndex) => {
       const currentSectionIndex = flatSectionCursor;
       flatSectionCursor += 1;
@@ -603,6 +625,14 @@ export function buildProjectSceneFromStructureSuggestion(params: {
           status: "draft",
           thumbnailAssetId: matchedAssetId,
           nodes,
+          structureSource: {
+            groupId: group.id,
+            groupLabel: group.label,
+            groupIndex,
+            sectionId: section.id,
+            sectionTitle: section.title,
+            sectionIndex,
+          },
           contentSuggestions,
           aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
         })
@@ -780,6 +810,44 @@ export function getSceneBoardById(scene: ProjectEditorScene, boardId: string | n
   return scene.boards.find((board) => board.id === boardId) ?? null;
 }
 
+export function getSceneBoardGroupRuns(scene: ProjectEditorScene): ProjectBoardGroupRun[] {
+  const orderedBoards = scene.boardOrder
+    .map((boardId) => getSceneBoardById(scene, boardId))
+    .filter((board): board is ProjectBoard => Boolean(board));
+
+  const runs: ProjectBoardGroupRun[] = [];
+  let manualRunIndex = 0;
+
+  orderedBoards.forEach((board) => {
+    const structureGroupId = board.structureSource?.groupId ?? null;
+    const label = board.structureSource?.groupLabel?.trim() || null;
+    const lastRun = runs[runs.length - 1];
+
+    if (structureGroupId && lastRun?.structureGroupId === structureGroupId) {
+      lastRun.boards.push(board);
+      return;
+    }
+
+    if (!structureGroupId && lastRun && lastRun.structureGroupId === null) {
+      lastRun.boards.push(board);
+      return;
+    }
+
+    if (!structureGroupId) {
+      manualRunIndex += 1;
+    }
+
+    runs.push({
+      key: structureGroupId ? `group:${structureGroupId}` : `manual:${manualRunIndex}`,
+      label,
+      structureGroupId,
+      boards: [board],
+    });
+  });
+
+  return runs;
+}
+
 export function getGenerationScopeBoardIds(scene: ProjectEditorScene) {
   if (scene.generationScope.mode === "all") {
     return scene.boardOrder;
@@ -821,6 +889,14 @@ export function serializeSceneForHash(scene: ProjectEditorScene) {
       name: board.name,
       intent: board.intent,
       status: board.status,
+      structureSource: board.structureSource
+        ? {
+            groupId: board.structureSource.groupId,
+            groupLabel: board.structureSource.groupLabel,
+            sectionId: board.structureSource.sectionId,
+            sectionTitle: board.structureSource.sectionTitle,
+          }
+        : null,
       nodes: board.nodes.map((node) => {
         if (node.type === "text") {
           return {
@@ -935,12 +1011,20 @@ export function summarizeProjectSceneForAI({
       return [
         `画板 ${index + 1}`,
         `名称：${board.name || "未命名"}`,
+        board.structureSource?.groupLabel
+          ? `结构分组：${board.structureSource.groupLabel}`
+          : null,
+        board.structureSource?.sectionTitle
+          ? `结构章节：${board.structureSource.sectionTitle}`
+          : null,
         `页面意图：${board.intent || "未填写"}`,
         `状态：${board.status}`,
         `文本内容：${textSummary || "无"}`,
         `引用素材：${imageSummary || "无"}`,
         `图形元素：${shapeSummary || "无"}`,
-      ].join("\n");
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n");
     })
     .filter(Boolean)
     .join("\n\n");

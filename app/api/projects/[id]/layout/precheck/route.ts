@@ -99,7 +99,17 @@ export async function POST(
     draftType: "layout",
   });
 
-  const suggestedMode = reusable ? "reuse" : actionQuota.remaining <= 0 ? "block" : "continue";
+  const blockReason = reusable
+    ? null
+    : !isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0
+      ? "active_project_limit"
+      : actionQuota.remaining <= 0
+        ? "action_quota_exhausted"
+        : null;
+  const suggestedMode = reusable ? "reuse" : blockReason ? "block" : "continue";
+  const remainingAfterAction = reusable
+    ? actionQuota.remaining
+    : Math.max(actionQuota.remaining - 1, 0);
 
   await writePrecheckLog({
     userId: session.user.id,
@@ -119,11 +129,17 @@ export async function POST(
   return NextResponse.json({
     actionType,
     styleProfile,
+    isHighCostAction: true,
+    actionLabel:
+      actionType === "project_layout_regeneration" ? "重新生成排版" : "生成排版",
     suggestedMode,
+    blockReason,
     consumesQuota: !reusable,
     failureCounts: false,
+    projectActivated: isProjectActivated,
     activeProjectRemaining: entitlementSummary.quotas.activeProjects.remaining,
     actionRemaining: actionQuota.remaining,
+    remainingAfterAction,
     reusableDraftId: reusable?.draft.id ?? null,
     reusableTaskId: reusable?.task.id ?? null,
     generationScope,
