@@ -67,7 +67,7 @@ export function EditorScaffold({
 }: EditorScaffoldProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta);
+  const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta || planSummary);
 
   return (
     <div className="dark flex h-full min-h-screen flex-col overflow-hidden bg-background text-white">
@@ -88,6 +88,14 @@ export function EditorScaffold({
                   </span>
                 ) : null}
                 {statusMeta ? <span>{statusMeta}</span> : null}
+                {planSummary ? (
+                  <Link
+                    href={planSummary.href}
+                    className="text-white/48 underline-offset-4 transition-colors hover:text-white hover:underline"
+                  >
+                    {planSummary.title}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
             <div className={cn("flex min-w-0 items-center gap-3", hasHeaderMeta ? "mt-1" : "")}>
@@ -101,15 +109,6 @@ export function EditorScaffold({
               ) : null}
             </div>
           </div>
-
-          {planSummary ? (
-            <Link
-              href={planSummary.href}
-              className="hidden rounded-full border border-white/8 bg-white/3 px-3 py-2 text-xs text-white/58 transition-colors hover:bg-white/[0.07] hover:text-white lg:block"
-            >
-              {planSummary.title}
-            </Link>
-          ) : null}
 
           <div className="flex shrink-0 items-center gap-2">
             {secondaryAction}

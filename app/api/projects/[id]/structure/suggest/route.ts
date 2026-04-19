@@ -172,7 +172,7 @@ ${input.recognitionSummary}
       "sections": [
         {
           "id": "<短 id>",
-          "title": "<小节标题>",
+          "title": "<小节标题，极简短>",
           "purpose": "<这一小节要讲清什么>",
           "recommendedContent": ["建议放的内容点 1", "建议放的内容点 2"],
           "suggestedAssets": ["建议使用的素材标题或素材类型"]
@@ -186,7 +186,11 @@ ${input.recognitionSummary}
 - groups 至少 4 组，至多 8 组
 - 每组至少 1 个 section
 - 所有 groups 下的 sections 合计不得超过 ${MAX_PROJECT_BOARDS} 个（与画板上限对齐）
-- sections 的标题要能直接用于作品集结构搭建
+- sections[].title 必须是极简短的画板标题：中文不超过 12 字，英文不超过 5 个单词
+- sections[].title 禁止使用冒号+副标题的结构（例如"项目概览：xxx"），详细说明一律放到 purpose 字段
+- sections[].title 不要出现英文项目名称、产品名全称或长定语
+- groups[].label 同样遵循：中文不超过 10 字，英文不超过 4 个单词
+- sections 的标题要能直接用于作品集画板顶部的大字标题
 - 不要输出 markdown，只输出 JSON`;
 }
 
@@ -324,6 +328,30 @@ export async function POST(
         track: { userId, projectId },
       }
     );
+
+    // 防御式裁剪：确保 title 适配画板顶部大字标题的版式容量
+    // 参见 spec-system-v3/09 §画板模板；超出的副标题应放进 purpose
+    const normalizeTitle = (raw: string, maxChars: number, maxWords: number) => {
+      let text = raw.trim().replace(/\s+/g, " ");
+      const colonIdx = text.search(/[:：]/);
+      if (colonIdx > 0) text = text.slice(0, colonIdx).trim();
+      const hasCJK = /[\u4e00-\u9fff]/.test(text);
+      if (hasCJK) {
+        if (text.length > maxChars) text = text.slice(0, maxChars);
+      } else {
+        const words = text.split(/\s+/).filter(Boolean);
+        if (words.length > maxWords) text = words.slice(0, maxWords).join(" ");
+      }
+      return text;
+    };
+    suggestion.groups = suggestion.groups.map((group) => ({
+      ...group,
+      label: normalizeTitle(group.label, 10, 4),
+      sections: group.sections.map((section) => ({
+        ...section,
+        title: normalizeTitle(section.title, 12, 5),
+      })),
+    }));
 
     // 章节总数硬上限：与单 Project 画板上限对齐
     // 参见 spec-system-v3/04 §4.5 与 spec-system-v3/09
