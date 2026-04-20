@@ -67,6 +67,8 @@
 ```bash
 npm run dev
 npm run build
+npm run lint
+npm run lint:fix
 npm run db:push
 npm run db:studio
 npm run db:generate

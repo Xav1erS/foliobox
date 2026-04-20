@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import type {
   ComponentType,
   PointerEvent as ReactPointerEvent,
@@ -912,6 +912,13 @@ export function ProjectEditorClient({
     setSceneSaveState("saved");
   }
 
+  const queueScenePersist = useEffectEvent((sceneToSave: ProjectEditorScene) => {
+    persistScene(sceneToSave).catch((error) => {
+      console.error("Project scene save error:", error);
+      setSceneSaveState("error");
+    });
+  });
+
   useEffect(() => {
     if (!didHydrateSceneRef.current) {
       didHydrateSceneRef.current = true;
@@ -922,14 +929,11 @@ export function ProjectEditorClient({
 
     setSceneSaveState("dirty");
     const timeout = window.setTimeout(() => {
-      persistScene(scene).catch((error) => {
-        console.error("Project scene save error:", error);
-        setSceneSaveState("error");
-      });
+      queueScenePersist(scene);
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [scene]);
+  }, [queueScenePersist, scene]);
 
   useEffect(() => {
     if (!interaction || !activeBoard) return;

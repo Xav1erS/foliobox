@@ -120,13 +120,13 @@ export const PLAN_SUMMARY_COPY: Record<PlanType, PlanSummaryCopy> = {
   PRO: {
     title: "标准版",
     description: "已解锁正式整理闭环，可完成第一版作品集初稿。",
-    href: "/profile",
+    href: "/profile?panel=account",
     ctaLabel: "查看完整权益",
   },
   SPRINT: {
     title: "进阶版",
     description: "已解锁更多项目和更高频高成本动作，适合持续打磨与多轮重生成。",
-    href: "/profile",
+    href: "/profile?panel=account",
     ctaLabel: "查看完整权益",
   },
 };

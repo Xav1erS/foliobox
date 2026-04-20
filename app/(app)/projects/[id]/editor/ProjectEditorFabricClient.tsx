@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
 import {
@@ -14,7 +14,6 @@ import {
 import {
   SortableContext,
   arrayMove,
-  horizontalListSortingStrategy,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -149,7 +148,6 @@ import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import type { ProjectEditorInitialData } from "./ProjectEditorClient";
 
 type FabricModule = typeof import("fabric");
-type BottomStripView = "filmstrip" | "outline";
 
 type ActiveObjectMeta =
   | { kind: "none" }
@@ -470,7 +468,6 @@ export function ProjectEditorFabricClient({
   const [applyingStructure, setApplyingStructure] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [bottomStripView, setBottomStripView] = useState<BottomStripView>("filmstrip");
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
   const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
   const [styleSelection, setStyleSelection] = useState<StyleReferenceSelection>(() => {
@@ -581,18 +578,25 @@ export function ProjectEditorFabricClient({
       boardGroupRuns.some((run) => Boolean(run.structureGroupId)),
     [boardGroupRuns]
   );
-  const generationBoardIds = useMemo(() => getGenerationScopeBoardIds(scene), [scene]);
-  const selectedGenerationBoardIds = useMemo(
+  const normalizedGenerationScope = useMemo<GenerationScope>(
     () =>
-      scene.generationScope.mode === "selected"
-        ? scene.generationScope.boardIds.filter((boardId) => scene.boardOrder.includes(boardId))
-        : [],
-    [scene]
+      scene.generationScope.mode === "all"
+        ? { mode: "all", boardIds: scene.boardOrder }
+        : { mode: "current", boardIds: [scene.activeBoardId] },
+    [scene.activeBoardId, scene.boardOrder, scene.generationScope.mode]
   );
-  const selectedGenerationBoardIdSet = useMemo(
-    () => new Set(selectedGenerationBoardIds),
-    [selectedGenerationBoardIds]
+  const generationBoardIds = useMemo(
+    () => getGenerationScopeBoardIds({ ...scene, generationScope: normalizedGenerationScope }),
+    [normalizedGenerationScope, scene]
   );
+  const generationScopeSummary = useMemo(() => {
+    if (normalizedGenerationScope.mode === "current") {
+      return "本轮生成当前画板";
+    }
+    return "本轮生成全部未锁定画板";
+  }, [
+    normalizedGenerationScope.mode,
+  ]);
   // 生成确认面板需要显式列出被锁定、将从本次 AI 写操作中跳过的画板。
   const skippedLockedBoardsInScope = useMemo(
     () =>
@@ -624,6 +628,29 @@ export function ProjectEditorFabricClient({
       },
       { text: 0, image: 0, shape: 0 }
     );
+  }, [activeBoard]);
+  const activeBoardIndex = useMemo(
+    () => (activeBoard ? scene.boardOrder.indexOf(activeBoard.id) : -1),
+    [activeBoard, scene.boardOrder]
+  );
+  const activeBoardIncludedInGeneration = useMemo(
+    () => Boolean(activeBoard) && generationBoardIds.includes(activeBoard.id),
+    [activeBoard, generationBoardIds]
+  );
+  const activeBoardStructureLabel = useMemo(() => {
+    if (!activeBoard?.structureSource) return null;
+    return (
+      activeBoard.structureSource.sectionTitle ??
+      activeBoard.structureSource.groupLabel ??
+      null
+    );
+  }, [activeBoard]);
+  const activeBoardAiStateLabel = useMemo(() => {
+    if (!activeBoard) return "";
+    if (activeBoard.locked) return "已锁定 AI 写操作";
+    if (activeBoard.aiMarkers.hasPendingSuggestion) return "有待处理建议";
+    if (activeBoard.aiMarkers.hasAnalysis) return "已完成分析";
+    return "尚未生成建议";
   }, [activeBoard]);
   function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent" | "locked">> & {
     frameBackground?: string;
@@ -728,18 +755,10 @@ export function ProjectEditorFabricClient({
       const nextActiveId = wasActive
         ? nextOrder[0] ?? nextBoards[0]?.id ?? current.activeBoardId
         : current.activeBoardId;
-      let nextScope = current.generationScope;
-      if (nextScope.mode === "selected") {
-        const filtered = nextScope.boardIds.filter((id) => id !== boardId);
-        nextScope =
-          filtered.length === 0
-            ? { mode: "current", boardIds: [nextActiveId] }
-            : { mode: "selected", boardIds: filtered };
-      } else if (nextScope.mode === "current" && wasActive) {
-        nextScope = { mode: "current", boardIds: [nextActiveId] };
-      } else if (nextScope.mode === "all") {
-        nextScope = { mode: "all", boardIds: nextOrder };
-      }
+      const nextScope =
+        current.generationScope.mode === "all"
+          ? { mode: "all" as const, boardIds: nextOrder }
+          : { mode: "current" as const, boardIds: [nextActiveId] };
       return normalizeProjectEditorScene({
         ...current,
         boards: nextBoards,
@@ -830,43 +849,9 @@ export function ProjectEditorFabricClient({
         });
       }
 
-      if (mode === "selected") {
-        const selectedIds =
-          current.generationScope.mode === "selected" && current.generationScope.boardIds.length > 0
-            ? current.generationScope.boardIds
-            : [current.activeBoardId];
-        return normalizeProjectEditorScene({
-          ...current,
-          generationScope: { mode: "selected", boardIds: selectedIds },
-        });
-      }
-
       return normalizeProjectEditorScene({
         ...current,
         generationScope: { mode: "current", boardIds: [current.activeBoardId] },
-      });
-    });
-  }
-
-  function toggleBoardInGenerationScope(boardId: string) {
-    setScene((current) => {
-      const baseIds =
-        current.generationScope.mode === "selected" && current.generationScope.boardIds.length > 0
-          ? current.generationScope.boardIds.filter((id) => current.boardOrder.includes(id))
-          : [current.activeBoardId];
-      const nextSelected = new Set(baseIds);
-      if (nextSelected.has(boardId)) {
-        nextSelected.delete(boardId);
-      } else {
-        nextSelected.add(boardId);
-      }
-      const nextBoardIds = current.boardOrder.filter((id) => nextSelected.has(id));
-      return normalizeProjectEditorScene({
-        ...current,
-        generationScope:
-          nextBoardIds.length > 0
-            ? { mode: "selected", boardIds: nextBoardIds }
-            : { mode: "current", boardIds: [current.activeBoardId] },
       });
     });
   }
@@ -928,7 +913,7 @@ export function ProjectEditorFabricClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             styleSelection: getResolvedStyleSelection(),
-            generationScope: scene.generationScope,
+            generationScope: normalizedGenerationScope,
           }),
         })
       );
@@ -1394,6 +1379,14 @@ export function ProjectEditorFabricClient({
     setFactsSaveState("saved");
   }
 
+  const queueScenePersist = useEffectEvent((sceneToSave: ProjectEditorScene) => {
+    persistScene(sceneToSave).catch(() => setSaveState("error"));
+  });
+
+  const queueFactsPersist = useEffectEvent((factsToSave: ProjectEditorInitialData["facts"]) => {
+    persistProjectFacts(factsToSave).catch(() => setFactsSaveState("error"));
+  });
+
   useEffect(() => {
     if (!didHydrateSceneRef.current) {
       didHydrateSceneRef.current = true;
@@ -1405,10 +1398,10 @@ export function ProjectEditorFabricClient({
 
     setSaveState("dirty");
     const timeout = window.setTimeout(() => {
-      persistScene(scene).catch(() => setSaveState("error"));
+      queueScenePersist(scene);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [scene]);
+  }, [queueScenePersist, scene]);
 
   useEffect(() => {
     if (!didHydrateFactsRef.current) {
@@ -1421,10 +1414,10 @@ export function ProjectEditorFabricClient({
 
     setFactsSaveState("dirty");
     const timeout = window.setTimeout(() => {
-      persistProjectFacts(projectFactsDraft).catch(() => setFactsSaveState("error"));
+      queueFactsPersist(projectFactsDraft);
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [projectFactsDraft]);
+  }, [projectFactsDraft, queueFactsPersist]);
 
   async function persistCurrentSceneForAction() {
     try {
@@ -1910,7 +1903,7 @@ export function ProjectEditorFabricClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             styleSelection: getResolvedStyleSelection(),
-            generationScope: scene.generationScope,
+            generationScope: normalizedGenerationScope,
           }),
         })
       );
@@ -2256,7 +2249,7 @@ export function ProjectEditorFabricClient({
     );
   }
 
-  async function loadBoardIntoCanvas(board: ProjectBoard) {
+  const loadBoardIntoCanvas = useEffectEvent(async (board: ProjectBoard) => {
     const canvas = canvasRef.current;
     const fabric = fabricRef.current;
     if (!canvas || !fabric) return;
@@ -2382,7 +2375,44 @@ export function ProjectEditorFabricClient({
     hydratingRef.current = false;
     scheduleFitSurface();
     scheduleThumbnailCapture();
-  }
+  });
+
+  const handleCanvasResize = useEffectEvent(() => {
+    scheduleFitSurface();
+  });
+
+  const handleCanvasSelectionChange = useEffectEvent((canvas: FabricCanvas) => {
+    updateSelectionSummary(canvas);
+  });
+
+  const handleCanvasMutation = useEffectEvent((
+    canvas: FabricCanvas,
+    target?: FabricSceneObject
+  ) => {
+    if (target?.data?.nodeType === "image" && target.type !== "activeSelection") {
+      normalizeImageObjectAfterTransform(target);
+    }
+    syncActiveBoardFromCanvas();
+    refreshLayerState(canvas);
+    scheduleThumbnailCapture();
+  });
+
+  const handleCanvasContextMenu = useEffectEvent((
+    canvas: FabricCanvas,
+    event: { e: globalThis.MouseEvent; target?: FabricObject }
+  ) => {
+    const nativeEvent = event.e;
+    if (nativeEvent.button !== 2) return;
+    nativeEvent.preventDefault();
+    nativeEvent.stopPropagation();
+    if (!isEditableCanvasTarget(event.target as FabricObject | undefined)) {
+      closeContextMenu();
+      return;
+    }
+    canvas.setActiveObject(event.target as FabricObject);
+    updateSelectionSummary(canvas);
+    openContextMenuAt(nativeEvent.clientX, nativeEvent.clientY);
+  });
 
   useEffect(() => {
     // 只有进入画布模式才挂载（setupMode=true 时 viewportRef 不在 DOM 中）。
@@ -2438,48 +2468,30 @@ export function ProjectEditorFabricClient({
       setSurfaceScale(initScale);
       canvas.setZoom(initScale);
 
-      const observer = new ResizeObserver(() => scheduleFitSurface());
+      const observer = new ResizeObserver(() => handleCanvasResize());
       observer.observe(vp);
 
-      canvas.on("selection:created", () => updateSelectionSummary(canvas));
-      canvas.on("selection:updated", () => updateSelectionSummary(canvas));
-      canvas.on("selection:cleared", () => updateSelectionSummary(canvas));
+      canvas.on("selection:created", () => handleCanvasSelectionChange(canvas));
+      canvas.on("selection:updated", () => handleCanvasSelectionChange(canvas));
+      canvas.on("selection:cleared", () => handleCanvasSelectionChange(canvas));
       canvas.on("object:modified", (event) => {
         const target = event.target as FabricSceneObject | undefined;
-        if (target?.data?.nodeType === "image" && target.type !== "activeSelection") {
-          normalizeImageObjectAfterTransform(target);
-        }
-        syncActiveBoardFromCanvas();
-        refreshLayerState(canvas);
-        scheduleThumbnailCapture();
+        handleCanvasMutation(canvas, target);
       });
       canvas.on("object:added", () => {
-        syncActiveBoardFromCanvas();
-        refreshLayerState(canvas);
-        scheduleThumbnailCapture();
+        handleCanvasMutation(canvas);
       });
       canvas.on("object:removed", () => {
-        syncActiveBoardFromCanvas();
-        refreshLayerState(canvas);
-        scheduleThumbnailCapture();
+        handleCanvasMutation(canvas);
       });
       canvas.on("text:changed", () => {
-        syncActiveBoardFromCanvas();
-        refreshLayerState(canvas);
-        scheduleThumbnailCapture();
+        handleCanvasMutation(canvas);
       });
       canvas.on("mouse:down", (event) => {
-        const nativeEvent = event.e as globalThis.MouseEvent;
-        if (nativeEvent.button !== 2) return;
-        nativeEvent.preventDefault();
-        nativeEvent.stopPropagation();
-        if (!isEditableCanvasTarget(event.target as FabricObject | undefined)) {
-          closeContextMenu();
-          return;
-        }
-        canvas.setActiveObject(event.target as FabricObject);
-        updateSelectionSummary(canvas);
-        openContextMenuAt(nativeEvent.clientX, nativeEvent.clientY);
+        handleCanvasContextMenu(canvas, {
+          e: event.e as globalThis.MouseEvent,
+          target: event.target as FabricObject | undefined,
+        });
       });
 
       setCanvasReady(true);
@@ -2509,7 +2521,13 @@ export function ProjectEditorFabricClient({
       disposed = true;
       cleanup?.();
     };
-  }, [setupMode]);
+  }, [
+    handleCanvasContextMenu,
+    handleCanvasMutation,
+    handleCanvasResize,
+    handleCanvasSelectionChange,
+    setupMode,
+  ]);
 
   useEffect(() => {
     // 加载自托管字体（得意黑 + 阿里普惠体）
@@ -2531,7 +2549,7 @@ export function ProjectEditorFabricClient({
   useEffect(() => {
     if (!canvasReady || !activeBoard) return;
     void loadBoardIntoCanvas(activeBoard);
-  }, [activeBoard?.id, canvasReady]);
+  }, [activeBoard, canvasReady, loadBoardIntoCanvas]);
 
   async function cloneActiveObject() {
     const canvas = canvasRef.current;
@@ -3021,49 +3039,53 @@ export function ProjectEditorFabricClient({
     }
   }
 
+  const handleCanvasKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName?.toLowerCase();
+    const isTyping =
+      tagName === "input" ||
+      tagName === "textarea" ||
+      target?.isContentEditable === true;
+    if (isTyping) return;
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "c") {
+      event.preventDefault();
+      void cloneActiveObject();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "v") {
+      event.preventDefault();
+      void pasteClipboard();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      void duplicateSelection();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key === "0") {
+      event.preventDefault();
+      fitSurface();
+      return;
+    }
+
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      deleteSelection();
+    }
+  });
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const tagName = target?.tagName?.toLowerCase();
-      const isTyping =
-        tagName === "input" ||
-        tagName === "textarea" ||
-        target?.isContentEditable === true;
-      if (isTyping) return;
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "c") {
-        event.preventDefault();
-        void cloneActiveObject();
-        return;
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "v") {
-        event.preventDefault();
-        void pasteClipboard();
-        return;
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
-        event.preventDefault();
-        void duplicateSelection();
-        return;
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key === "0") {
-        event.preventDefault();
-        fitSurface();
-        return;
-      }
-
-      if (event.key === "Delete" || event.key === "Backspace") {
-        event.preventDefault();
-        deleteSelection();
-      }
+      handleCanvasKeyDown(event);
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeBoard?.id]);
+  }, [activeBoard?.id, handleCanvasKeyDown]);
 
   const contextMenuItems = [
     { id: "copy", label: "复制", shortcut: "⌘C" },
@@ -3083,7 +3105,6 @@ export function ProjectEditorFabricClient({
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} />
       {needsCreationGate ? (
         <ProjectCreationGate
@@ -3133,9 +3154,9 @@ export function ProjectEditorFabricClient({
       }
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
-      rightRailLabel={hasActiveInspector ? "对象属性" : "画板属性"}
+      rightRailLabel="信息与编辑"
       leftRailWidthClass={setupMode ? "w-[272px]" : leftPanel ? "w-[336px]" : "w-[56px]"}
-      rightRailWidthClass="w-[288px]"
+      rightRailWidthClass="w-[320px]"
       hideLeftRailHeader
       leftRail={setupMode ? (
         <SetupContextSidebar projectName={initialData.name} facts={projectFactsDraft} />
@@ -4034,7 +4055,10 @@ export function ProjectEditorFabricClient({
                       </div>
                     </div>
                   </EditorRailSection>
-                  <EditorRailSection title="画板列表">
+                  <EditorRailSection title="画板导航">
+                    <div className={cn(editorPanelMutedCardClass, "mb-3 px-3.5 py-3 text-xs leading-5 text-white/44")}>
+                      左侧负责查看标题、状态、分组并调整顺序。底部只保留缩略图预览和本轮生成范围。
+                    </div>
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
@@ -4065,7 +4089,7 @@ export function ProjectEditorFabricClient({
                                   const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
                                   const isLive = Boolean(liveThumbnails[board.id]);
                                   return (
-                                    <SortableBoardRow
+                                    <BoardListRow
                                       key={board.id}
                                       board={board}
                                       index={index}
@@ -4317,9 +4341,80 @@ export function ProjectEditorFabricClient({
         <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mt-0">
+                  {activeBoard ? (
+                    <EditorRailSection title="当前画板">
+                      <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] leading-5 text-white/36">
+                              <span>第 {activeBoardIndex + 1} / {scene.boardOrder.length} 张</span>
+                              {activeBoardStructureLabel ? (
+                                <span className="max-w-[180px] truncate" title={activeBoardStructureLabel}>
+                                  来源：{activeBoardStructureLabel}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 truncate text-sm font-semibold text-white">
+                              {activeBoard.name}
+                            </p>
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
+                              {activeBoard.intent.trim()
+                                ? activeBoard.intent
+                                : "这张画板还没写讲述目标，AI 生成和更新时会缺少上下文。"}
+                            </p>
+                          </div>
+                          <div className="shrink-0">
+                            <BoardStatusBadge board={activeBoard} />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                            <p className="text-[11px] tracking-[0.14em] text-white/34">尺寸</p>
+                            <p className="mt-1 text-sm text-white/78">
+                              {activeBoard.frame.width} × {activeBoard.frame.height}
+                            </p>
+                          </div>
+                          <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                            <p className="text-[11px] tracking-[0.14em] text-white/34">内容</p>
+                            <p className="mt-1 text-sm text-white/78">
+                              {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-[11px] leading-5 text-white/48">
+                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
+                            {activeBoardIncludedInGeneration ? "已纳入本轮生成" : "当前不在本轮生成范围"}
+                          </span>
+                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
+                            {activeBoard.locked ? "AI 已锁定" : "可参与 AI"}
+                          </span>
+                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
+                            {activeBoardAiStateLabel}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => setGenerationMode("current")}
+                          >
+                            仅生成当前页
+                          </EditorChromeButton>
+                          <EditorChromeButton
+                            className="h-10 justify-center"
+                            onClick={() => setGenerationMode("all")}
+                          >
+                            生成全部未锁定
+                          </EditorChromeButton>
+                        </div>
+                      </div>
+                    </EditorRailSection>
+                  ) : null}
                   {hasActiveInspector ? (
                     <div className="h-full overflow-y-auto">
-                      <EditorRailSection title="编辑">
+                      <EditorRailSection title="对象编辑">
                         <div className={cn(editorPanelCardClass, "space-y-4 p-4")}>
                           <div className={cn(editorPanelMutedCardClass, "flex items-center justify-between px-3 py-2.5")}>
                             <div>
@@ -4967,7 +5062,7 @@ export function ProjectEditorFabricClient({
                         </div>
                       </EditorRailSection>
 
-                      <EditorRailSection title="图层排布">
+                      <EditorRailSection title="层级调整">
                         <div className={cn(editorPanelCardClass, "grid grid-cols-2 gap-2 p-3")}>
                           <EditorChromeButton
                             className="h-10 justify-center"
@@ -5004,8 +5099,8 @@ export function ProjectEditorFabricClient({
                     <Tabs defaultValue="properties" className="flex h-full flex-col">
                       <div className="shrink-0 border-b border-white/6 px-5 pt-3 pb-2">
                         <EditorTabsList className="grid w-full grid-cols-2">
-                          <EditorTabsTrigger value="properties">属性</EditorTabsTrigger>
-                          <EditorTabsTrigger value="ai">AI</EditorTabsTrigger>
+                          <EditorTabsTrigger value="properties">基础</EditorTabsTrigger>
+                          <EditorTabsTrigger value="ai">讲述</EditorTabsTrigger>
                         </EditorTabsList>
                       </div>
                       <TabsContent
@@ -5049,11 +5144,20 @@ export function ProjectEditorFabricClient({
                         </div>
 
                         <div className="flex items-center gap-3 text-xs text-white/50">
-                          <span>内容</span>
+                          <span>画面内容</span>
                           <span className="text-white/78">
                             {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
                           </span>
                         </div>
+
+                        {activeBoardStructureLabel ? (
+                          <div className="flex items-center gap-3 text-xs text-white/50">
+                            <span>结构来源</span>
+                            <span className="truncate text-white/78" title={activeBoardStructureLabel}>
+                              {activeBoardStructureLabel}
+                            </span>
+                          </div>
+                        ) : null}
 
                         {/* 画板锁定：开启后不参与任何 AI 写操作 */}
                         <button
@@ -5111,23 +5215,23 @@ export function ProjectEditorFabricClient({
                         className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5"
                       >
                         <div className="space-y-1.5">
-                          <p className="text-xs text-white/40">画板意图</p>
+                          <p className="text-xs text-white/40">讲述目标</p>
                           <Textarea
                             value={activeBoard.intent}
                             onChange={(event) =>
                               updateActiveBoard({ intent: event.target.value })
                             }
                             className="min-h-[96px] rounded-xl border-white/8 bg-secondary text-sm text-white"
-                            placeholder="这张画板要讲什么，越具体越有利于 AI 排版"
+                            placeholder="写清这张画板要交代什么、重点结论是什么、希望读者先看到什么"
                           />
                           <p className="text-[11px] leading-relaxed text-white/36">
-                            供 AI 生成 / 更新排版时参考，不会直接出现在画板上。
+                            这里写的是给 AI 的讲述目标，不会直接显示在画板上。
                           </p>
                         </div>
 
                         {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
                           <div className="rounded-xl border border-white/6 bg-white/2.5 p-3">
-                            <p className="mb-2 text-xs tracking-[0.16em] text-white/30">AI 内容建议</p>
+                            <p className="mb-2 text-xs tracking-[0.16em] text-white/30">推荐补充内容</p>
                             <ul className="space-y-1.5">
                               {activeBoard.contentSuggestions!.map((item, i) => (
                                 <li key={i} className="flex items-start gap-1.5">
@@ -5139,7 +5243,7 @@ export function ProjectEditorFabricClient({
                           </div>
                         ) : (
                           <EditorEmptyState>
-                            暂无 AI 内容建议。在结构面板生成 / 确认结构后会回填。
+                            暂无内容建议。先补充讲述目标，或在左侧结构面板确认大纲后再回来查看。
                           </EditorEmptyState>
                         )}
                       </TabsContent>
@@ -5154,114 +5258,81 @@ export function ProjectEditorFabricClient({
         </div>
       )}
       bottomStrip={setupMode ? undefined : (
-        <div className="mx-auto flex w-[calc(100%-40px)] items-stretch gap-2 overflow-x-auto rounded-[22px] border border-white/6 bg-background p-1.5 shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
-          <div className="flex shrink-0 flex-col justify-between rounded-[16px] border border-white/8 bg-white/3 px-2.5 py-2">
-            <div className="inline-flex rounded-[12px] border border-white/8 bg-white/4 p-1">
-              {[
-                { key: "filmstrip", label: "页条" },
-                { key: "outline", label: "大纲" },
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setBottomStripView(item.key as BottomStripView)}
-                  className={cn(
-                    "rounded-[10px] px-2.5 py-1.5 text-xs transition-colors",
-                    bottomStripView === item.key
-                      ? "bg-white text-neutral-950"
-                      : "text-white/56 hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </button>
+        <div className="mx-auto flex w-[calc(100%-40px)] flex-col overflow-hidden rounded-[22px] border border-white/6 bg-background shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/6 px-4 py-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+              <div className="rounded-[12px] border border-white/8 bg-white/4 px-3 py-1.5 text-xs text-white/76">
+                缩略图预览
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 text-white/42">
+                <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5 text-white/70">
+                  {generationScopeSummary}
+                </span>
+                <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
+                  共 {scene.boardOrder.length} 张
+                </span>
+                {showBoardGroupHeaders ? (
+                  <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
+                    已按结构分组
+                  </span>
+                ) : null}
+                {activeBoard ? (
+                  <span
+                    className="max-w-[220px] truncate rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5"
+                    title={activeBoard.name}
+                  >
+                    当前编辑：{activeBoard.name}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <p className="basis-full text-[11px] leading-5 text-white/38">
+              底部只负责预览当前顺序和勾选本轮生成范围；标题、状态和分组信息请在左侧查看。
+            </p>
+          </div>
+          <div className="overflow-x-auto px-4 py-4">
+            <div className="flex items-stretch gap-2">
+              {boardGroupRuns.map((run) => (
+                <div key={run.key} className="flex shrink-0 flex-col gap-1.5">
+                  {getBoardGroupRunLabel(run, {
+                    showUngrouped: showBoardGroupHeaders,
+                  }) ? (
+                    <div className="px-1">
+                      <p className="truncate text-[11px] font-medium tracking-[0.16em] text-white/36">
+                        {getBoardGroupRunLabel(run, {
+                          showUngrouped: showBoardGroupHeaders,
+                        })}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-1.5">
+                    {run.boards.map((board) => {
+                      const index = scene.boardOrder.indexOf(board.id);
+                      const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
+                      const isLive = Boolean(liveThumbnails[board.id]);
+                      return (
+                        <FilmstripCard
+                          key={board.id}
+                          board={board}
+                          index={index}
+                          thumbnailUrl={thumbnailUrl}
+                          isLive={isLive}
+                          active={scene.activeBoardId === board.id}
+                          canDelete={scene.boards.length > 1}
+                          onSelect={() =>
+                            setScene((current) =>
+                              normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
+                            )
+                          }
+                          onDelete={() => deleteBoard(board.id)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
-            <div className="space-y-1 px-0.5 pt-3 text-[11px] leading-5 text-white/42">
-              <p>
-                {scene.generationScope.mode === "selected"
-                  ? `已选 ${selectedGenerationBoardIds.length} 张`
-                  : "勾选底部卡片可切到部分生成"}
-              </p>
-              <p>{showBoardGroupHeaders ? "底部分组已按结构来源聚合" : "当前画板顺序用于生成范围"}</p>
-            </div>
           </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleBoardDragEnd}
-          >
-            <SortableContext items={scene.boardOrder} strategy={horizontalListSortingStrategy}>
-              <div className="flex items-stretch gap-2">
-                {boardGroupRuns.map((run) => (
-                  <div key={run.key} className="flex shrink-0 flex-col gap-1.5">
-                    {getBoardGroupRunLabel(run, {
-                      showUngrouped: showBoardGroupHeaders,
-                    }) ? (
-                      <div className="px-1">
-                        <p className="truncate text-[11px] font-medium tracking-[0.16em] text-white/36">
-                          {getBoardGroupRunLabel(run, {
-                            showUngrouped: showBoardGroupHeaders,
-                          })}
-                        </p>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center gap-1.5">
-                      {run.boards.map((board) => {
-                        const index = scene.boardOrder.indexOf(board.id);
-                        const thumbnailUrl = boardThumbnailMap.get(board.id) ?? null;
-                        const isLive = Boolean(liveThumbnails[board.id]);
-                        const selectedForGeneration = selectedGenerationBoardIdSet.has(board.id);
-                        return bottomStripView === "outline" ? (
-                          <SortableOutlineCard
-                            key={board.id}
-                            board={board}
-                            index={index}
-                            active={scene.activeBoardId === board.id}
-                            selectedForGeneration={selectedForGeneration}
-                            canDelete={scene.boards.length > 1}
-                            onSelect={() =>
-                              setScene((current) =>
-                                normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
-                              )
-                            }
-                            onDelete={() => deleteBoard(board.id)}
-                            onToggleSelected={() => toggleBoardInGenerationScope(board.id)}
-                          />
-                        ) : (
-                          <SortableFilmstripCard
-                            key={board.id}
-                            board={board}
-                            index={index}
-                            thumbnailUrl={thumbnailUrl}
-                            isLive={isLive}
-                            active={scene.activeBoardId === board.id}
-                            selectedForGeneration={selectedForGeneration}
-                            canDelete={scene.boards.length > 1}
-                            onSelect={() =>
-                              setScene((current) =>
-                                normalizeProjectEditorScene({ ...current, activeBoardId: board.id })
-                              )
-                            }
-                            onDelete={() => deleteBoard(board.id)}
-                            onToggleSelected={() => toggleBoardInGenerationScope(board.id)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-          <button
-            type="button"
-            onClick={createBoard}
-            disabled={scene.boards.length >= PROJECT_BOARD_MAX}
-            className="flex h-full shrink-0 items-center justify-center self-stretch rounded-[16px] border border-dashed border-white/10 bg-white/2 px-4 text-white/36 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white/62 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="新建画板"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         </div>
       )}
       />
@@ -5296,29 +5367,28 @@ export function ProjectEditorFabricClient({
                     重新检查
                   </Button>
                 </div>
-                <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid gap-2 md:grid-cols-2">
                   {[
                     { mode: "current", label: "当前画板", detail: activeBoard?.name ?? "当前页" },
                     {
-                      mode: "selected",
-                      label: "已选画板",
+                      mode: "all",
+                      label: "全部未锁定画板",
                       detail:
-                        scene.generationScope.mode === "selected"
-                          ? `${scene.generationScope.boardIds.length} 张`
-                          : "从底部缩略图勾选",
+                        skippedLockedBoardsInScope.length > 0
+                          ? `${Math.max(scene.boardOrder.length - skippedLockedBoardsInScope.length, 0)} 张会参与`
+                          : `${scene.boardOrder.length} 张会参与`,
                     },
-                    { mode: "all", label: "全部画板", detail: `${scene.boardOrder.length} 张` },
                   ].map((item) => (
                     <button
                       key={item.mode}
                       type="button"
                       className={cn(
                         "rounded-xl border px-3 py-3 text-left transition-colors",
-                        scene.generationScope.mode === item.mode
+                        normalizedGenerationScope.mode === item.mode
                           ? "border-white/16 bg-white/10 text-white"
                           : "border-white/8 bg-background text-white/70 hover:bg-white/5"
                       )}
-                      onClick={() => setGenerationMode(item.mode as GenerationScope["mode"])}
+                      onClick={() => setGenerationMode(item.mode as "current" | "all")}
                     >
                       <p className="text-sm font-medium">{item.label}</p>
                       <p className="mt-1 text-xs leading-5 text-white/44">{item.detail}</p>
@@ -5693,7 +5763,7 @@ function BoardStatusBadge({ board }: { board: ProjectBoard }) {
   );
 }
 
-function SortableBoardRow({
+function BoardListRow({
   board,
   index,
   thumbnailUrl,
@@ -5733,20 +5803,20 @@ function SortableBoardRow({
         active
           ? "border-white/16 bg-white/8 text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
           : "border-white/8 bg-white/3 text-white/72 hover:border-white/12 hover:bg-white/5 hover:text-white/84",
-        isDragging ? "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]" : "opacity-100"
+        isDragging && "scale-[1.01] opacity-80 shadow-[0_20px_36px_-22px_rgba(0,0,0,0.9)]"
       )}
     >
       <button
         type="button"
         className={cn(
-          "flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-lg text-white/40 transition-colors hover:text-white/80 active:cursor-grabbing",
-          active && "text-white/70"
+          "inline-flex h-8 min-w-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-white/8 bg-white/4 px-2 text-[11px] text-white/54 transition-colors hover:border-white/14 hover:text-white/82 active:cursor-grabbing",
+          active && "border-white/14 text-white/74"
         )}
         {...attributes}
         {...listeners}
-        aria-label="拖拽排序"
+        aria-label="拖拽调整画板顺序"
       >
-        <GripVertical className="h-4 w-4" />
+        {index + 1}
       </button>
 
       <button
@@ -5775,13 +5845,23 @@ function SortableBoardRow({
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-white">
-            {index + 1}. {board.name}
+            {board.name}
           </p>
           <p className="mt-1 truncate text-xs text-white/44">
             {board.intent || "未填写意图"}
           </p>
         </div>
       </button>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        {board.locked ? (
+          <span className="inline-flex h-7 items-center rounded-full border border-white/10 bg-white/4 px-2 text-[10px] text-white/52">
+            <Lock className="mr-1 h-3 w-3" />
+            已锁定
+          </span>
+        ) : null}
+        <BoardStatusBadge board={board} />
+      </div>
 
       {canDelete ? (
         <button
@@ -5800,35 +5880,25 @@ function SortableBoardRow({
   );
 }
 
-function SortableFilmstripCard({
+function FilmstripCard({
   board,
   index,
   thumbnailUrl,
   isLive,
   active,
-  selectedForGeneration,
   canDelete,
   onSelect,
   onDelete,
-  onToggleSelected,
 }: {
   board: ProjectBoard;
   index: number;
   thumbnailUrl: string | null;
   isLive: boolean;
   active: boolean;
-  selectedForGeneration: boolean;
   canDelete: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  onToggleSelected: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: board.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
   const resolvedThumb = thumbnailUrl
     ? isLive
       ? thumbnailUrl
@@ -5837,21 +5907,13 @@ function SortableFilmstripCard({
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={cn(
-        "group relative shrink-0 cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-80"
-      )}
+      className="group relative shrink-0"
     >
       <EditorStripButton
         active={active}
         className={cn(
           "relative w-[88px] rounded-[16px] p-1.5 transition-all duration-200",
-          active && "-translate-y-px shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]",
-          selectedForGeneration && "ring-1 ring-white/12"
+          active && "-translate-y-px shadow-[0_14px_26px_-18px_rgba(255,255,255,0.12)]"
         )}
         onClick={onSelect}
       >
@@ -5860,9 +5922,7 @@ function SortableFilmstripCard({
             "overflow-hidden rounded-[12px] border bg-background transition-all duration-200",
             active
               ? "border-white/18 shadow-[0_12px_18px_-14px_rgba(255,255,255,0.16)]"
-              : selectedForGeneration
-                ? "border-white/16"
-                : "border-white/8 group-hover:border-white/12"
+              : "border-white/8 group-hover:border-white/12"
           )}
         >
           {resolvedThumb ? (
@@ -5881,36 +5941,13 @@ function SortableFilmstripCard({
           )}
         </div>
         <p className="mt-1 truncate text-xs text-white/46">{index + 1}</p>
-        {selectedForGeneration ? (
-          <div className="pointer-events-none absolute inset-x-4 top-2 rounded-full bg-white/86 px-1.5 py-0.5 text-[10px] font-medium text-neutral-950">
-            已选
-          </div>
-        ) : null}
         {active ? (
           <div className="pointer-events-none absolute inset-x-5 bottom-4 h-[2px] rounded-full bg-white/70" />
         ) : null}
       </EditorStripButton>
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleSelected();
-        }}
-        className={cn(
-          "absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border bg-background/95 text-white/60 transition-all duration-150",
-          selectedForGeneration
-            ? "border-white/20 text-white"
-            : "border-white/12 opacity-0 group-hover:opacity-100 hover:border-white/24 hover:text-white"
-        )}
-        aria-label={selectedForGeneration ? "取消选中画板" : "选中画板加入生成范围"}
-      >
-        <Check className="h-3 w-3" />
-      </button>
       {canDelete ? (
         <button
           type="button"
-          onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             onDelete();
@@ -5921,109 +5958,6 @@ function SortableFilmstripCard({
           <X className="h-3 w-3" />
         </button>
       ) : null}
-    </div>
-  );
-}
-
-function SortableOutlineCard({
-  board,
-  index,
-  active,
-  selectedForGeneration,
-  canDelete,
-  onSelect,
-  onDelete,
-  onToggleSelected,
-}: {
-  board: ProjectBoard;
-  index: number;
-  active: boolean;
-  selectedForGeneration: boolean;
-  canDelete: boolean;
-  onSelect: () => void;
-  onDelete: () => void;
-  onToggleSelected: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: board.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "group relative shrink-0 cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-80"
-      )}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        className={cn(
-          "flex min-h-[88px] w-[172px] flex-col justify-between rounded-[16px] border px-3 py-3 text-left transition-all duration-200",
-          active
-            ? "border-white/16 bg-white/9 text-white shadow-[0_14px_26px_-20px_rgba(255,255,255,0.14)]"
-            : selectedForGeneration
-              ? "border-white/14 bg-white/6 text-white"
-              : "border-white/8 bg-white/3 text-white/72 hover:border-white/12 hover:bg-white/5"
-        )}
-      >
-        <div className="min-w-0 pr-7">
-          <p className="text-[11px] tracking-[0.14em] text-white/34">{index + 1}</p>
-          <p className="mt-1 line-clamp-2 text-sm font-medium text-white">{board.name}</p>
-        </div>
-        <p className="line-clamp-2 text-xs leading-5 text-white/48">
-          {board.intent || "未填写意图"}
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <BoardStatusBadge board={board} />
-          <span className="w-6" />
-        </div>
-      </button>
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleSelected();
-        }}
-        className={cn(
-          "absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border transition-colors",
-          selectedForGeneration
-            ? "border-white/18 bg-white text-neutral-950"
-            : "border-white/12 bg-white/6 text-white/60 hover:border-white/24 hover:text-white"
-        )}
-        aria-label={selectedForGeneration ? "取消选中画板" : "选中画板加入生成范围"}
-      >
-        <Check className="h-3.5 w-3.5" />
-      </button>
-      {canDelete ? (
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          className="absolute bottom-2 left-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/4 text-white/52 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
-          aria-label="删除画板"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-background/92 text-white/56 opacity-0 transition-all duration-150 hover:border-white/20 hover:text-white group-hover:opacity-100"
-        {...attributes}
-        {...listeners}
-        aria-label="拖拽排序"
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }

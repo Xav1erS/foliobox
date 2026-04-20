@@ -247,10 +247,10 @@ export default async function DashboardPage({
         cta: "查看项目池",
       }
     : {
-        title: "先补个人资料会更顺手",
+        title: "先补设计师档案会更顺手",
         description: "把职位、经验和目标岗位写清楚，再回到项目或作品集，后续生成会更贴近投递方向。",
         href: "/profile",
-        cta: "完善个人资料",
+        cta: "完善设计师档案",
       };
 
   const projectsWithCover = projects.map((p) => ({
@@ -385,7 +385,7 @@ export default async function DashboardPage({
                 <Button asChild variant="outline" className="h-11 px-5">
                   <Link href="/profile">
                     <User className="mr-2 h-4 w-4" />
-                    先补个人资料
+                    先补设计师档案
                   </Link>
                 </Button>
               </div>
@@ -423,7 +423,7 @@ export default async function DashboardPage({
                           入口二
                         </p>
                       <p className="mt-3 text-lg font-semibold tracking-[-0.03em] text-foreground">
-                        先补个人资料
+                        先补设计师档案
                       </p>
                       <p className="mt-2 text-sm leading-6 text-muted-foreground">
                         完善职位、年限与目标岗位，后续生成的表达重心会更稳定。
@@ -479,7 +479,7 @@ export default async function DashboardPage({
               </CardHeader>
               <CardContent>
                 <Button asChild variant="outline" className="h-10 px-4">
-                  <Link href={currentPlan === "FREE" ? "/pricing" : "/profile"}>
+                  <Link href={currentPlan === "FREE" ? "/pricing" : "/profile?panel=account"}>
                     <CreditCard className="mr-2 h-4 w-4" />
                     查看完整权益
                   </Link>
@@ -604,7 +604,7 @@ export default async function DashboardPage({
                   { icon: BookOpen, label: "新建作品集", href: "/portfolios/new" },
                   { icon: FolderOpen, label: "查看全部项目", href: "/projects" },
                   { icon: Layers, label: "查看全部作品集", href: "/portfolios" },
-                  { icon: User, label: "个人资料", href: "/profile" },
+                  { icon: User, label: "设计师档案", href: "/profile" },
                 ].map(({ icon: Icon, label, href }) => (
                   <Link
                     key={href}
@@ -634,7 +634,7 @@ export default async function DashboardPage({
                     </p>
                   </div>
                   <Button asChild variant="outline" className="h-9 px-3.5">
-                    <Link href={currentPlan === "FREE" ? "/pricing" : "/profile"}>
+                    <Link href={currentPlan === "FREE" ? "/pricing" : "/profile?panel=account"}>
                       <CreditCard className="mr-2 h-3.5 w-3.5" />
                       查看权益
                     </Link>

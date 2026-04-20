@@ -15,6 +15,7 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AccountDialog, type AccountDialogData } from "@/components/app/AccountDialog";
 import { CreateProjectDialog } from "@/components/app/CreateProjectDialog";
 import { BrandLockup } from "@/components/brand/BrandLogo";
 
@@ -22,7 +23,7 @@ const PRIMARY_NAV_ITEMS = [
   { href: "/dashboard", label: "工作台首页", icon: LayoutDashboard },
   { href: "/projects", label: "项目", icon: FolderOpen },
   { href: "/portfolios", label: "作品集", icon: BookOpen },
-  { href: "/profile", label: "个人资料", icon: User },
+  { href: "/profile", label: "设计师档案", icon: User },
 ];
 
 const SECONDARY_NAV_ITEMS = [
@@ -30,7 +31,13 @@ const SECONDARY_NAV_ITEMS = [
   { href: "/score", label: "作品集评分", icon: BarChart3 },
 ];
 
-export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
+export function AppSidebar({
+  userEmail,
+  accountDialogData,
+}: {
+  userEmail?: string | null;
+  accountDialogData?: AccountDialogData | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -155,19 +162,43 @@ export function AppSidebar({ userEmail }: { userEmail?: string | null }) {
       </nav>
 
       <div className="app-divider-soft relative z-10 mt-auto border-t pt-4">
-        <div className="mb-3 flex items-center gap-3 rounded-[18px] border border-border bg-card px-3 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-white/60">
-            <User className="h-4 w-4 shrink-0" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium app-text-primary">当前账号</p>
-            {userEmail ? (
-              <p className="mt-0.5 truncate text-xs app-text-muted">{userEmail}</p>
-            ) : (
-              <p className="mt-0.5 text-xs app-text-muted">已登录工作台</p>
-            )}
+        {accountDialogData ? (
+          <AccountDialog userEmail={userEmail} data={accountDialogData}>
+            <button
+              type="button"
+              className="mb-3 flex w-full items-center gap-3 rounded-[18px] border border-border bg-card px-3 py-3 text-left transition-colors hover:bg-accent"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-white/60">
+                <User className="h-4 w-4 shrink-0" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium app-text-primary">当前账号</p>
+                {userEmail ? (
+                  <p className="mt-0.5 truncate text-xs app-text-muted">{userEmail}</p>
+                ) : (
+                  <p className="mt-0.5 text-xs app-text-muted">已登录工作台</p>
+                )}
+              </div>
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/36">
+                账号
+              </span>
+            </button>
+          </AccountDialog>
+        ) : (
+          <div className="mb-3 flex items-center gap-3 rounded-[18px] border border-border bg-card px-3 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-white/60">
+              <User className="h-4 w-4 shrink-0" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium app-text-primary">当前账号</p>
+              {userEmail ? (
+                <p className="mt-0.5 truncate text-xs app-text-muted">{userEmail}</p>
+              ) : (
+                <p className="mt-0.5 text-xs app-text-muted">已登录工作台</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="app-nav-item flex w-full items-center gap-3 px-3 py-3 text-sm"

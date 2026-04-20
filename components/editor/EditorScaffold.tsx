@@ -70,7 +70,7 @@ export function EditorScaffold({
   const hasHeaderMeta = Boolean(objectLabel || statusLabel || statusMeta || planSummary);
 
   return (
-    <div className="dark flex h-full min-h-screen flex-col overflow-hidden bg-background text-white">
+    <div className="editor-shell dark flex h-full min-h-screen flex-col overflow-hidden bg-background text-white">
       <header className="border-b border-white/10 bg-background shadow-[0_18px_48px_-28px_rgba(0,0,0,0.88)]">
         <div className="flex min-h-[64px] items-center gap-3 px-5 py-2">
           <EditorChromeLink href={backHref} className="shrink-0 gap-2 px-3.5 text-sm">

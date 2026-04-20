@@ -4,9 +4,10 @@ import { BrandMark } from "@/components/brand/BrandLogo";
 // 现阶段用 logo 呼吸，后续统一品牌动画时原地替换即可。
 export default function AppLoading() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+    <div className="dark app-shell fixed inset-0 z-50 items-center justify-center">
+      <div className="app-shell-grid" />
       <span
-        className="animate-pulse"
+        className="relative z-10 animate-pulse"
         aria-label="加载中"
         role="status"
       >

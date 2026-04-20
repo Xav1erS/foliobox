@@ -307,6 +307,22 @@
 }
 
 @layer utilities {
+  .editor-shell {
+    --scrollbar-size: 10px;
+    --scrollbar-track: rgba(255, 255, 255, 0.02);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.28);
+  }
+
+  .marketing-shell {
+    --scrollbar-size: 10px;
+    --scrollbar-track: rgba(255, 255, 255, 0.018);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.22);
+  }
+
   .app-shell::before {
     content: "";
     position: absolute;
@@ -494,6 +510,11 @@
     --app-radius-control: 1rem;
     --marketing-radius-panel: var(--app-radius-panel);
     --marketing-radius-control: var(--app-radius-control);
+    --scrollbar-size: 12px;
+    --scrollbar-track: rgba(255, 255, 255, 0.035);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
   }
 
   .dark {
@@ -534,14 +555,52 @@
     --app-text-secondary: hsl(var(--muted-foreground));
     --app-accent-bg: hsl(var(--accent));
     --app-accent-border: rgba(255, 255, 255, 0.16);
+    --scrollbar-track: rgba(255, 255, 255, 0.035);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+    --scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--scrollbar-thumb);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background: var(--scrollbar-thumb-active);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

@@ -293,7 +293,8 @@ export default async function VisionPage() {
               </h2>
               <div className="mt-6 space-y-4 text-sm leading-[1.9] text-white/62 sm:text-base">
                 <p>
-                  如果你是在 MVP 阶段就开始使用集盒FolioBox的用户，未来围绕"设计师求职表达"这条主线持续上线的重要能力，我会默认免费开放给你。
+                  如果你是在 MVP 阶段就开始使用集盒FolioBox的用户，未来围绕
+                  &quot;设计师求职表达&quot;这条主线持续上线的重要能力，我会默认免费开放给你。
                 </p>
                 <p>
                   这不等于以后所有东西都永久免费。但只要它仍然属于这条主线，我希望首批用户能一直在里面。
