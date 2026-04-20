@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ComponentType,
   PointerEvent as ReactPointerEvent,
@@ -252,6 +252,16 @@ const LEFT_PANEL_ITEMS: Array<{
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function useEffectEvent<T extends (...args: Parameters<T>) => ReturnType<T>>(handler: T): T {
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
+
+  return useRef(((...args: Parameters<T>) => handlerRef.current(...args)) as T).current;
 }
 
 function packageModeLabel(mode: string | null) {

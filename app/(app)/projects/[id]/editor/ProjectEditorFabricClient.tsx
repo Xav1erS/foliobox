@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
 import {
@@ -293,6 +293,16 @@ function newStructureId(prefix: "group" | "section") {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function useEffectEvent<T extends (...args: Parameters<T>) => ReturnType<T>>(handler: T): T {
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
+
+  return useRef(((...args: Parameters<T>) => handlerRef.current(...args)) as T).current;
 }
 
 const SURFACE_FIT_PADDING = 48;
