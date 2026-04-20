@@ -37,7 +37,6 @@ describe("project editor scene", () => {
               id: "board-1",
               name: "Start",
               intent: "",
-              status: "empty",
               frame: {
                 width: PROJECT_BOARD_WIDTH,
                 height: PROJECT_BOARD_HEIGHT,
@@ -45,7 +44,6 @@ describe("project editor scene", () => {
               },
               thumbnailAssetId: null,
               nodes: [],
-              aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
             },
           ],
           generationScope: { mode: "current", boardIds: ["board-1"] },

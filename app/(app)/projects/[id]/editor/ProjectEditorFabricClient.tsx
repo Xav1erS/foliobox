@@ -524,6 +524,10 @@ export function ProjectEditorFabricClient({
   const clipboardRef = useRef<FabricObject | ActiveSelection | null>(null);
   const hydratingRef = useRef(false);
   const boardLoadTokenRef = useRef(0);
+  const imageElementCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const sceneRef = useRef(scene);
+  const [boardRebuildTick, setBoardRebuildTick] = useState(0);
+  const requestActiveBoardRebuild = () => setBoardRebuildTick((t) => t + 1);
   const fitFrameRef = useRef<number | null>(null);
   const lastSavedSceneRef = useRef(JSON.stringify(scene));
   const lastSavedFactsRef = useRef(JSON.stringify(initialData.facts));
@@ -599,14 +603,6 @@ export function ProjectEditorFabricClient({
     () => getGenerationScopeBoardIds({ ...scene, generationScope: normalizedGenerationScope }),
     [normalizedGenerationScope, scene]
   );
-  const generationScopeSummary = useMemo(() => {
-    if (normalizedGenerationScope.mode === "current") {
-      return "本轮生成当前画板";
-    }
-    return "本轮生成全部未锁定画板";
-  }, [
-    normalizedGenerationScope.mode,
-  ]);
   // 生成确认面板需要显式列出被锁定、将从本次 AI 写操作中跳过的画板。
   const skippedLockedBoardsInScope = useMemo(
     () =>
@@ -627,26 +623,6 @@ export function ProjectEditorFabricClient({
     [recognizedAssetIdSet, selectedAssets]
   );
   const hasActiveInspector = activeMeta.kind !== "none";
-  const activeBoardNodeStats = useMemo(() => {
-    if (!activeBoard) return { text: 0, image: 0, shape: 0 };
-    return activeBoard.nodes.reduce(
-      (acc, node) => {
-        if (node.type === "text") acc.text += 1;
-        else if (node.type === "image") acc.image += 1;
-        else if (node.type === "shape") acc.shape += 1;
-        return acc;
-      },
-      { text: 0, image: 0, shape: 0 }
-    );
-  }, [activeBoard]);
-  const activeBoardIndex = useMemo(
-    () => (activeBoard ? scene.boardOrder.indexOf(activeBoard.id) : -1),
-    [activeBoard, scene.boardOrder]
-  );
-  const activeBoardIncludedInGeneration = useMemo(
-    () => Boolean(activeBoard) && generationBoardIds.includes(activeBoard.id),
-    [activeBoard, generationBoardIds]
-  );
   const activeBoardStructureLabel = useMemo(() => {
     if (!activeBoard?.structureSource) return null;
     return (
@@ -654,13 +630,6 @@ export function ProjectEditorFabricClient({
       activeBoard.structureSource.groupLabel ??
       null
     );
-  }, [activeBoard]);
-  const activeBoardAiStateLabel = useMemo(() => {
-    if (!activeBoard) return "";
-    if (activeBoard.locked) return "已锁定 AI 写操作";
-    if (activeBoard.aiMarkers.hasPendingSuggestion) return "有待处理建议";
-    if (activeBoard.aiMarkers.hasAnalysis) return "已完成分析";
-    return "尚未生成建议";
   }, [activeBoard]);
   function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent" | "locked">> & {
     frameBackground?: string;
@@ -683,6 +652,16 @@ export function ProjectEditorFabricClient({
         ),
       })
     );
+    // 背景色属于画板外观属性，修改时 scene 引用会变，但 load effect 只在 activeBoardId/rebuildTick 变时重跑，
+    // 所以必须直接把新底色写到 fabric canvas 并重绘一次，否则视觉上不会更新。
+    if (patch.frameBackground !== undefined) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.backgroundColor = patch.frameBackground || "#ffffff";
+        canvas.requestRenderAll();
+        scheduleThumbnailCapture();
+      }
+    }
   }
   const currentLeftPanelLabel =
     LEFT_PANEL_ITEMS.find((item) => item.key === leftPanel)?.label ?? "工具栏";
@@ -801,12 +780,21 @@ export function ProjectEditorFabricClient({
   function captureBoardThumbnail() {
     const canvas = canvasRef.current;
     const board = activeBoard;
-    if (!canvas || !board) return;
+    if (!canvas || !board) {
+      console.warn("[thumb] skipped: canvas or board missing", {
+        hasCanvas: Boolean(canvas),
+        hasBoard: Boolean(board),
+      });
+      return;
+    }
     try {
       const srcCanvas = canvas.lowerCanvasEl;
       const srcW = canvas.getWidth();
       const srcH = canvas.getHeight();
-      if (srcW <= 0 || srcH <= 0) return;
+      if (srcW <= 0 || srcH <= 0) {
+        console.warn("[thumb] skipped: zero-sized canvas", { srcW, srcH, boardId: board.id });
+        return;
+      }
 
       // 缩略图目标宽度 220px，等比缩放
       const scale = Math.min(1, 220 / srcW);
@@ -819,18 +807,32 @@ export function ProjectEditorFabricClient({
       offscreen.width = dstW;
       offscreen.height = dstH;
       const ctx = offscreen.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        console.warn("[thumb] skipped: no 2d context", { boardId: board.id });
+        return;
+      }
 
       ctx.fillStyle = board.frame.background || "#ffffff";
       ctx.fillRect(0, 0, dstW, dstH);
       ctx.drawImage(srcCanvas, 0, 0, dstW, dstH);
 
       const dataUrl = offscreen.toDataURL("image/jpeg", 0.6);
+      console.info("[thumb] captured", {
+        boardId: board.id,
+        nodeCount: board.nodes.length,
+        srcW,
+        srcH,
+        objectCount: canvas.getObjects().length,
+      });
       setLiveThumbnails((prev) =>
         prev[board.id] === dataUrl ? prev : { ...prev, [board.id]: dataUrl }
       );
-    } catch {
-      // ignore capture errors (e.g., tainted canvas from cross-origin images)
+    } catch (err) {
+      console.error("[thumb] capture failed", {
+        boardId: board.id,
+        nodeCount: board.nodes.length,
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      });
     }
   }
 
@@ -841,7 +843,7 @@ export function ProjectEditorFabricClient({
     thumbnailCaptureRef.current = window.setTimeout(() => {
       thumbnailCaptureRef.current = null;
       captureBoardThumbnail();
-    }, 350);
+    }, 800);
   }
 
   function selectBoard(boardId: string) {
@@ -1564,6 +1566,7 @@ export function ProjectEditorFabricClient({
         recognition: materialRecognition ?? undefined,
       });
       setScene(nextScene);
+      requestActiveBoardRebuild();
       lastSavedSceneRef.current = JSON.stringify(nextScene);
       // 持久化画板 + 标记 setup 已完成（退出重进将跳过向导）
       await persistScene(nextScene, true, { markSetupCompleted: true });
@@ -1860,6 +1863,7 @@ export function ProjectEditorFabricClient({
       });
 
       setScene(nextScene);
+      requestActiveBoardRebuild();
       setLeftPanel("boards");
       lastSavedSceneRef.current = JSON.stringify(nextScene);
       await persistScene(nextScene, true);
@@ -1927,6 +1931,7 @@ export function ProjectEditorFabricClient({
           projectName: initialData.name,
         });
         setScene(nextScene);
+        requestActiveBoardRebuild();
         lastSavedSceneRef.current = JSON.stringify(nextScene);
       } else {
         setScene((current) => markBoardsAfterGeneration(current, generationBoardIds));
@@ -2238,8 +2243,7 @@ export function ProjectEditorFabricClient({
 
     return {
       ...board,
-      frame: { ...board.frame, background: "#ffffff" },
-      status: nextNodes.length > 0 ? "draft" : "empty",
+      frame: { ...board.frame },
       thumbnailAssetId,
       nodes: nextNodes,
     };
@@ -2269,6 +2273,7 @@ export function ProjectEditorFabricClient({
     const token = boardLoadTokenRef.current;
 
     canvas.clear();
+    canvas.backgroundColor = board.frame.background || "#ffffff";
 
     for (const node of board.nodes.sort((a, b) => a.zIndex - b.zIndex)) {
       if (node.type === "text") {
@@ -2356,8 +2361,22 @@ export function ProjectEditorFabricClient({
       const asset = assetMap.get(node.assetId);
       if (!asset) continue;
 
-      const image = (await fabric.FabricImage.fromURL(buildPrivateBlobProxyUrl(asset.imageUrl))) as FabricSceneObject;
+      const url = buildPrivateBlobProxyUrl(asset.imageUrl);
+      const cache = imageElementCacheRef.current;
+      let imgEl = cache.get(url);
+      if (!imgEl || !imgEl.complete || imgEl.naturalWidth === 0) {
+        imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.crossOrigin = "anonymous";
+          el.decoding = "async";
+          el.onload = () => resolve(el);
+          el.onerror = (err) => reject(err);
+          el.src = url;
+        });
+        cache.set(url, imgEl);
+      }
       if (token !== boardLoadTokenRef.current) return;
+      const image = new fabric.FabricImage(imgEl) as unknown as FabricSceneObject;
 
       image.data = {
         nodeId: node.id,
@@ -2381,6 +2400,7 @@ export function ProjectEditorFabricClient({
     }
 
     canvas.discardActiveObject();
+    canvas.requestRenderAll();
     updateSelectionSummary(canvas);
     hydratingRef.current = false;
     scheduleFitSurface();
@@ -2557,9 +2577,20 @@ export function ProjectEditorFabricClient({
   }, []);
 
   useEffect(() => {
-    if (!canvasReady || !activeBoard) return;
-    void loadBoardIntoCanvas(activeBoard);
-  }, [activeBoard, canvasReady, loadBoardIntoCanvas]);
+    sceneRef.current = scene;
+  }, [scene]);
+
+  const activeBoardId = activeBoard?.id ?? null;
+  useEffect(() => {
+    if (!canvasReady || !activeBoardId) return;
+    const latestBoard = getSceneBoardById(sceneRef.current, activeBoardId);
+    if (!latestBoard) return;
+    void loadBoardIntoCanvas(latestBoard);
+    // 注意：只依赖 activeBoardId + rebuildTick + canvasReady。
+    // 画布内的编辑通过 syncActiveBoardFromCanvas 回写到 scene，但不应该触发画布重建。
+    // 外部（AI 生成、结构应用等）改动 scene 后必须显式调用 requestActiveBoardRebuild()。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBoardId, canvasReady, boardRebuildTick, loadBoardIntoCanvas]);
 
   async function cloneActiveObject() {
     const canvas = canvasRef.current;
@@ -3164,7 +3195,7 @@ export function ProjectEditorFabricClient({
       }
       planSummary={planSummary}
       leftRailLabel={currentLeftPanelLabel}
-      rightRailLabel="信息与编辑"
+      rightRailLabel={hasActiveInspector ? "对象属性" : "画板属性"}
       leftRailWidthClass={setupMode ? "w-[272px]" : leftPanel ? "w-[336px]" : "w-[56px]"}
       rightRailWidthClass="w-[320px]"
       hideLeftRailHeader
@@ -4066,9 +4097,6 @@ export function ProjectEditorFabricClient({
                     </div>
                   </EditorRailSection>
                   <EditorRailSection title="画板导航">
-                    <div className={cn(editorPanelMutedCardClass, "mb-3 px-3.5 py-3 text-xs leading-5 text-white/44")}>
-                      左侧负责查看标题、状态、分组并调整顺序。底部只保留缩略图预览和本轮生成范围。
-                    </div>
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
@@ -4351,80 +4379,9 @@ export function ProjectEditorFabricClient({
         <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mt-0">
-                  {activeBoard ? (
-                    <EditorRailSection title="当前画板">
-                      <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] leading-5 text-white/36">
-                              <span>第 {activeBoardIndex + 1} / {scene.boardOrder.length} 张</span>
-                              {activeBoardStructureLabel ? (
-                                <span className="max-w-[180px] truncate" title={activeBoardStructureLabel}>
-                                  来源：{activeBoardStructureLabel}
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 truncate text-sm font-semibold text-white">
-                              {activeBoard.name}
-                            </p>
-                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/46">
-                              {activeBoard.intent.trim()
-                                ? activeBoard.intent
-                                : "这张画板还没写讲述目标，AI 生成和更新时会缺少上下文。"}
-                            </p>
-                          </div>
-                          <div className="shrink-0">
-                            <BoardStatusBadge board={activeBoard} />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                            <p className="text-[11px] tracking-[0.14em] text-white/34">尺寸</p>
-                            <p className="mt-1 text-sm text-white/78">
-                              {activeBoard.frame.width} × {activeBoard.frame.height}
-                            </p>
-                          </div>
-                          <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                            <p className="text-[11px] tracking-[0.14em] text-white/34">内容</p>
-                            <p className="mt-1 text-sm text-white/78">
-                              {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-[11px] leading-5 text-white/48">
-                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
-                            {activeBoardIncludedInGeneration ? "已纳入本轮生成" : "当前不在本轮生成范围"}
-                          </span>
-                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
-                            {activeBoard.locked ? "AI 已锁定" : "可参与 AI"}
-                          </span>
-                          <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
-                            {activeBoardAiStateLabel}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <EditorChromeButton
-                            className="h-10 justify-center"
-                            onClick={() => setGenerationMode("current")}
-                          >
-                            仅生成当前页
-                          </EditorChromeButton>
-                          <EditorChromeButton
-                            className="h-10 justify-center"
-                            onClick={() => setGenerationMode("all")}
-                          >
-                            生成全部未锁定
-                          </EditorChromeButton>
-                        </div>
-                      </div>
-                    </EditorRailSection>
-                  ) : null}
                   {hasActiveInspector ? (
                     <div className="h-full overflow-y-auto">
-                      <EditorRailSection title="对象编辑">
+                      <EditorRailSection title="对象属性">
                         <div className={cn(editorPanelCardClass, "space-y-4 p-4")}>
                           <div className={cn(editorPanelMutedCardClass, "flex items-center justify-between px-3 py-2.5")}>
                             <div>
@@ -5072,7 +5029,7 @@ export function ProjectEditorFabricClient({
                         </div>
                       </EditorRailSection>
 
-                      <EditorRailSection title="层级调整">
+                      <EditorRailSection title="层级">
                         <div className={cn(editorPanelCardClass, "grid grid-cols-2 gap-2 p-3")}>
                           <EditorChromeButton
                             className="h-10 justify-center"
@@ -5107,122 +5064,114 @@ export function ProjectEditorFabricClient({
                     </div>
                   ) : activeBoard ? (
                     <Tabs defaultValue="properties" className="flex h-full flex-col">
-                      <div className="shrink-0 border-b border-white/6 px-5 pt-3 pb-2">
+                      <div className="shrink-0 border-b border-white/6 px-4 pt-3 pb-2">
                         <EditorTabsList className="grid w-full grid-cols-2">
-                          <EditorTabsTrigger value="properties">基础</EditorTabsTrigger>
+                          <EditorTabsTrigger value="properties">属性</EditorTabsTrigger>
                           <EditorTabsTrigger value="ai">讲述</EditorTabsTrigger>
                         </EditorTabsList>
                       </div>
                       <TabsContent
                         value="properties"
-                        className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5"
+                        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-4"
                       >
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-white/40">画板名称</p>
-                          <Input
-                            value={activeBoard.name}
-                            onChange={(event) =>
-                              updateActiveBoard({ name: event.target.value })
-                            }
-                            className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white"
-                            placeholder="画板名称"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-white/50">
-                          <span>尺寸</span>
-                          <span className="text-white/78">
-                            {activeBoard.frame.width} × {activeBoard.frame.height}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/50">底色</span>
-                          <ColorPickerPopover
-                            value={{ mode: "solid", ...parseColorString(activeBoard.frame.background) }}
-                            onChange={(cv) => {
-                              if (cv.mode === "solid") {
-                                updateActiveBoard({ frameBackground: hexToRgba(cv.hex, cv.alpha) });
+                        <div className={cn(editorPanelCardClass, "space-y-3 p-3.5")}>
+                          <div className="space-y-1.5">
+                            <p className="text-xs text-white/40">画板名称</p>
+                            <Input
+                              value={activeBoard.name}
+                              onChange={(event) =>
+                                updateActiveBoard({ name: event.target.value })
                               }
-                            }}
-                            side="left"
-                            align="start"
-                          />
-                          <span className="truncate text-sm text-white/60">
-                            {parseColorString(activeBoard.frame.background).hex.toUpperCase()}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs text-white/50">
-                          <span>画面内容</span>
-                          <span className="text-white/78">
-                            {activeBoardNodeStats.text} 文本 · {activeBoardNodeStats.image} 图片 · {activeBoardNodeStats.shape} 形状
-                          </span>
-                        </div>
-
-                        {activeBoardStructureLabel ? (
-                          <div className="flex items-center gap-3 text-xs text-white/50">
-                            <span>结构来源</span>
-                            <span className="truncate text-white/78" title={activeBoardStructureLabel}>
-                              {activeBoardStructureLabel}
-                            </span>
-                          </div>
-                        ) : null}
-
-                        {/* 画板锁定：开启后不参与任何 AI 写操作 */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateActiveBoard({ locked: !activeBoard.locked })
-                          }
-                          aria-pressed={Boolean(activeBoard.locked)}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-                            activeBoard.locked
-                              ? "border-white/14 bg-white/8 text-white"
-                              : "border-white/6 bg-white/2 text-white/70 hover:bg-white/4 hover:text-white"
-                          )}
-                        >
-                          <span className="flex items-center gap-2 text-sm">
-                            <Lock className="h-3.5 w-3.5" />
-                            画板锁定
-                          </span>
-                          <span
-                            className={cn(
-                              "relative h-5 w-9 rounded-full border transition-colors",
-                              activeBoard.locked
-                                ? "border-white/20 bg-white/80"
-                                : "border-white/10 bg-white/8"
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all",
-                                activeBoard.locked ? "left-[18px]" : "left-[2px]"
-                              )}
+                              className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white"
+                              placeholder="画板名称"
                             />
-                          </span>
-                        </button>
-                        <p className="-mt-2 text-xs leading-relaxed text-white/36">
-                          锁定后，该画板不参与生成排版 / 更新排版 / 重新生成等任何 AI 写操作。
-                        </p>
+                          </div>
 
-                        <div className="pt-1">
+                          <div className="space-y-2">
+                            <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">尺寸</p>
+                              <p className="mt-1 text-sm text-white/78">
+                                {activeBoard.frame.width} × {activeBoard.frame.height}
+                              </p>
+                            </div>
+                            {activeBoardStructureLabel ? (
+                              <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                                <p className="text-[11px] tracking-[0.14em] text-white/34">结构来源</p>
+                                <p className="mt-1 truncate text-sm text-white/78" title={activeBoardStructureLabel}>
+                                  {activeBoardStructureLabel}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className={cn(editorPanelMutedCardClass, "flex items-center justify-between gap-3 px-3 py-2.5")}>
+                            <div>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">底色</p>
+                              <p className="mt-1 text-sm text-white/78">
+                                {parseColorString(activeBoard.frame.background).hex.toUpperCase()}
+                              </p>
+                            </div>
+                            <ColorPickerPopover
+                              value={{ mode: "solid", ...parseColorString(activeBoard.frame.background) }}
+                              onChange={(cv) => {
+                                if (cv.mode === "solid") {
+                                  updateActiveBoard({ frameBackground: hexToRgba(cv.hex, cv.alpha) });
+                                }
+                              }}
+                              side="left"
+                              align="start"
+                            />
+                          </div>
+
                           <button
                             type="button"
-                            onClick={() => deleteBoard(activeBoard.id)}
-                            disabled={scene.boards.length <= 1}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-xs text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={() =>
+                              updateActiveBoard({ locked: !activeBoard.locked })
+                            }
+                            aria-pressed={Boolean(activeBoard.locked)}
+                            className={cn(
+                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                              activeBoard.locked
+                                ? "border-white/14 bg-white/8 text-white"
+                                : "border-white/6 bg-white/2 text-white/70 hover:bg-white/4 hover:text-white"
+                            )}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            删除当前画板
+                            <span className="flex items-center gap-2 text-sm">
+                              <Lock className="h-3.5 w-3.5" />
+                              画板锁定
+                            </span>
+                            <span
+                              className={cn(
+                                "relative h-5 w-9 rounded-full border transition-colors",
+                                activeBoard.locked
+                                  ? "border-white/20 bg-white/80"
+                                  : "border-white/10 bg-white/8"
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all",
+                                  activeBoard.locked ? "left-[18px]" : "left-[2px]"
+                                )}
+                              />
+                            </span>
                           </button>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteBoard(activeBoard.id)}
+                          disabled={scene.boards.length <= 1}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-xs text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          删除当前画板
+                        </button>
                       </TabsContent>
 
                       <TabsContent
                         value="ai"
-                        className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5"
+                        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-4"
                       >
                         <div className="space-y-1.5">
                           <p className="text-xs text-white/40">讲述目标</p>
@@ -5231,12 +5180,9 @@ export function ProjectEditorFabricClient({
                             onChange={(event) =>
                               updateActiveBoard({ intent: event.target.value })
                             }
-                            className="min-h-[96px] rounded-xl border-white/8 bg-secondary text-sm text-white"
+                            className="min-h-[84px] rounded-xl border-white/8 bg-secondary text-sm text-white"
                             placeholder="写清这张画板要交代什么、重点结论是什么、希望读者先看到什么"
                           />
-                          <p className="text-[11px] leading-relaxed text-white/36">
-                            这里写的是给 AI 的讲述目标，不会直接显示在画板上。
-                          </p>
                         </div>
 
                         {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
@@ -5252,9 +5198,7 @@ export function ProjectEditorFabricClient({
                             </ul>
                           </div>
                         ) : (
-                          <EditorEmptyState>
-                            暂无内容建议。先补充讲述目标，或在左侧结构面板确认大纲后再回来查看。
-                          </EditorEmptyState>
+                          <EditorEmptyState>暂无建议。</EditorEmptyState>
                         )}
                       </TabsContent>
                     </Tabs>
@@ -5269,37 +5213,6 @@ export function ProjectEditorFabricClient({
       )}
       bottomStrip={setupMode ? undefined : (
         <div className="mx-auto flex w-[calc(100%-40px)] flex-col overflow-hidden rounded-[22px] border border-white/6 bg-background shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/6 px-4 py-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-              <div className="rounded-[12px] border border-white/8 bg-white/4 px-3 py-1.5 text-xs text-white/76">
-                缩略图预览
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] leading-5 text-white/42">
-                <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5 text-white/70">
-                  {generationScopeSummary}
-                </span>
-                <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
-                  共 {scene.boardOrder.length} 张
-                </span>
-                {showBoardGroupHeaders ? (
-                  <span className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5">
-                    已按结构分组
-                  </span>
-                ) : null}
-                {activeBoard ? (
-                  <span
-                    className="max-w-[220px] truncate rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5"
-                    title={activeBoard.name}
-                  >
-                    当前编辑：{activeBoard.name}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <p className="basis-full text-[11px] leading-5 text-white/38">
-              底部只负责预览当前顺序和勾选本轮生成范围；标题、状态和分组信息请在左侧查看。
-            </p>
-          </div>
           <div className="overflow-x-auto px-4 py-4">
             <div className="flex items-stretch gap-2">
               {boardGroupRuns.map((run) => (
@@ -5712,11 +5625,14 @@ function BoardThumbnailPlaceholder({
   index: number;
   variant: "row" | "strip";
 }) {
-  // 优先展示画板里第一个 title/caption 文字，没有则回退到画板名。
-  const titleNode = board.nodes.find(
-    (node): node is ProjectBoardTextNode =>
-      node.type === "text" && (node.role === "title" || node.role === "caption")
+  // 优先展示画板里的文本内容（title > caption > 任意文本节点），再回退到画板名。
+  const textNodes = board.nodes.filter(
+    (node): node is ProjectBoardTextNode => node.type === "text"
   );
+  const titleNode =
+    textNodes.find((node) => node.role === "title") ??
+    textNodes.find((node) => node.role === "caption") ??
+    textNodes.find((node) => node.text.trim().length > 0);
   const previewText = titleNode?.text.trim() || board.name.trim() || "";
   const bg = board.frame.background || "#ffffff";
   const textSize = variant === "row" ? "text-[10px] leading-tight" : "text-[11px] leading-snug";
@@ -5737,39 +5653,6 @@ function BoardThumbnailPlaceholder({
         {previewText || "（空画板）"}
       </span>
     </div>
-  );
-}
-
-function getBoardStatusLabel(status: ProjectBoard["status"]) {
-  switch (status) {
-    case "ready":
-      return "已就绪";
-    case "analyzed":
-      return "已分析";
-    case "needs_attention":
-      return "待处理";
-    case "draft":
-      return "草稿";
-    default:
-      return "空白";
-  }
-}
-
-function BoardStatusBadge({ board }: { board: ProjectBoard }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] leading-none",
-        board.status === "ready"
-          ? "border-emerald-300/18 bg-emerald-400/10 text-emerald-100"
-          : board.status === "needs_attention"
-            ? "border-amber-300/18 bg-amber-400/10 text-amber-100"
-            : "border-white/8 bg-white/6 text-white/52"
-      )}
-    >
-      {board.aiMarkers.hasPendingSuggestion ? <Sparkles className="h-2.5 w-2.5" /> : null}
-      {getBoardStatusLabel(board.status)}
-    </span>
   );
 }
 
@@ -5803,13 +5686,18 @@ function BoardListRow({
       ? thumbnailUrl
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
+  const secondaryText =
+    (board.structureSource?.sectionTitle ??
+      board.structureSource?.groupLabel ??
+      board.intent) ||
+    "未填写讲述";
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative flex items-center gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
+        "group relative flex items-start gap-2 rounded-[18px] border px-2 py-2 transition-all duration-150",
         active
           ? "border-white/16 bg-white/8 text-white shadow-[0_18px_30px_-24px_rgba(0,0,0,0.86)]"
           : "border-white/8 bg-white/3 text-white/72 hover:border-white/12 hover:bg-white/5 hover:text-white/84",
@@ -5832,7 +5720,7 @@ function BoardListRow({
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        className="flex min-w-0 flex-1 items-start gap-3 py-1 text-left"
       >
         <div
           className={cn(
@@ -5853,25 +5741,23 @@ function BoardListRow({
             <BoardThumbnailPlaceholder board={board} index={index} variant="row" />
           )}
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-white">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-sm leading-5 font-medium text-white">
             {board.name}
           </p>
           <p className="mt-1 truncate text-xs text-white/44">
-            {board.intent || "未填写意图"}
+            {secondaryText}
           </p>
+          {board.locked ? (
+            <div className="mt-2">
+              <span className="inline-flex h-6 items-center rounded-full border border-white/10 bg-white/4 px-2 text-[10px] text-white/52">
+                <Lock className="mr-1 h-3 w-3" />
+                已锁定
+              </span>
+            </div>
+          ) : null}
         </div>
       </button>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        {board.locked ? (
-          <span className="inline-flex h-7 items-center rounded-full border border-white/10 bg-white/4 px-2 text-[10px] text-white/52">
-            <Lock className="mr-1 h-3 w-3" />
-            已锁定
-          </span>
-        ) : null}
-        <BoardStatusBadge board={board} />
-      </div>
 
       {canDelete ? (
         <button

@@ -469,6 +469,8 @@ export function ColorPickerPopover({
   const b = parseInt(currentHex.slice(5, 7), 16);
   const previewBg =
     mode === "solid" ? `rgba(${r},${g},${b},${alpha})` : currentHex;
+  const pickerFieldClass =
+    "h-8 rounded-lg border border-white/10 bg-white/[0.05] text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] outline-hidden";
 
   return (
     <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
@@ -496,7 +498,7 @@ export function ColorPickerPopover({
         side={side}
         align={align}
         sideOffset={8}
-        className="w-[256px] border-white/8 bg-card p-0 text-white shadow-[0_24px_56px_-16px_rgba(0,0,0,0.9)]"
+        className="w-[272px] rounded-[20px] border border-white/10 bg-[#1b1c20] p-0 text-white shadow-[0_28px_64px_-18px_rgba(0,0,0,0.82)] backdrop-blur-xl"
       >
         {/* Mode tabs */}
         <div className="relative flex border-b border-white/[0.07]">
@@ -543,7 +545,7 @@ export function ColorPickerPopover({
                   max={360}
                   value={gradient.angle}
                   onChange={(e) => handleAngleChange(Number(e.target.value) % 360)}
-                  className="h-7 w-16 rounded-lg border border-white/8 bg-secondary px-2 text-center text-sm text-white [appearance:textfield]"
+                  className={cn(pickerFieldClass, "h-7 w-16 px-2 text-center [appearance:textfield]")}
                 />
                 <span className="text-xs text-white/40">°</span>
                 {gradient.stops.length > 2 ? (
@@ -576,7 +578,7 @@ export function ColorPickerPopover({
           ) : null}
 
           {/* Hex + preview + opacity row */}
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             {/* Color preview swatch (with checkerboard for alpha) */}
             <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/12">
               <span
@@ -593,7 +595,7 @@ export function ColorPickerPopover({
               value={hexInput.toUpperCase()}
               onChange={(e) => handleHexInputChange(e.target.value)}
               maxLength={7}
-              className="h-8 flex-1 rounded-lg border border-white/8 bg-secondary px-2 text-center font-mono text-sm text-white"
+              className={cn(pickerFieldClass, "min-w-0 flex-1 px-2 text-center font-mono")}
             />
             {/* Opacity % input (solid mode only) */}
             {mode === "solid" ? (
@@ -607,7 +609,7 @@ export function ColorPickerPopover({
                   onChange={(e) =>
                     handleOpacityInputChange(Number(e.target.value))
                   }
-                  className="h-8 w-[52px] rounded-lg border border-white/8 bg-secondary pl-2 pr-5 text-right text-sm text-white [appearance:textfield]"
+                  className={cn(pickerFieldClass, "w-[78px] pl-2 pr-7 text-right font-mono [appearance:textfield]")}
                 />
                 <span className="pointer-events-none absolute right-2 text-xs text-white/40">
                   %

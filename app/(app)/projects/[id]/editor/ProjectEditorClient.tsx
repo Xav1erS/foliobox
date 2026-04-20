@@ -100,7 +100,6 @@ import {
   mergeProjectLayoutDocument,
   normalizeProjectEditorScene,
   PROJECT_BOARD_HEIGHT,
-  PROJECT_BOARD_STATUSES,
   PROJECT_BOARD_WIDTH,
   PROJECT_IMAGE_ROLE_TAGS,
   PROJECT_TEXT_ROLES,
@@ -111,7 +110,6 @@ import {
   type ProjectBoardImageNode,
   type ProjectBoardNode,
   type ProjectBoardShapeNode,
-  type ProjectBoardStatus,
   type ProjectBoardTextNode,
   type ProjectEditorScene,
   type ProjectImageRoleTag,
@@ -285,14 +283,6 @@ function verdictLabel(verdict: string | undefined) {
   return "待判断";
 }
 
-function boardStatusLabel(status: ProjectBoardStatus) {
-  if (status === "empty") return "空白";
-  if (status === "draft") return "草稿";
-  if (status === "analyzed") return "已诊断";
-  if (status === "needs_attention") return "待补强";
-  return "可继续";
-}
-
 function getBoardThumbnailAssetId(board: ProjectBoard) {
   if (board.thumbnailAssetId) return board.thumbnailAssetId;
   const imageNode = board.nodes.find(
@@ -305,12 +295,7 @@ function duplicateBoard(board: ProjectBoard) {
   return createProjectBoard({
     name: `${board.name} Copy`,
     intent: board.intent,
-    status: board.nodes.length > 0 ? "draft" : "empty",
     thumbnailAssetId: getBoardThumbnailAssetId(board),
-    aiMarkers: {
-      hasAnalysis: false,
-      hasPendingSuggestion: board.aiMarkers.hasPendingSuggestion,
-    },
     nodes: board.nodes.map((node) => {
       if (node.type === "text") {
         return createProjectTextNode({
@@ -1055,7 +1040,6 @@ export function ProjectEditorClient({
     const newBoard = createProjectBoard({
       name: `Board ${scene.boards.length + 1}`,
       intent: "",
-      status: "empty",
     });
     updateScene((current) => {
       const currentIndex = current.boardOrder.findIndex((boardId) => boardId === current.activeBoardId);
@@ -1141,7 +1125,6 @@ export function ProjectEditorClient({
     updateActiveBoard(
       (board) => ({
         ...board,
-        status: board.nodes.length === 0 ? "draft" : board.status,
         nodes: [...board.nodes, node],
       }),
       { selectBoard: false }
@@ -1164,7 +1147,6 @@ export function ProjectEditorClient({
         ...board,
         nodes: nextNodes,
         thumbnailAssetId: nextThumbnail,
-        status: nextNodes.length === 0 ? "empty" : board.status,
       };
     });
     setSelection({ kind: "board" });
@@ -1770,7 +1752,6 @@ export function ProjectEditorClient({
 
     updateActiveBoard((board) => ({
       ...board,
-      status: board.nodes.length === 0 ? "draft" : board.status,
       thumbnailAssetId: board.thumbnailAssetId ?? asset.id,
       nodes: [...board.nodes, node],
     }));
@@ -2121,9 +2102,6 @@ export function ProjectEditorClient({
                   </div>
                   <div className="h-8 w-px bg-black/8" />
                   <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-xs text-neutral-700">
-                    {boardStatusLabel(activeBoard?.status ?? "empty")}
-                  </span>
-                  <span className="inline-flex items-center rounded-full border border-black/8 bg-white/85 px-3 py-1 text-xs text-neutral-700">
                     {scene.generationScope.mode === "current"
                       ? "当前页"
                       : scene.generationScope.mode === "selected"
@@ -2235,49 +2213,24 @@ export function ProjectEditorClient({
                             className={cn("min-h-24", editorFieldClass)}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <FieldLabel>背景色</FieldLabel>
-                            <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/3 px-3">
-                              <input
-                                type="color"
-                                value={activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
-                                onChange={(event) =>
-                                  updateActiveBoard((board) => ({
-                                    ...board,
-                                    frame: { ...board.frame, background: event.target.value },
-                                  }))
-                                }
-                                className="h-5 w-5 rounded border-none bg-transparent p-0"
-                              />
-                              <span className="text-sm text-white/72">
-                                {activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
-                              </span>
-                            </label>
-                          </div>
-                          <div className="space-y-2">
-                            <FieldLabel>状态</FieldLabel>
-                            <Select
-                              value={activeBoard.status}
-                              onValueChange={(value) =>
+                        <div className="space-y-2">
+                          <FieldLabel>背景色</FieldLabel>
+                          <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-white/3 px-3">
+                            <input
+                              type="color"
+                              value={activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
+                              onChange={(event) =>
                                 updateActiveBoard((board) => ({
                                   ...board,
-                                  status: value as ProjectBoardStatus,
+                                  frame: { ...board.frame, background: event.target.value },
                                 }))
                               }
-                            >
-                              <SelectTrigger className={cn("h-10 border-white/10 bg-white/3 text-white")}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {PROJECT_BOARD_STATUSES.map((status) => (
-                                  <SelectItem key={status} value={status}>
-                                    {boardStatusLabel(status)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                              className="h-5 w-5 rounded border-none bg-transparent p-0"
+                            />
+                            <span className="text-sm text-white/72">
+                              {activeBoard.frame.background ?? DEFAULT_BOARD_BACKGROUND}
+                            </span>
+                          </label>
                         </div>
                       </div>
                     </EditorRailSection>

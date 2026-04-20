@@ -40,15 +40,6 @@ export const PROJECT_SHAPE_TYPES = [
 ] as const;
 export type ProjectShapeType = (typeof PROJECT_SHAPE_TYPES)[number];
 
-export const PROJECT_BOARD_STATUSES = [
-  "empty",
-  "draft",
-  "analyzed",
-  "needs_attention",
-  "ready",
-] as const;
-export type ProjectBoardStatus = (typeof PROJECT_BOARD_STATUSES)[number];
-
 export const GenerationScopeSchema = z.object({
   mode: z.enum(["current", "selected", "all"]),
   boardIds: z.array(z.string()),
@@ -160,7 +151,6 @@ export const ProjectBoardSchema = z.object({
   id: z.string(),
   name: z.string(),
   intent: z.string(),
-  status: z.enum(PROJECT_BOARD_STATUSES),
   frame: z.object({
     width: z.literal(PROJECT_BOARD_WIDTH),
     height: z.literal(PROJECT_BOARD_HEIGHT),
@@ -169,10 +159,6 @@ export const ProjectBoardSchema = z.object({
   thumbnailAssetId: z.string().nullable(),
   nodes: z.array(ProjectBoardNodeSchema),
   structureSource: ProjectBoardStructureSourceSchema.nullable().optional().default(null),
-  aiMarkers: z.object({
-    hasAnalysis: z.boolean(),
-    hasPendingSuggestion: z.boolean(),
-  }),
   // AI 生成的内容建议（来自结构建议的 recommendedContent），不放画布上，显示在 Inspector
   contentSuggestions: z.array(z.string()).optional().default([]),
   // 画板锁定：开启后该画板不参与任何 AI 写操作（生成排版 / 更新排版 / 重新生成 / 局部改写）
@@ -459,7 +445,6 @@ export function createProjectBoard(
     id: patch?.id ?? createSceneId("board"),
     name: patch?.name ?? "Untitled board",
     intent: patch?.intent ?? "",
-    status: patch?.status ?? "empty",
     frame: {
       width: PROJECT_BOARD_WIDTH,
       height: PROJECT_BOARD_HEIGHT,
@@ -468,7 +453,6 @@ export function createProjectBoard(
     thumbnailAssetId: patch?.thumbnailAssetId ?? null,
     nodes: patch?.nodes ?? [],
     structureSource: patch?.structureSource ?? null,
-    aiMarkers: patch?.aiMarkers ?? { hasAnalysis: false, hasPendingSuggestion: false },
     contentSuggestions: patch?.contentSuggestions ?? [],
     locked: patch?.locked ?? false,
   };
@@ -480,7 +464,6 @@ export function createEmptyProjectEditorScene(projectName?: string): ProjectEdit
     intent: projectName
       ? `用这一页搭出 ${projectName} 的项目开场`
       : "用这一页搭出项目开场",
-    status: "empty",
   });
 
   return {
@@ -622,7 +605,6 @@ export function buildProjectSceneFromStructureSuggestion(params: {
               ? `${group.label} · ${section.title}`
               : section.title || `${projectName ?? "项目"} · ${sectionIndex + 1}`,
           intent: `${group.label}：${section.purpose}`,
-          status: "draft",
           thumbnailAssetId: matchedAssetId,
           nodes,
           structureSource: {
@@ -634,7 +616,6 @@ export function buildProjectSceneFromStructureSuggestion(params: {
             sectionIndex,
           },
           contentSuggestions,
-          aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
         })
       );
     });
@@ -703,10 +684,8 @@ export function seedProjectEditorSceneFromLayout({
     return createProjectBoard({
       name: page.titleSuggestion || `Board ${index + 1}`,
       intent: page.contentGuidance,
-      status: "draft",
       thumbnailAssetId: matchedAsset?.id ?? null,
       nodes,
-      aiMarkers: { hasAnalysis: false, hasPendingSuggestion: false },
     });
   });
 
@@ -722,6 +701,33 @@ export function seedProjectEditorSceneFromLayout({
   });
 }
 
+function clampNum(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+/**
+ * AI 落版生成时，把节点坐标/尺寸夹回板内，避免首屏就越界。
+ * 仅用于生成路径；用户手动编辑允许越界。
+ */
+export function clampSceneNodesToFrame(scene: ProjectEditorScene): ProjectEditorScene {
+  return {
+    ...scene,
+    boards: scene.boards.map((board) => ({
+      ...board,
+      nodes: board.nodes.map((node) => {
+        const width = clampNum(node.width, 1, PROJECT_BOARD_WIDTH);
+        const height = clampNum(node.height, 1, PROJECT_BOARD_HEIGHT);
+        const x = clampNum(node.x, 0, Math.max(0, PROJECT_BOARD_WIDTH - width));
+        const y = clampNum(node.y, 0, Math.max(0, PROJECT_BOARD_HEIGHT - height));
+        return { ...node, x, y, width, height };
+      }),
+    })),
+  };
+}
+
 export function resolveProjectEditorScene(
   layoutJson: unknown,
   options: {
@@ -731,7 +737,7 @@ export function resolveProjectEditorScene(
 ): ProjectEditorScene {
   const layoutDocument = resolveProjectLayoutDocument(layoutJson);
   if (layoutDocument.editorScene) {
-    return normalizeProjectEditorScene(layoutDocument.editorScene);
+    return normalizeProjectEditorScene(clampSceneNodesToFrame(layoutDocument.editorScene));
   }
 
   if (hasGeneratedLayoutData(layoutDocument) && Array.isArray(layoutDocument.pages)) {
@@ -888,7 +894,6 @@ export function serializeSceneForHash(scene: ProjectEditorScene) {
       id: board.id,
       name: board.name,
       intent: board.intent,
-      status: board.status,
       structureSource: board.structureSource
         ? {
             groupId: board.structureSource.groupId,
@@ -1018,7 +1023,6 @@ export function summarizeProjectSceneForAI({
           ? `结构章节：${board.structureSource.sectionTitle}`
           : null,
         `页面意图：${board.intent || "未填写"}`,
-        `状态：${board.status}`,
         `文本内容：${textSummary || "无"}`,
         `引用素材：${imageSummary || "无"}`,
         `图形元素：${shapeSummary || "无"}`,
@@ -1067,20 +1071,13 @@ export function summarizeMaterialRecognitionForAI({
 export function markBoardsAsAnalyzed(
   scene: ProjectEditorScene,
   boardIds: string[],
-  status: ProjectBoard["status"]
+  status?: string
 ) {
   return normalizeProjectEditorScene({
     ...scene,
     boards: scene.boards.map((board) =>
       boardIds.includes(board.id)
-        ? {
-            ...board,
-            status,
-            aiMarkers: {
-              hasAnalysis: true,
-              hasPendingSuggestion: status === "needs_attention",
-            },
-          }
+        ? { ...board }
         : board
     ),
   });
@@ -1094,14 +1091,7 @@ export function markBoardsAfterGeneration(
     ...scene,
     boards: scene.boards.map((board) =>
       boardIds.includes(board.id)
-        ? {
-            ...board,
-            status: board.nodes.length > 0 ? "ready" : "draft",
-            aiMarkers: {
-              ...board.aiMarkers,
-              hasPendingSuggestion: false,
-            },
-          }
+        ? { ...board }
         : board
     ),
   });
