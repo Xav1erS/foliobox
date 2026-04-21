@@ -62,7 +62,7 @@ export async function writePrecheckLog(params: {
   objectId: string;
   actionType: string;
   budgetStatus: "healthy" | "near_limit" | "needs_topup";
-  suggestedMode: "continue" | "reuse" | "downgrade" | "block";
+  suggestedMode: "continue" | "reuse" | "skip" | "downgrade" | "block";
   reusableDraftId?: string | null;
 }) {
   return db.precheckLog.create({

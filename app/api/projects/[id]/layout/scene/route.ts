@@ -5,7 +5,10 @@ import { db } from "@/lib/db";
 import {
   ProjectEditorSceneSchema,
   mergeProjectLayoutDocument,
+  resolveProjectEditorScene,
+  resolveProjectLayoutDocument,
 } from "@/lib/project-editor-scene";
+import { validateProjectEditorScene } from "@/lib/project-editor-validation";
 
 export async function PUT(
   request: NextRequest,
@@ -19,7 +22,23 @@ export async function PUT(
   const { id } = await params;
   const project = await db.project.findFirst({
     where: { id, userId: session.user.id },
-    select: { id: true, layoutJson: true },
+    select: {
+      id: true,
+      name: true,
+      layoutJson: true,
+      assets: {
+        where: { selected: true },
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          title: true,
+          imageUrl: true,
+          isCover: true,
+          selected: true,
+          metaJson: true,
+        },
+      },
+    },
   });
 
   if (!project) {
@@ -39,19 +58,40 @@ export async function PUT(
     );
   }
 
+  const previousLayout = resolveProjectLayoutDocument(project.layoutJson);
+  const previousScene = resolveProjectEditorScene(project.layoutJson, {
+    assets: project.assets,
+    projectName: project.name,
+  });
   const layoutDocument = mergeProjectLayoutDocument(project.layoutJson, {
     editorScene: parsedScene.data,
     ...(body.markSetupCompleted
       ? { setup: { completedAt: new Date().toISOString() } }
       : {}),
   });
+  const nextScene =
+    layoutDocument.editorScene ??
+    resolveProjectEditorScene(layoutDocument, {
+      assets: project.assets,
+      projectName: project.name,
+    });
+  const validation = validateProjectEditorScene({
+    scene: nextScene,
+    assets: project.assets,
+    source: "manual_edit",
+    previousScene,
+    previousValidation: previousLayout.validation ?? null,
+  });
+  const nextLayout = mergeProjectLayoutDocument(layoutDocument, {
+    validation,
+  });
 
   await db.project.update({
     where: { id },
     data: {
-      layoutJson: layoutDocument as unknown as Prisma.InputJsonValue,
+      layoutJson: nextLayout as unknown as Prisma.InputJsonValue,
     },
   });
 
-  return NextResponse.json({ editorScene: layoutDocument.editorScene });
+  return NextResponse.json({ layoutJson: nextLayout });
 }

@@ -18,20 +18,29 @@ import {
   type StyleProfile,
   type StyleReferenceSelection,
 } from "@/lib/style-reference-presets";
+import {
+  stampProjectValidationFailure,
+  validateProjectEditorScene,
+} from "@/lib/project-editor-validation";
 import type {
+  GeneratedLayoutPageSeed,
+  ProjectBoard,
   ProjectEditorScene,
+  ProjectLayoutValidation,
   ProjectMaterialRecognition,
+  ProjectPageType,
   ProjectStructureSuggestion,
 } from "@/lib/project-editor-scene";
 import {
+  applyGeneratedLayoutToScene,
   GenerationScopeSchema,
   getEffectiveGenerationBoardIds,
   MAX_PROJECT_BOARDS,
-  getGenerationScopeBoardIds,
   getLockedBoardIdsInScope,
+  getPrototypeBoardIdsInScope,
   hasGeneratedLayoutData,
-  markBoardsAfterGeneration,
   mergeProjectLayoutDocument,
+  ProjectPageTypeSchema,
   resolveProjectEditorScene,
   resolveProjectLayoutDocument,
   serializeSceneForHash,
@@ -40,20 +49,10 @@ import {
 
 // ─── Layout JSON schema ───────────────────────────────────────────────────────
 
-const PAGE_TYPES = [
-  "cover",
-  "background",
-  "problem",
-  "process",
-  "solution",
-  "result",
-  "reflection",
-  "closing",
-] as const;
-
 const LayoutPageSchema = z.object({
+  boardId: z.string(),
   pageNumber: z.number(),
-  type: z.enum(PAGE_TYPES),
+  type: ProjectPageTypeSchema,
   titleSuggestion: z.string(),
   contentGuidance: z.string(),
   keyPoints: z.array(z.string()),
@@ -71,6 +70,7 @@ const LayoutJsonSchema = z.object({
 
 export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
   styleProfile?: StyleProfile;
+  validation?: ProjectLayoutValidation;
   editorScene?: ProjectEditorScene;
   materialRecognition?: ProjectMaterialRecognition;
   structureSuggestion?: ProjectStructureSuggestion;
@@ -90,6 +90,7 @@ function buildPrompt(project: {
   sceneSummary: string;
   structureSummary: string;
   scopeLabel: string;
+  boardPlanSummary: string;
 }): string {
   const modeLabel =
     project.packageMode === "DEEP"
@@ -105,10 +106,12 @@ function buildPrompt(project: {
         .join("\n")
     : "（暂无项目事实数据）";
 
-  return `你是一位资深作品集顾问，帮助设计师规划单个项目的展示结构。
+  return `你是一位资深作品集顾问，帮助设计师把已经确认好的项目原型画板，升级成高保真排版计划。
 
 ## 任务
-为以下项目生成一份排版页面计划（page plan），用于指导作品集中该项目的排版方向。
+当前项目已经完成结构确认，并已创建原型画板。
+请基于当前原型范围，为每一张原型画板生成一份高保真排版计划。
+你必须严格沿用当前原型画板的顺序和 boardId，一张原型对应一条计划，不能新增、删除或合并画板。
 
 ## 项目信息
 项目名称：${project.name}
@@ -125,25 +128,31 @@ ${project.styleSummary}
 本次生成范围：${project.scopeLabel}
 ${project.sceneSummary}
 
+## 当前原型画板清单
+${project.boardPlanSummary}
+
 ## 已有结构建议
 ${project.structureSummary}
 
 ## 要求
-1. 严格按照包装模式的页数范围生成页面计划
-2. 每页给出：页面类型（cover/background/problem/process/solution/result/reflection/closing）、标题建议、内容指导、3–5个关键要点
-3. 给出一句话叙事摘要，说明这个项目的核心故事弧度
-4. 给出2–4条质量提示，指出当前信息中可以加强的方向
-5. 语言简洁专业，面向中国设计师
+1. 严格按当前原型画板数量输出 pages；每条 pages 必须保留对应 boardId
+2. page.type 必须从当前原型页型中选择，不要自造新页型
+3. 每页给出：boardId、页面类型、标题建议、内容指导、3–5 个关键要点
+4. 这是一份高保真排版计划：要帮助后续模板层决定主次、图文关系、信息密度与节奏，而不是重写结构
+5. 给出一句话叙事摘要，说明这个项目的核心故事弧度
+6. 给出 2–4 条质量提示，指出当前信息中可以加强的方向
+7. 语言简洁专业，面向中国设计师
 
 请输出 JSON，格式如下：
 {
   "packageMode": "${project.packageMode}",
-  "totalPages": <数字>,
+  "totalPages": <当前原型画板数>,
   "narrativeSummary": "<一句话描述项目叙事弧度>",
   "pages": [
     {
+      "boardId": "<必须与输入里的 boardId 完全一致>",
       "pageNumber": 1,
-      "type": "<cover|background|problem|process|solution|result|reflection|closing>",
+      "type": "<沿用输入里已有的页型>",
       "titleSuggestion": "<页面标题建议>",
       "contentGuidance": "<这页应该呈现什么内容>",
       "keyPoints": ["要点1", "要点2", "要点3"],
@@ -153,6 +162,33 @@ ${project.structureSummary}
   ],
   "qualityNotes": ["提示1", "提示2"]
 }`;
+}
+
+function buildBoardPlanSummary(boards: Array<{
+  id: string;
+  name: string;
+  intent: string;
+  pageType: ProjectPageType | null;
+  structureSource?: {
+    groupLabel?: string | null;
+    sectionTitle?: string | null;
+  } | null;
+}>) {
+  return boards
+    .map((board, index) =>
+      [
+        `画板 ${index + 1}`,
+        `boardId：${board.id}`,
+        `页型：${board.pageType ?? "关键模块优化"}`,
+        `名称：${board.name || "未命名"}`,
+        board.structureSource?.groupLabel ? `结构分组：${board.structureSource.groupLabel}` : null,
+        board.structureSource?.sectionTitle ? `结构章节：${board.structureSource.sectionTitle}` : null,
+        `页面意图：${board.intent || "未填写"}`,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n")
+    )
+    .join("\n\n");
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
@@ -222,11 +258,9 @@ export async function POST(
     ...scene,
     generationScope,
   };
-  // 用户选定范围（含锁定画板）。
-  const scopedBoardIds = getGenerationScopeBoardIds(scopedScene);
   // 锁定画板必须从 AI 写操作中显式跳过（参见 spec-system-v3/11 §9.4）。
   const lockedBoardIdsInScope = getLockedBoardIdsInScope(scopedScene);
-  // 实际参与生成的画板（不含锁定画板）。
+  // 本次用户选择范围内、未锁定的画板。
   const effectiveBoardIds = getEffectiveGenerationBoardIds(scopedScene);
   if (effectiveBoardIds.length === 0) {
     return NextResponse.json(
@@ -234,6 +268,11 @@ export async function POST(
       { status: 400 }
     );
   }
+  // 两阶段线性规则：已是 hi-fi 的画板不再参与本次生成，只显式跳过。
+  const prototypeBoardIds = getPrototypeBoardIdsInScope(scopedScene);
+  const skippedGeneratedBoardIds = effectiveBoardIds.filter(
+    (boardId) => !prototypeBoardIds.includes(boardId)
+  );
   // 单 Project 画板硬上限（参见 spec-system-v3/04 §4.5 与 spec-system-v3/09）。
   if (scopedScene.boards.length > MAX_PROJECT_BOARDS) {
     return NextResponse.json(
@@ -242,6 +281,22 @@ export async function POST(
       },
       { status: 400 }
     );
+  }
+  if (prototypeBoardIds.length === 0) {
+    const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
+      editorScene: scene,
+    }) as LayoutJson;
+    return NextResponse.json({
+      layoutJson,
+      skipped: true,
+      skippedBoardIds: skippedGeneratedBoardIds,
+      precheck: {
+        suggestedMode: "skip",
+        failureCounts: false,
+        consumesQuota: false,
+        reusableDraftId: null,
+      },
+    });
   }
   const isRegeneration = hasGeneratedLayoutData(project.layoutJson);
   const actionType = isRegeneration
@@ -270,16 +325,46 @@ export async function POST(
     styleSelection,
     assetIds: project.assets.map((asset) => asset.id),
     facts: project.facts ?? {},
-    scene: serializeSceneForHash(scopedScene),
+    scene: serializeSceneForHash({
+      ...scopedScene,
+      generationScope: { mode: "selected", boardIds: prototypeBoardIds },
+    }),
   });
 
-  const reusable = await findReusableGeneratedDraft({
+  let reusable = await findReusableGeneratedDraft({
     userId,
     objectType: "project",
     objectId: projectId,
     requestHash,
     draftType: "layout",
   });
+
+  let reusableLayoutJson: LayoutJson | null = null;
+  if (reusable) {
+    const candidateLayout = mergeProjectLayoutDocument(
+      project.layoutJson,
+      reusable.draft.contentJson as LayoutJson
+    ) as LayoutJson;
+    const candidateScene = resolveProjectEditorScene(candidateLayout, {
+      assets: project.assets,
+      projectName: project.name,
+    });
+    const reusableValidation = validateProjectEditorScene({
+      scene: candidateScene,
+      assets: project.assets,
+      source: "layout_generation",
+      previousScene: scene,
+      previousValidation: layoutDocument.validation ?? null,
+    });
+
+    if (reusableValidation.projectState === "not_ready") {
+      reusable = null;
+    } else {
+      reusableLayoutJson = mergeProjectLayoutDocument(candidateLayout, {
+        validation: reusableValidation,
+      }) as LayoutJson;
+    }
+  }
 
   if (!reusable) {
     if (!isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0) {
@@ -325,10 +410,7 @@ export async function POST(
       },
     });
 
-    const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
-      ...(reusable.draft.contentJson as LayoutJson),
-      editorScene: markBoardsAfterGeneration(scene, effectiveBoardIds),
-    }) as LayoutJson;
+    const layoutJson = reusableLayoutJson ?? ((reusable.draft.contentJson as LayoutJson) ?? null);
     await db.project.update({
       where: { id: projectId },
       data: { layoutJson: layoutJson as unknown as Prisma.InputJsonValue },
@@ -379,6 +461,9 @@ export async function POST(
     const factsRecord = project.facts
       ? (project.facts as Record<string, unknown>)
       : null;
+    const prototypeBoards = prototypeBoardIds
+      .map((boardId) => scene.boards.find((board) => board.id === boardId))
+      .filter((board): board is ProjectBoard => Boolean(board));
 
     const prompt = buildPrompt({
       name: project.name,
@@ -389,8 +474,12 @@ export async function POST(
       sceneSummary: summarizeProjectSceneForAI({
         scene,
         assets: project.assets,
-        scope: generationScope,
+        scope: {
+          mode: "selected",
+          boardIds: prototypeBoardIds,
+        },
       }),
+      boardPlanSummary: buildBoardPlanSummary(prototypeBoards),
       structureSummary: layoutDocument.structureSuggestion
         ? [
             layoutDocument.structureSuggestion.summary,
@@ -405,13 +494,15 @@ export async function POST(
       scopeLabel:
         generationScope.mode === "all"
           ? lockedBoardIdsInScope.length > 0
-            ? `全部画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板）`
-            : "全部画板"
+            ? `全部画板中的 ${prototypeBoardIds.length} 张原型画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板，${skippedGeneratedBoardIds.length} 个已生成画板）`
+            : `全部画板中的 ${prototypeBoardIds.length} 张原型画板`
           : generationScope.mode === "selected"
             ? lockedBoardIdsInScope.length > 0
-              ? `已选择的 ${effectiveBoardIds.length} 个画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板）`
-              : `已选择的 ${effectiveBoardIds.length} 个画板`
-            : "当前画板",
+              ? `已选择范围中的 ${prototypeBoardIds.length} 张原型画板（已跳过 ${lockedBoardIdsInScope.length} 个锁定画板，${skippedGeneratedBoardIds.length} 个已生成画板）`
+              : `已选择范围中的 ${prototypeBoardIds.length} 张原型画板`
+            : skippedGeneratedBoardIds.length > 0
+              ? `当前范围中的原型画板（已跳过 ${skippedGeneratedBoardIds.length} 个已生成画板）`
+              : "当前原型画板",
     });
 
     const generatedLayout = await llm.generateStructured(prompt, LayoutJsonSchema, {
@@ -419,10 +510,90 @@ export async function POST(
       temperature: 0.4,
       track: { userId, projectId },
     });
+    const normalizedPages: GeneratedLayoutPageSeed[] = prototypeBoards.map((board, index) => {
+      const matchedPage =
+        generatedLayout.pages.find((page) => page.boardId === board.id) ??
+        generatedLayout.pages[index];
+      const fallbackType = (board.pageType ?? "关键模块优化") as ProjectPageType;
+      return {
+        boardId: board.id,
+        pageNumber: index + 1,
+        type: (matchedPage?.type ?? fallbackType) as ProjectPageType,
+        titleSuggestion:
+          matchedPage?.titleSuggestion?.trim() ||
+          board.name ||
+          board.structureSource?.sectionTitle ||
+          `画板 ${index + 1}`,
+        contentGuidance:
+          matchedPage?.contentGuidance?.trim() ||
+          board.intent ||
+          "继续补齐这一页的重点内容。",
+        keyPoints:
+          matchedPage?.keyPoints?.filter(Boolean).slice(0, 5) ??
+          board.contentSuggestions.slice(0, 5),
+        assetHint: matchedPage?.assetHint,
+        wordCountGuideline: matchedPage?.wordCountGuideline,
+      };
+    });
+    const nextEditorScene = applyGeneratedLayoutToScene({
+      scene,
+      boardIds: prototypeBoardIds,
+      layoutPages: normalizedPages,
+      assets: project.assets,
+      styleProfile,
+      suggestion: layoutDocument.structureSuggestion ?? null,
+      recognition: layoutDocument.materialRecognition ?? null,
+    });
+    const validation = validateProjectEditorScene({
+      scene: nextEditorScene,
+      assets: project.assets,
+      source: "layout_generation",
+      previousScene: scene,
+      previousValidation: layoutDocument.validation ?? null,
+    });
+
+    if (validation.projectState === "not_ready") {
+      const rollbackValidation = stampProjectValidationFailure({
+        scene,
+        validation: validateProjectEditorScene({
+          scene,
+          assets: project.assets,
+          source: "export_check",
+          previousValidation: layoutDocument.validation ?? null,
+        }),
+        summary: "本次生成未完成，已保留原内容。",
+      });
+      const rollbackLayout = mergeProjectLayoutDocument(project.layoutJson, {
+        validation: rollbackValidation,
+      }) as LayoutJson;
+
+      await db.project.update({
+        where: { id: projectId },
+        data: { layoutJson: rollbackLayout as unknown as Prisma.InputJsonValue },
+      });
+      await db.generationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "failed",
+          wasSuccessful: false,
+          countedToBudget: false,
+        },
+      });
+
+      return NextResponse.json({
+        layoutJson: rollbackLayout,
+        rolledBack: true,
+        message: "本次生成未完成，已保留原内容。",
+      });
+    }
+
     const layoutJson = mergeProjectLayoutDocument(project.layoutJson, {
       ...generatedLayout,
+      totalPages: normalizedPages.length,
+      pages: normalizedPages,
       styleProfile,
-      editorScene: markBoardsAfterGeneration(scene, effectiveBoardIds),
+      editorScene: nextEditorScene,
+      validation,
     }) as LayoutJson;
 
     // Persist layout JSON to project

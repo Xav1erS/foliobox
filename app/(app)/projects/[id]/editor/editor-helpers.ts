@@ -24,6 +24,7 @@ export type FabricSceneObject = FabricObject & {
     };
     shapeType?: ProjectShapeType;
     role?: ProjectBoardTextNode["role"];
+    placeholder?: boolean;
   };
 };
 

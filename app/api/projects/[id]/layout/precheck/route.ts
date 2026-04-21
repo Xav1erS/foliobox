@@ -12,6 +12,7 @@ import {
 } from "@/lib/generation-precheck";
 import {
   GenerationScopeSchema,
+  getPrototypeBoardIdsInScope,
   hasGeneratedLayoutData,
   resolveProjectEditorScene,
   serializeSceneForHash,
@@ -67,6 +68,10 @@ export async function POST(
     assets: project.assets,
   });
   const generationScope = parsedScope.success ? parsedScope.data : scene.generationScope;
+  const scopedScene = {
+    ...scene,
+    generationScope,
+  };
   const isRegeneration = hasGeneratedLayoutData(project.layoutJson);
   const actionType = isRegeneration
     ? "project_layout_regeneration"
@@ -78,6 +83,17 @@ export async function POST(
     projectActionSummary.layoutGenerations.used +
       projectActionSummary.layoutRegenerations.used >
     0;
+  const prototypeBoardIds = getPrototypeBoardIdsInScope(scopedScene);
+  const selectedBoardIds =
+    generationScope.mode === "all"
+      ? scene.boardOrder
+      : generationScope.mode === "selected"
+        ? generationScope.boardIds.filter((boardId) => scene.boardOrder.includes(boardId))
+        : generationScope.boardIds.slice(0, 1);
+  const skippedGeneratedBoardCount = selectedBoardIds.filter((boardId) => {
+    const board = scene.boards.find((item) => item.id === boardId);
+    return Boolean(board) && !prototypeBoardIds.includes(boardId) && !board?.locked;
+  }).length;
 
   const requestHash = hashGenerationInput({
     actionType,
@@ -86,28 +102,36 @@ export async function POST(
     styleSelection,
     assetIds: project.assets.map((asset) => asset.id),
     facts: project.facts ?? {},
-    scene: serializeSceneForHash({
-      ...scene,
-      generationScope,
-    }),
+    scene: serializeSceneForHash(scopedScene),
   });
-  const reusable = await findReusableGeneratedDraft({
-    userId: session.user.id,
-    objectType: "project",
-    objectId: projectId,
-    requestHash,
-    draftType: "layout",
-  });
+  const reusable =
+    prototypeBoardIds.length > 0
+      ? await findReusableGeneratedDraft({
+          userId: session.user.id,
+          objectType: "project",
+          objectId: projectId,
+          requestHash,
+          draftType: "layout",
+        })
+      : null;
 
   const blockReason = reusable
     ? null
+    : prototypeBoardIds.length === 0
+      ? null
     : !isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0
       ? "active_project_limit"
       : actionQuota.remaining <= 0
         ? "action_quota_exhausted"
         : null;
-  const suggestedMode = reusable ? "reuse" : blockReason ? "block" : "continue";
-  const remainingAfterAction = reusable
+  const suggestedMode = reusable
+    ? "reuse"
+    : prototypeBoardIds.length === 0
+      ? "skip"
+      : blockReason
+        ? "block"
+        : "continue";
+  const remainingAfterAction = reusable || prototypeBoardIds.length === 0
     ? actionQuota.remaining
     : Math.max(actionQuota.remaining - 1, 0);
 
@@ -117,7 +141,9 @@ export async function POST(
     objectId: projectId,
     actionType,
     budgetStatus:
-      !isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0
+      prototypeBoardIds.length === 0
+        ? "healthy"
+        : !isProjectActivated && entitlementSummary.quotas.activeProjects.remaining <= 0
         ? "needs_topup"
         : actionQuota.remaining <= 1
           ? "near_limit"
@@ -134,7 +160,7 @@ export async function POST(
       actionType === "project_layout_regeneration" ? "重新生成排版" : "生成排版",
     suggestedMode,
     blockReason,
-    consumesQuota: !reusable,
+    consumesQuota: !reusable && prototypeBoardIds.length > 0,
     failureCounts: false,
     projectActivated: isProjectActivated,
     activeProjectRemaining: entitlementSummary.quotas.activeProjects.remaining,
@@ -143,5 +169,7 @@ export async function POST(
     reusableDraftId: reusable?.draft.id ?? null,
     reusableTaskId: reusable?.task.id ?? null,
     generationScope,
+    prototypeBoardCount: prototypeBoardIds.length,
+    skippedGeneratedBoardCount,
   });
 }

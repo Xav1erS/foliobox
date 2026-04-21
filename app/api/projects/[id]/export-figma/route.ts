@@ -6,7 +6,14 @@ import {
   getPrivateBlob,
   isBlobStorageUrl,
 } from "@/lib/storage";
-import { resolveProjectEditorScene } from "@/lib/project-editor-scene";
+import {
+  resolveProjectEditorScene,
+  resolveProjectLayoutDocument,
+} from "@/lib/project-editor-scene";
+import {
+  getProjectExportBlockReason,
+  validateProjectEditorScene,
+} from "@/lib/project-editor-validation";
 
 export const runtime = "nodejs";
 
@@ -85,6 +92,20 @@ export async function GET(
     assets: project.assets,
     projectName: project.name,
   });
+  const validation = validateProjectEditorScene({
+    scene,
+    assets: project.assets,
+    source: "export_check",
+    previousValidation: resolveProjectLayoutDocument(project.layoutJson).validation ?? null,
+  });
+  const blockReason = getProjectExportBlockReason({
+    scene,
+    validation,
+  });
+
+  if (blockReason) {
+    return NextResponse.json({ error: blockReason }, { status: 400 });
+  }
 
   const payload = await buildProjectFigmaExportPayload({
     projectId: project.id,

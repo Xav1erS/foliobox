@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyGeneratedLayoutToScene,
   buildProjectSceneFromStructureSuggestion,
+  createProjectTextNode,
   createEmptyProjectEditorScene,
   getSceneBoardGroupRuns,
   hasGeneratedLayoutData,
+  isPrototypeBoard,
   mergeProjectAssetMeta,
   mergeProjectLayoutDocument,
   normalizeProjectEditorScene,
@@ -12,6 +15,7 @@ import {
   resolveProjectEditorScene,
   summarizeProjectSceneForAI,
 } from "./project-editor-scene";
+import { resolveStyleProfile } from "./style-reference-presets";
 
 describe("project editor scene", () => {
   it("creates a 1920x1080 starter board", () => {
@@ -229,19 +233,18 @@ describe("project editor scene", () => {
     expect(scene.boardOrder).toHaveLength(2);
     expect(scene.generationScope.mode).toBe("all");
     expect(scene.boards[0].name).toContain("项目概览");
+    expect(scene.boards[0].phase).toBe("prototype");
+    expect(scene.boards[0].pageType).toBe("项目定位 / 背景页");
+    expect(isPrototypeBoard(scene.boards[0])).toBe(true);
     expect(scene.boards[0].structureSource).toMatchObject({
       groupId: "group-overview",
       groupLabel: "项目概览",
       sectionId: "section-cover",
       sectionTitle: "项目封面",
     });
-    expect(scene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
-    expect(
-      scene.boards[0].nodes.find((node) => node.type === "image")
-    ).toMatchObject({
-      type: "image",
-      fit: "fit",
-    });
+    expect(scene.boards[0].nodes.some((node) => node.placeholder)).toBe(true);
+    expect(scene.boards[0].nodes.some((node) => node.type === "shape")).toBe(true);
+    expect(scene.boards[1].pageType).toBe("流程 / 任务链优化页");
   });
 
   it("groups ordered boards by structure source runs", () => {
@@ -334,14 +337,14 @@ describe("project editor scene", () => {
         pages: [
           {
             pageNumber: 1,
-            type: "cover",
+            type: "项目定位 / 背景页",
             titleSuggestion: "项目封面",
             contentGuidance: "先讲清项目是什么",
             keyPoints: ["标题", "背景", "封面图"],
           },
           {
             pageNumber: 2,
-            type: "process",
+            type: "关键模块优化",
             titleSuggestion: "关键过程",
             contentGuidance: "展开核心判断",
             keyPoints: ["过程", "取舍", "输出"],
@@ -365,6 +368,8 @@ describe("project editor scene", () => {
 
     expect(scene.boards).toHaveLength(2);
     expect(scene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
+    expect(scene.boards[0].phase).toBe("generated");
+    expect(scene.boards[0].pageType).toBe("项目定位 / 背景页");
     expect(scene.boardOrder).toEqual(scene.boards.map((board) => board.id));
   });
 
@@ -377,7 +382,7 @@ describe("project editor scene", () => {
         pages: [
           {
             pageNumber: 1,
-            type: "cover",
+            type: "项目定位 / 背景",
             titleSuggestion: "封面",
             contentGuidance: "说明项目背景",
             keyPoints: ["背景", "目标", "结果"],
@@ -426,6 +431,200 @@ describe("project editor scene", () => {
     expect(summary).toContain("名称：封面");
     expect(summary).toContain("结构分组：项目概览");
     expect(summary).toContain("主图【main】：最终结果图");
+  });
+
+  it("replaces placeholder nodes during layout generation without dropping manual edits", () => {
+    const prototypeScene = buildProjectSceneFromStructureSuggestion({
+      suggestion: {
+        generatedAt: "2026-04-11T00:00:00.000Z",
+        summary: "按概览、模块、结果来组织。",
+        narrativeArc: "概览 -> 模块 -> 结果",
+        status: "confirmed",
+        confirmedAt: "2026-04-11T00:05:00.000Z",
+        groups: [
+          {
+            id: "group-overview",
+            label: "项目概览",
+            rationale: "先建立项目边界。",
+            narrativeRole: "开场",
+            sections: [
+              {
+                id: "section-cover",
+                title: "项目封面",
+                purpose: "先讲清这个项目是什么。",
+                recommendedContent: ["项目名称", "角色", "目标"],
+                suggestedAssets: ["封面图"],
+              },
+            ],
+          },
+          {
+            id: "group-module",
+            label: "关键模块",
+            rationale: "展示最强方案。",
+            narrativeRole: "主体",
+            sections: [
+              {
+                id: "section-module",
+                title: "模块优化",
+                purpose: "展示关键界面和设计取舍。",
+                recommendedContent: ["Before / After", "方案亮点"],
+                suggestedAssets: ["模块图"],
+              },
+            ],
+          },
+        ],
+      },
+      assets: [
+        {
+          id: "asset-cover",
+          title: "封面图",
+          selected: true,
+          isCover: true,
+          metaJson: { roleTag: "main", note: "首页主视觉" },
+        },
+        {
+          id: "asset-module",
+          title: "模块图",
+          selected: true,
+          metaJson: { roleTag: "support", note: "关键模块截图" },
+        },
+      ],
+      recognition: {
+        generatedAt: "2026-04-11T00:00:00.000Z",
+        summary: "封面图和关键模块截图都比较明确。",
+        recognizedTypes: ["封面", "关键界面"],
+        heroAssetIds: ["asset-cover"],
+        supportingAssetIds: ["asset-module"],
+        decorativeAssetIds: [],
+        riskyAssetIds: [],
+        missingInfo: [],
+        suggestedNextStep: "确认结构并落板。",
+        recognizedAssetIds: ["asset-cover", "asset-module"],
+        lastIncrementalDiff: null,
+      },
+      projectName: "案例 A",
+    });
+    const manualNote = createProjectTextNode({
+      id: "manual-note",
+      role: "note",
+      text: "用户手动补充说明",
+      x: 120,
+      y: 930,
+      width: 480,
+      height: 48,
+      fontSize: 20,
+      placeholder: false,
+    });
+    const sceneWithManualNode = normalizeProjectEditorScene({
+      ...prototypeScene,
+      boards: prototypeScene.boards.map((board, index) =>
+        index === 0 ? { ...board, nodes: [...board.nodes, manualNote] } : board
+      ),
+    });
+
+    const nextScene = applyGeneratedLayoutToScene({
+      scene: sceneWithManualNode,
+      boardIds: sceneWithManualNode.boardOrder,
+      layoutPages: [
+        {
+          boardId: sceneWithManualNode.boards[0].id,
+          pageNumber: 1,
+          type: "项目定位 / 背景页",
+          titleSuggestion: "案例开场",
+          contentGuidance: "说明项目定位与目标。",
+          keyPoints: ["角色", "目标", "成果"],
+        },
+        {
+          boardId: sceneWithManualNode.boards[1].id,
+          pageNumber: 2,
+          type: "关键模块优化",
+          titleSuggestion: "关键模块",
+          contentGuidance: "展开界面优化与设计取舍。",
+          keyPoints: ["Before / After", "方案理由", "关键收益"],
+        },
+      ],
+      assets: [
+        {
+          id: "asset-cover",
+          title: "封面图",
+          selected: true,
+          isCover: true,
+          metaJson: { roleTag: "main", note: "首页主视觉" },
+        },
+        {
+          id: "asset-module",
+          title: "模块图",
+          selected: true,
+          metaJson: { roleTag: "support", note: "关键模块截图" },
+        },
+      ],
+      styleProfile: resolveStyleProfile({ source: "preset", presetKey: "clean-case" }),
+      suggestion: sceneWithManualNode.boards[0].structureSource
+        ? {
+            generatedAt: "2026-04-11T00:00:00.000Z",
+            summary: "按概览、模块、结果来组织。",
+            narrativeArc: "概览 -> 模块 -> 结果",
+            status: "confirmed",
+            confirmedAt: "2026-04-11T00:05:00.000Z",
+            groups: [
+              {
+                id: "group-overview",
+                label: "项目概览",
+                rationale: "先建立项目边界。",
+                narrativeRole: "开场",
+                sections: [
+                  {
+                    id: "section-cover",
+                    title: "项目封面",
+                    purpose: "先讲清这个项目是什么。",
+                    recommendedContent: ["项目名称", "角色", "目标"],
+                    suggestedAssets: ["封面图"],
+                  },
+                ],
+              },
+              {
+                id: "group-module",
+                label: "关键模块",
+                rationale: "展示最强方案。",
+                narrativeRole: "主体",
+                sections: [
+                  {
+                    id: "section-module",
+                    title: "模块优化",
+                    purpose: "展示关键界面和设计取舍。",
+                    recommendedContent: ["Before / After", "方案亮点"],
+                    suggestedAssets: ["模块图"],
+                  },
+                ],
+              },
+            ],
+          }
+        : null,
+      recognition: {
+        generatedAt: "2026-04-11T00:00:00.000Z",
+        summary: "封面图和关键模块截图都比较明确。",
+        recognizedTypes: ["封面", "关键界面"],
+        heroAssetIds: ["asset-cover"],
+        supportingAssetIds: ["asset-module"],
+        decorativeAssetIds: [],
+        riskyAssetIds: [],
+        missingInfo: [],
+        suggestedNextStep: "确认结构并落板。",
+        recognizedAssetIds: ["asset-cover", "asset-module"],
+        lastIncrementalDiff: null,
+      },
+    });
+
+    expect(nextScene.boards.every((board) => board.phase === "generated")).toBe(true);
+    expect(nextScene.boards.every((board) => board.nodes.every((node) => !node.placeholder))).toBe(
+      true
+    );
+    expect(nextScene.boards[0].nodes.find((node) => node.id === "manual-note")).toMatchObject({
+      id: "manual-note",
+      text: "用户手动补充说明",
+      placeholder: false,
+    });
+    expect(nextScene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
   });
 
   it("merges asset note and roleTag without dropping existing values", () => {

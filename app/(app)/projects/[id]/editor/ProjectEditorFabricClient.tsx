@@ -137,12 +137,12 @@ import {
 import type { PlanSummaryCopy } from "@/lib/entitlement";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
-  buildProjectSceneFromStructureSuggestion,
+  boardHasPlaceholderNodes,
   createProjectBoard,
   createProjectImageNode,
   getSceneBoardGroupRuns,
+  isPrototypeBoard,
   MAX_PROJECT_BOARDS,
-  markBoardsAfterGeneration,
   createProjectShapeNode,
   createProjectTextNode,
   getGenerationScopeBoardIds,
@@ -157,9 +157,11 @@ import {
   resolveProjectAssetMeta,
   type GenerationScope,
   type ProjectBoard,
+  type ProjectBoardValidation,
   type ProjectBoardGroupRun,
   type ProjectBoardImageNode,
   type ProjectImageRoleTag,
+  type ProjectLayoutValidation,
   type ProjectMaterialRecognition,
   type ProjectBoardNode,
   type ProjectStructureGroup,
@@ -168,6 +170,7 @@ import {
   type ProjectBoardTextNode,
   type ProjectEditorScene,
   type ProjectShapeType,
+  type ProjectValidationCause,
 } from "@/lib/project-editor-scene";
 import {
   STYLE_PRESETS,
@@ -249,7 +252,7 @@ type GeneratePrecheck = {
   styleProfile: StyleProfile;
   isHighCostAction: boolean;
   actionLabel: string;
-  suggestedMode: "continue" | "reuse" | "block";
+  suggestedMode: "continue" | "reuse" | "skip" | "block";
   blockReason: "active_project_limit" | "action_quota_exhausted" | null;
   consumesQuota: boolean;
   failureCounts: boolean;
@@ -260,7 +263,111 @@ type GeneratePrecheck = {
   reusableDraftId: string | null;
   reusableTaskId?: string | null;
   generationScope?: GenerationScope;
+  prototypeBoardCount?: number;
+  skippedGeneratedBoardCount?: number;
 };
+
+function getFallbackProjectValidation(): ProjectLayoutValidation {
+  return {
+    projectState: "unknown",
+    projectVerdict: null,
+    cause: null,
+    summary: "当前结果尚未完成自动校验。",
+    updatedAt: "",
+    sceneHash: "",
+    boards: [],
+  };
+}
+
+function getProjectValidationMeta(
+  validation: ProjectLayoutValidation | null | undefined,
+  scene: ProjectEditorScene
+) {
+  const resolved = validation ?? getFallbackProjectValidation();
+  const hasPrototypeBoards = scene.boards.some((board) => isPrototypeBoard(board));
+
+  if (resolved.cause === "system_generation_failed") {
+    return {
+      label: "系统生成未完成，已回退",
+      shortLabel: "已回退",
+      summary: resolved.summary || "本次生成未完成，已保留原内容。",
+      className: "border-red-300/20 bg-red-400/10 text-red-100/88",
+    };
+  }
+  if (resolved.cause === "user_modified_regression" || resolved.projectState === "not_ready") {
+    return {
+      label: "你修改后需调整",
+      shortLabel: "需调整",
+      summary: resolved.summary || "当前仍有未达标画板，建议先调整。",
+      className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
+    };
+  }
+  if (resolved.cause === "missing_user_material" || resolved.projectState === "pass_with_notes") {
+    return {
+      label: hasPrototypeBoards ? "原型需补充信息" : "需要补充信息",
+      shortLabel: "需补充",
+      summary: resolved.summary || "当前仍建议补充素材或信息。",
+      className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
+    };
+  }
+  if (resolved.projectState === "pass") {
+    return {
+      label: hasPrototypeBoards ? "原型已通过" : "已通过",
+      shortLabel: hasPrototypeBoards ? "原型通过" : "已通过",
+      summary:
+        resolved.summary ||
+        (hasPrototypeBoards
+          ? "当前原型已通过自动校验，可继续生成排版。"
+          : "当前项目已达到可进入作品集的基础质量线。"),
+      className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/86",
+    };
+  }
+
+  return {
+    label: hasPrototypeBoards ? "原型待检查" : "待检查",
+    shortLabel: "待检查",
+    summary: resolved.summary || "当前结果尚未完成自动校验。",
+    className: "border-white/10 bg-white/5 text-white/62",
+  };
+}
+
+function getBoardQualityMeta(boardValidation: ProjectBoardValidation | null | undefined) {
+  if (!boardValidation) return null;
+  if (boardValidation.cause === "system_generation_failed") {
+    return {
+      label: "系统生成未完成，已回退",
+      className: "border-red-300/20 bg-red-400/10 text-red-100/88",
+    };
+  }
+  if (boardValidation.cause === "user_modified_regression") {
+    return {
+      label: "你修改后需调整",
+      className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
+    };
+  }
+  if (boardValidation.cause === "missing_user_material") {
+    return {
+      label: "需要补充信息",
+      className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
+    };
+  }
+  if (boardValidation.status === "block") {
+    return {
+      label: "需调整",
+      className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
+    };
+  }
+  if (boardValidation.status === "warn") {
+    return {
+      label: "有提示",
+      className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
+    };
+  }
+  return {
+    label: "已通过",
+    className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/86",
+  };
+}
 
 type SaveFilePickerWindow = Window & {
   showSaveFilePicker?: (options?: {
@@ -290,6 +397,10 @@ const LEFT_PANEL_ITEMS: Array<{
   { key: "layers", label: "图层", icon: Layers, hint: "对象层级与管理" },
   { key: "boards", label: "画板", icon: LayoutTemplate, hint: "新增与切换画板" },
 ];
+
+function isUserCanceledFileSave(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
 
 function useEffectEvent<T extends (...args: Parameters<T>) => ReturnType<T>>(handler: T): T {
   const handlerRef = useRef(handler);
@@ -366,6 +477,7 @@ export function ProjectEditorFabricClient({
   const [applyingStructure, setApplyingStructure] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exportingFigma, setExportingFigma] = useState(false);
+  const [downloadingFigmaPlugin, setDownloadingFigmaPlugin] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
@@ -444,6 +556,32 @@ export function ProjectEditorFabricClient({
     () => getSceneBoardById(scene, scene.activeBoardId) ?? scene.boards[0] ?? null,
     [scene]
   );
+  const projectValidation = useMemo(
+    () => layout?.validation ?? getFallbackProjectValidation(),
+    [layout]
+  );
+  const boardValidationMap = useMemo(
+    () => new Map(projectValidation.boards.map((board) => [board.boardId, board])),
+    [projectValidation]
+  );
+  const activeBoardValidation = useMemo(
+    () => (activeBoard ? boardValidationMap.get(activeBoard.id) ?? null : null),
+    [activeBoard, boardValidationMap]
+  );
+  const activeBoardQualityMeta = useMemo(
+    () => getBoardQualityMeta(activeBoardValidation),
+    [activeBoardValidation]
+  );
+  const projectValidationMeta = useMemo(
+    () => getProjectValidationMeta(projectValidation, scene),
+    [projectValidation, scene]
+  );
+  const canExportCurrentProject = useMemo(
+    () =>
+      projectValidation.projectState !== "not_ready" &&
+      !scene.boards.some((board) => isPrototypeBoard(board)),
+    [projectValidation.projectState, scene.boards]
+  );
   const visibleAssets = useMemo(() => {
     const keyword = assetSearch.trim().toLowerCase();
     if (!keyword) return assets;
@@ -492,6 +630,22 @@ export function ProjectEditorFabricClient({
   const generationBoardIds = useMemo(
     () => getGenerationScopeBoardIds({ ...scene, generationScope: normalizedGenerationScope }),
     [normalizedGenerationScope, scene]
+  );
+  const prototypeBoardsInScope = useMemo(
+    () =>
+      generationBoardIds
+        .map((boardId) => scene.boards.find((board) => board.id === boardId))
+        .filter((board): board is ProjectBoard => board != null)
+        .filter((board) => isPrototypeBoard(board)),
+    [generationBoardIds, scene.boards]
+  );
+  const generatedBoardsInScope = useMemo(
+    () =>
+      generationBoardIds
+        .map((boardId) => scene.boards.find((board) => board.id === boardId))
+        .filter((board): board is ProjectBoard => board != null)
+        .filter((board) => !isPrototypeBoard(board)),
+    [generationBoardIds, scene.boards]
   );
   // 生成确认面板需要显式列出被锁定、将从本次 AI 写操作中跳过的画板。
   const skippedLockedBoardsInScope = useMemo(
@@ -597,12 +751,12 @@ export function ProjectEditorFabricClient({
             : "结构已保存";
   const topStatusLabel =
     saveState === "saved" && factsSaveState === "saved"
-      ? "已保存"
+      ? `已保存 · ${projectValidationMeta.shortLabel}`
       : saveState === "error" || factsSaveState === "error"
         ? "保存失败"
         : saveState === "saving" || factsSaveState === "saving"
           ? "保存中"
-          : "待保存";
+          : `待保存 · ${projectValidationMeta.shortLabel}`;
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
@@ -1157,14 +1311,19 @@ export function ProjectEditorFabricClient({
     }
 
     lastSavedSceneRef.current = serialized;
-    setLayout((current) =>
-      mergeProjectLayoutDocument(current, {
-        editorScene: sceneToSave,
-        ...(options.markSetupCompleted
-          ? { setup: { completedAt: new Date().toISOString() } }
-          : {}),
-      }) as LayoutJson
-    );
+    const nextLayout = (data as { layoutJson?: LayoutJson }).layoutJson;
+    if (nextLayout) {
+      setLayout(nextLayout);
+    } else {
+      setLayout((current) =>
+        mergeProjectLayoutDocument(current, {
+          editorScene: sceneToSave,
+          ...(options.markSetupCompleted
+            ? { setup: { completedAt: new Date().toISOString() } }
+            : {}),
+        }) as LayoutJson
+      );
+    }
     setSaveState("saved");
   }
 
@@ -1285,6 +1444,84 @@ export function ProjectEditorFabricClient({
     }
   }
 
+  async function saveBlobWithPicker(options: {
+    blob: Blob;
+    filename: string;
+    description: string;
+    accept: Record<string, string[]>;
+  }) {
+    const pickerWindow = window as SaveFilePickerWindow;
+
+    if (pickerWindow.showSaveFilePicker) {
+      const handle = await pickerWindow.showSaveFilePicker({
+        suggestedName: options.filename,
+        excludeAcceptAllOption: false,
+        types: [
+          {
+            description: options.description,
+            accept: options.accept,
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(options.blob);
+      await writable.close();
+      return;
+    }
+
+    const objectUrl = window.URL.createObjectURL(options.blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = options.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
+  async function handleDownloadFigmaPlugin() {
+    if (downloadingFigmaPlugin) return;
+
+    setDownloadingFigmaPlugin(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      const response = await fetch("/api/figma-plugin/download", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("下载 Figma 插件包失败，请稍后重试");
+      }
+
+      const filename = readDownloadFilename(response, "foliobox-figma-plugin.zip");
+      const blob = await response.blob();
+      await saveBlobWithPicker({
+        blob,
+        filename,
+        description: "FolioBox Figma 插件包",
+        accept: {
+          "application/zip": [".zip"],
+        },
+      });
+
+      setActionMessage({
+        tone: "info",
+        text: "Figma 插件包已保存，解压后在 Figma 导入 manifest.json 即可安装。",
+      });
+    } catch (error) {
+      if (isUserCanceledFileSave(error)) return;
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "下载 Figma 插件包失败，请稍后重试",
+      });
+    } finally {
+      setDownloadingFigmaPlugin(false);
+    }
+  }
+
   async function handleExportToFigma() {
     if (exportingFigma) return;
 
@@ -1307,34 +1544,14 @@ export function ProjectEditorFabricClient({
       const fallbackName = `${initialData.name || "project"}-figma-export.json`;
       const filename = readDownloadFilename(response, fallbackName);
       const blob = await response.blob();
-      const pickerWindow = window as SaveFilePickerWindow;
-
-      if (pickerWindow.showSaveFilePicker) {
-        const handle = await pickerWindow.showSaveFilePicker({
-          suggestedName: filename,
-          excludeAcceptAllOption: false,
-          types: [
-            {
-              description: "FolioBox Figma 导出",
-              accept: {
-                "application/json": [".json"],
-              },
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-      } else {
-        const objectUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = objectUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(objectUrl);
-      }
+      await saveBlobWithPicker({
+        blob,
+        filename,
+        description: "FolioBox Figma 导出",
+        accept: {
+          "application/json": [".json"],
+        },
+      });
 
       setActionMessage({
         tone: "info",
@@ -1342,6 +1559,7 @@ export function ProjectEditorFabricClient({
       });
       setExportDialogOpen(false);
     } catch (error) {
+      if (isUserCanceledFileSave(error)) return;
       setActionMessage({
         tone: "error",
         text: error instanceof Error ? error.message : "导出 Figma 文件失败，请稍后重试",
@@ -1462,22 +1680,36 @@ export function ProjectEditorFabricClient({
       };
       await saveStructureDraft(confirmedSuggestion);
 
-      // 2. 创建画板组（无需 window.confirm，向导本身已有确认语义）
-      const nextScene = buildProjectSceneFromStructureSuggestion({
-        suggestion: confirmedSuggestion,
+      // 2. 创建原型画板（服务端落板，确保阶段 1 不走 LLM / 不计高成本配额）
+      const data = await parseJsonResponse<{
+        layoutJson: LayoutJson;
+        rolledBack?: boolean;
+        message?: string;
+      }>(
+        await fetch(`/api/projects/${initialData.id}/structure/apply`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markSetupCompleted: true }),
+        })
+      );
+      const nextScene = resolveProjectEditorScene(data.layoutJson, {
         assets,
         projectName: initialData.name,
-        recognition: materialRecognition ?? undefined,
       });
+      setLayout(data.layoutJson);
       setScene(nextScene);
       requestActiveBoardRebuild();
       lastSavedSceneRef.current = JSON.stringify(nextScene);
-      // 持久化画板 + 标记 setup 已完成（退出重进将跳过向导）
-      await persistScene(nextScene, true, { markSetupCompleted: true });
+
+      if (data.rolledBack) {
+        setActionError(data.message ?? "创建画板未完成，已保留原内容。");
+        return;
+      }
 
       // 3. 进入画布编辑模式
       setSetupMode(false);
       setLeftPanel("boards");
+      setActionMessage({ tone: "info", text: "已创建原型画板，可继续进入排版。" });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "创建画板失败，请稍后重试");
     } finally {
@@ -1759,19 +1991,31 @@ export function ProjectEditorFabricClient({
     setActionMessage(null);
 
     try {
-      const nextScene = buildProjectSceneFromStructureSuggestion({
-        suggestion: structureDraft,
+      const data = await parseJsonResponse<{
+        layoutJson: LayoutJson;
+        rolledBack?: boolean;
+        message?: string;
+      }>(
+        await fetch(`/api/projects/${initialData.id}/structure/apply`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      const nextScene = resolveProjectEditorScene(data.layoutJson, {
         assets,
         projectName: initialData.name,
-        recognition: materialRecognition ?? undefined,
       });
-
+      setLayout(data.layoutJson);
       setScene(nextScene);
       requestActiveBoardRebuild();
       setLeftPanel("boards");
       lastSavedSceneRef.current = JSON.stringify(nextScene);
-      await persistScene(nextScene, true);
-      setActionMessage({ tone: "info", text: "已按当前结构创建画板组。" });
+      setActionMessage({
+        tone: data.rolledBack ? "error" : "info",
+        text:
+          data.message ??
+          (data.rolledBack ? "创建画板未完成，已保留原内容。" : "已按当前结构创建画板组。"),
+      });
     } catch (error) {
       setActionMessage({
         tone: "error",
@@ -1815,6 +2059,10 @@ export function ProjectEditorFabricClient({
       const data = await parseJsonResponse<{
         layoutJson: LayoutJson;
         reused?: boolean;
+        skipped?: boolean;
+        skippedBoardIds?: string[];
+        rolledBack?: boolean;
+        message?: string;
       }>(
         await fetch(`/api/projects/${initialData.id}/layout/generate`, {
           method: "POST",
@@ -1837,11 +2085,18 @@ export function ProjectEditorFabricClient({
         setScene(nextScene);
         requestActiveBoardRebuild();
         lastSavedSceneRef.current = JSON.stringify(nextScene);
-      } else {
-        setScene((current) => markBoardsAfterGeneration(current, generationBoardIds));
       }
 
-      if (data.reused) {
+      if (data.rolledBack) {
+        setActionError(data.message ?? "本次生成未完成，已保留原内容。");
+        return;
+      }
+      if (data.skipped) {
+        setActionMessage({
+          tone: "info",
+          text: "当前范围内没有原型画板；已跳过已生成画板，本次没有额外计次。",
+        });
+      } else if (data.reused) {
         setActionMessage({ tone: "info", text: "命中可复用排版结果，本次没有额外计次。" });
       } else {
         setActionMessage({ tone: "info", text: "排版建议已生成，可继续结合单画板细调。" });
@@ -2082,6 +2337,7 @@ export function ProjectEditorFabricClient({
             note: meta.note ?? null,
             roleTag: meta.roleTag ?? null,
             zIndex: index + 1,
+            placeholder: Boolean(data.placeholder),
           })
         );
         return acc;
@@ -2106,6 +2362,7 @@ export function ProjectEditorFabricClient({
             align: (textbox.textAlign as ProjectBoardTextNode["align"]) ?? "left",
             color: String(textbox.fill ?? "#111111"),
             zIndex: index + 1,
+            placeholder: Boolean(data.placeholder),
           })
         );
         return acc;
@@ -2132,6 +2389,7 @@ export function ProjectEditorFabricClient({
             opacity: typeof object.opacity === "number" ? object.opacity : 1,
             rx: serializedRx,
             zIndex: index + 1,
+            placeholder: Boolean(data.placeholder),
           })
         );
         return acc;
@@ -2195,6 +2453,7 @@ export function ProjectEditorFabricClient({
           nodeId: node.id,
           nodeType: "text",
           role: node.role,
+          placeholder: node.placeholder,
         };
         applyTextChrome(textbox);
         canvas.add(textbox);
@@ -2254,6 +2513,7 @@ export function ProjectEditorFabricClient({
           nodeId: node.id,
           nodeType: "shape",
           shapeType: node.shape,
+          placeholder: node.placeholder,
         };
         applyObjectChrome(shape);
         canvas.add(shape);
@@ -2288,6 +2548,7 @@ export function ProjectEditorFabricClient({
         frameWidth: node.width,
         frameHeight: node.height,
         crop: getImageCropMeta(),
+        placeholder: node.placeholder,
       };
       applyImagePresentation(image, {
         fit: "fit",
@@ -2321,6 +2582,9 @@ export function ProjectEditorFabricClient({
     canvas: FabricCanvas,
     target?: FabricSceneObject
   ) => {
+    if (target?.data?.placeholder) {
+      target.data.placeholder = false;
+    }
     if (target?.data?.nodeType === "image" && target.type !== "activeSelection") {
       normalizeImageObjectAfterTransform(target);
     }
@@ -2416,8 +2680,8 @@ export function ProjectEditorFabricClient({
       canvas.on("object:removed", () => {
         handleCanvasMutation(canvas);
       });
-      canvas.on("text:changed", () => {
-        handleCanvasMutation(canvas);
+      canvas.on("text:changed", (event) => {
+        handleCanvasMutation(canvas, event.target as FabricSceneObject | undefined);
       });
       canvas.on("mouse:down", (event) => {
         handleCanvasContextMenu(canvas, {
@@ -3044,7 +3308,8 @@ export function ProjectEditorFabricClient({
             <EditorChromeButton
               className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
               onClick={() => setExportDialogOpen(true)}
-              disabled={exportingFigma}
+              disabled={exportingFigma || !canExportCurrentProject}
+              title={!canExportCurrentProject ? projectValidationMeta.summary : undefined}
             >
               {exportingFigma ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -4007,6 +4272,7 @@ export function ProjectEditorFabricClient({
                                     <BoardListRow
                                       key={board.id}
                                       board={board}
+                                      boardValidation={boardValidationMap.get(board.id) ?? null}
                                       index={index}
                                       thumbnailUrl={thumbnailUrl}
                                       isLive={isLive}
@@ -4892,6 +5158,51 @@ export function ProjectEditorFabricClient({
                                 </p>
                               </div>
                             ) : null}
+                            {activeBoard.pageType || isPrototypeBoard(activeBoard) || activeBoard.phase ? (
+                              <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                                <p className="text-[11px] tracking-[0.14em] text-white/34">阶段状态</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <p className="text-sm text-white/78">
+                                    {isPrototypeBoard(activeBoard) ? "原型" : activeBoard.phase === "generated" ? "已生成" : "手动"}
+                                  </p>
+                                  {activeBoard.pageType ? (
+                                    <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] text-white/56">
+                                      {activeBoard.pageType}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ) : null}
+                            <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">质量状态</p>
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                {activeBoardQualityMeta ? (
+                                  <span
+                                    className={cn(
+                                      "inline-flex h-6 items-center rounded-full border px-2 text-[10px]",
+                                      activeBoardQualityMeta.className
+                                    )}
+                                  >
+                                    {activeBoardQualityMeta.label}
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] text-white/56">
+                                    待检查
+                                  </span>
+                                )}
+                                <span
+                                  className={cn(
+                                    "inline-flex h-6 items-center rounded-full border px-2 text-[10px]",
+                                    projectValidationMeta.className
+                                  )}
+                                >
+                                  {projectValidationMeta.label}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs leading-5 text-white/54">
+                                {activeBoardValidation?.message ?? projectValidationMeta.summary}
+                              </p>
+                            </div>
                           </div>
 
                           <div className={cn(editorPanelMutedCardClass, "flex items-center justify-between gap-3 px-3 py-2.5")}>
@@ -5027,6 +5338,7 @@ export function ProjectEditorFabricClient({
                         <FilmstripCard
                           key={board.id}
                           board={board}
+                          boardValidation={boardValidationMap.get(board.id) ?? null}
                           index={index}
                           thumbnailUrl={thumbnailUrl}
                           isLive={isLive}
@@ -5061,57 +5373,90 @@ export function ProjectEditorFabricClient({
           <DialogHeader>
             <DialogTitle>导出到 Figma</DialogTitle>
             <DialogDescription className="text-white/58">
-              当前版本走的是“导出 JSON + Figma 插件导入”的单向流程，不是直接把文件写进 Figma。
+              当前版本提供完整的手动安装路径：先下载插件包，再导出项目文件导入 Figma。
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 text-sm leading-6 text-white/72">
             <div className="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3">
-              <p className="font-medium text-white">导出后怎么用</p>
+              <p className="font-medium text-white">安装和使用</p>
               <div className="mt-2 space-y-1.5 text-white/60">
+                <p>1. 先点击下方“下载插件包”，保存 `foliobox-figma-plugin.zip`。</p>
                 <p>
-                  1. 先点击下方“另存为导出文件”，把当前项目保存成 <code>.json</code>。
+                  2. 解压后在 Figma 中打开 <code>Plugins -&gt; Development -&gt; Import plugin from manifest...</code>，
+                  选择 <code>FolioBox-Figma-Plugin/manifest.json</code>。
                 </p>
-                <p>2. 在 Figma 中导入开发插件 `FolioBox Figma Import`。</p>
                 <p>
-                  3. 运行插件后，选择刚保存的 <code>.json</code> 文件，插件会在当前页面生成可编辑图层。
+                  3. 再点击下方“另存为导出文件”，把当前项目保存成 <code>.json</code>。
+                </p>
+                <p>
+                  4. 回到 Figma 运行 <code>FolioBox Figma Import</code>，选择刚保存的 <code>.json</code>，
+                  插件会在当前页面生成可编辑图层。
                 </p>
               </div>
             </div>
 
             <div className="rounded-[18px] border border-amber-300/14 bg-amber-400/8 px-4 py-3 text-amber-50/88">
-              <p className="font-medium text-amber-50">当前插件还是开发版</p>
+              <p className="font-medium text-amber-50">当前仍是手动安装版</p>
               <p className="mt-2 text-sm leading-6 text-amber-50/72">
-                现在的插件在仓库目录 <code>figma-plugin/manifest.json</code>，需要通过
-                <code>Plugins -&gt; Development -&gt; Import plugin from manifest...</code>
-                手动导入。正式面向用户时，应该把插件发布到 Figma Community 或内部组织分发，而不是让用户找仓库文件。
+                下载的 zip 安装包里已经包含 <code>manifest.json</code>、插件代码和 README。当前不需要再去仓库里找文件，
+                但仍然需要通过 Figma 的 Development 安装入口手动导入。后续如果发布到 Figma Community，再把这一步换成一键安装。
               </p>
             </div>
+
+            {!canExportCurrentProject ? (
+              <div className="rounded-[18px] border border-red-300/18 bg-red-400/10 px-4 py-3 text-red-50/88">
+                <p className="font-medium text-red-50">当前暂不可导出</p>
+                <p className="mt-2 text-sm leading-6 text-red-50/72">
+                  {projectValidationMeta.summary}
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          <DialogFooter className="gap-2 sm:space-x-0">
+          <DialogFooter className="gap-2 sm:flex-row sm:justify-between sm:space-x-0">
             <Button
               type="button"
               variant="outline"
               onClick={() => setExportDialogOpen(false)}
-              disabled={exportingFigma}
+              disabled={exportingFigma || downloadingFigmaPlugin}
             >
               取消
             </Button>
-            <Button
-              type="button"
-              onClick={() => void handleExportToFigma()}
-              disabled={exportingFigma}
-            >
-              {exportingFigma ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  保存中
-                </>
-              ) : (
-                "另存为导出文件"
-              )}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleDownloadFigmaPlugin()}
+                disabled={downloadingFigmaPlugin || exportingFigma}
+              >
+                {downloadingFigmaPlugin ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    下载中
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    下载插件包
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleExportToFigma()}
+                disabled={exportingFigma || downloadingFigmaPlugin || !canExportCurrentProject}
+              >
+                {exportingFigma ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    保存中
+                  </>
+                ) : (
+                  "另存为导出文件"
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -5121,7 +5466,7 @@ export function ProjectEditorFabricClient({
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription className="text-white/56">
-              系统会基于当前画板范围、项目上下文和包装模式生成新的排版建议，不会覆盖你已经摆好的单画板内容。
+              系统只会处理当前范围内仍处于原型态的画板；已生成或手动改过的内容会明确跳过，不会被静默覆盖。
             </DialogDescription>
           </DialogHeader>
 
@@ -5142,14 +5487,20 @@ export function ProjectEditorFabricClient({
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                   {[
-                    { mode: "current", label: "当前画板", detail: activeBoard?.name ?? "当前页" },
+                    {
+                      mode: "current",
+                      label: "当前画板",
+                      detail: activeBoard
+                        ? `${activeBoard.name} · ${isPrototypeBoard(activeBoard) ? "原型可生成" : "已生成将跳过"}`
+                        : "当前页",
+                    },
                     {
                       mode: "all",
-                      label: "全部未锁定画板",
+                      label: "全部画板",
                       detail:
                         skippedLockedBoardsInScope.length > 0
-                          ? `${Math.max(scene.boardOrder.length - skippedLockedBoardsInScope.length, 0)} 张会参与`
-                          : `${scene.boardOrder.length} 张会参与`,
+                          ? `${prototypeBoardsInScope.length} 张原型会参与，${generatedBoardsInScope.length} 张已生成会跳过`
+                          : `${prototypeBoardsInScope.length} 张原型会参与，${generatedBoardsInScope.length} 张已生成会跳过`,
                     },
                   ].map((item) => (
                     <button
@@ -5179,6 +5530,17 @@ export function ProjectEditorFabricClient({
                     </p>
                   </div>
                 ) : null}
+                {generatedBoardsInScope.length > 0 ? (
+                  <div className="rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-xs leading-5 text-white/70">
+                    <div className="flex items-center gap-1.5 text-white/82">
+                      <Sparkles className="h-3 w-3" />
+                      <span>将跳过 {generatedBoardsInScope.length} 个已生成画板</span>
+                    </div>
+                    <p className="mt-1 text-white/50">
+                      {generatedBoardsInScope.map((b) => b.name).join("、")}
+                    </p>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -5192,6 +5554,8 @@ export function ProjectEditorFabricClient({
                     <Badge variant="outline" className="rounded-full border-white/8 bg-white/4 text-white">
                       {generatePrecheck.suggestedMode === "reuse"
                         ? "可复用"
+                        : generatePrecheck.suggestedMode === "skip"
+                          ? "将跳过"
                         : generatePrecheck.suggestedMode === "block"
                           ? "当前受限"
                           : "可继续"}
@@ -5216,6 +5580,8 @@ export function ProjectEditorFabricClient({
                       <p className="font-medium text-white">
                         {generatePrecheck.suggestedMode === "reuse"
                           ? "当前命中了可复用排版结果。"
+                          : generatePrecheck.suggestedMode === "skip"
+                            ? "当前范围内没有可继续生成的原型画板。"
                           : generatePrecheck.suggestedMode === "block"
                             ? generatePrecheck.blockReason === "active_project_limit"
                               ? "当前账期可激活 Project 已用完。"
@@ -5225,6 +5591,8 @@ export function ProjectEditorFabricClient({
                       <p className="mt-1 text-white/58">
                         {generatePrecheck.suggestedMode === "reuse"
                           ? "系统会优先回到上一版可复用结果，本次不会额外计次。"
+                          : generatePrecheck.suggestedMode === "skip"
+                            ? "本次会明确跳过已生成画板，不会再覆盖它们，也不会额外计次。"
                           : generatePrecheck.suggestedMode === "block"
                             ? generatePrecheck.blockReason === "active_project_limit"
                               ? "需要先补充可激活项目额度，才能正式执行排版生成。"
@@ -5239,7 +5607,9 @@ export function ProjectEditorFabricClient({
                         <p className="mt-1 text-sm font-medium text-white">
                           {generatePrecheck.consumesQuota
                             ? `${generatePrecheck.actionLabel} 1 次`
-                            : "命中复用，不额外计次"}
+                            : generatePrecheck.suggestedMode === "skip"
+                              ? "本次跳过，不额外计次"
+                              : "命中复用，不额外计次"}
                         </p>
                       </div>
                       <div className="rounded-xl border border-white/8 bg-background px-3 py-3">
@@ -5269,6 +5639,12 @@ export function ProjectEditorFabricClient({
                     {generatePrecheck.reusableDraftId ? (
                       <p className="text-xs leading-5 text-white/46">
                         已找到一版可复用结果。点击主按钮时，系统会优先复用，而不是盲目重跑。
+                      </p>
+                    ) : null}
+                    {typeof generatePrecheck.prototypeBoardCount === "number" ? (
+                      <p className="text-xs leading-5 text-white/46">
+                        本次范围内可生成原型画板 {generatePrecheck.prototypeBoardCount} 张，
+                        已生成跳过 {generatePrecheck.skippedGeneratedBoardCount ?? 0} 张。
                       </p>
                     ) : null}
                   </div>
@@ -5383,6 +5759,8 @@ export function ProjectEditorFabricClient({
               {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {generatePrecheck?.suggestedMode === "reuse"
                 ? "复用结果"
+                : generatePrecheck?.suggestedMode === "skip"
+                  ? "确认跳过"
                 : generatePrecheck?.actionLabel ?? "开始生成"}
             </Button>
           </DialogFooter>
@@ -5506,8 +5884,25 @@ function BoardThumbnailPlaceholder({
   );
 }
 
+function getBoardPhaseMeta(board: ProjectBoard) {
+  if (board.phase === "generated" && !boardHasPlaceholderNodes(board)) {
+    return {
+      label: "已生成",
+      className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/82",
+    };
+  }
+  if (isPrototypeBoard(board)) {
+    return {
+      label: "原型",
+      className: "border-amber-300/18 bg-amber-300/10 text-amber-100/82",
+    };
+  }
+  return null;
+}
+
 function BoardListRow({
   board,
+  boardValidation,
   index,
   thumbnailUrl,
   isLive,
@@ -5517,6 +5912,7 @@ function BoardListRow({
   onDelete,
 }: {
   board: ProjectBoard;
+  boardValidation: ProjectBoardValidation | null;
   index: number;
   thumbnailUrl: string | null;
   isLive: boolean;
@@ -5536,6 +5932,8 @@ function BoardListRow({
       ? thumbnailUrl
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
+  const phaseMeta = getBoardPhaseMeta(board);
+  const qualityMeta = getBoardQualityMeta(boardValidation);
   const secondaryText =
     (board.structureSource?.sectionTitle ??
       board.structureSource?.groupLabel ??
@@ -5598,12 +5996,34 @@ function BoardListRow({
           <p className="mt-1 truncate text-xs text-white/44">
             {secondaryText}
           </p>
-          {board.locked ? (
-            <div className="mt-2">
+          {phaseMeta || qualityMeta || board.locked ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {phaseMeta ? (
+                <span
+                  className={cn(
+                    "inline-flex h-6 items-center rounded-full border px-2 text-[10px]",
+                    phaseMeta.className
+                  )}
+                >
+                  {phaseMeta.label}
+                </span>
+              ) : null}
+              {qualityMeta ? (
+                <span
+                  className={cn(
+                    "inline-flex h-6 items-center rounded-full border px-2 text-[10px]",
+                    qualityMeta.className
+                  )}
+                >
+                  {qualityMeta.label}
+                </span>
+              ) : null}
+              {board.locked ? (
               <span className="inline-flex h-6 items-center rounded-full border border-white/10 bg-white/4 px-2 text-[10px] text-white/52">
                 <Lock className="mr-1 h-3 w-3" />
                 已锁定
               </span>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -5628,6 +6048,7 @@ function BoardListRow({
 
 function FilmstripCard({
   board,
+  boardValidation,
   index,
   thumbnailUrl,
   isLive,
@@ -5637,6 +6058,7 @@ function FilmstripCard({
   onDelete,
 }: {
   board: ProjectBoard;
+  boardValidation: ProjectBoardValidation | null;
   index: number;
   thumbnailUrl: string | null;
   isLive: boolean;
@@ -5650,6 +6072,8 @@ function FilmstripCard({
       ? thumbnailUrl
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
+  const phaseMeta = getBoardPhaseMeta(board);
+  const qualityMeta = getBoardQualityMeta(boardValidation);
 
   return (
     <div
@@ -5687,6 +6111,30 @@ function FilmstripCard({
           )}
         </div>
         <p className="mt-1 truncate text-xs text-white/46">{index + 1}</p>
+        {phaseMeta || qualityMeta ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {phaseMeta ? (
+              <span
+                className={cn(
+                  "inline-flex h-5 items-center rounded-full border px-1.5 text-[9px]",
+                  phaseMeta.className
+                )}
+              >
+                {phaseMeta.label}
+              </span>
+            ) : null}
+            {qualityMeta ? (
+              <span
+                className={cn(
+                  "inline-flex h-5 items-center rounded-full border px-1.5 text-[9px]",
+                  qualityMeta.className
+                )}
+              >
+                {qualityMeta.label}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {active ? (
           <div className="pointer-events-none absolute inset-x-5 bottom-4 h-[2px] rounded-full bg-white/70" />
         ) : null}
