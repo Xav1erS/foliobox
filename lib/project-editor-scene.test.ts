@@ -236,6 +236,12 @@ describe("project editor scene", () => {
       sectionTitle: "项目封面",
     });
     expect(scene.boards[0].nodes.some((node) => node.type === "image")).toBe(true);
+    expect(
+      scene.boards[0].nodes.find((node) => node.type === "image")
+    ).toMatchObject({
+      type: "image",
+      fit: "fit",
+    });
   });
 
   it("groups ordered boards by structure source runs", () => {

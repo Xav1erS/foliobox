@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>FolioBox Figma Import</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, "Noto Sans SC", system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #111114;
+        color: #f8f8fb;
+      }
+
+      .shell {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .card {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .dropzone {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        min-height: 168px;
+        border: 1px dashed rgba(255, 255, 255, 0.22);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
+        text-align: center;
+      }
+
+      .button,
+      label.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: none;
+        background: #ffffff;
+        color: #101114;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .button[disabled] {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      .status {
+        min-height: 18px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .status.error {
+        color: #ffb2b2;
+      }
+
+      .status.success {
+        color: #bcf0c3;
+      }
+
+      .footnote {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="card">
+        <h1>导入 FolioBox 导出文件</h1>
+        <p style="margin-top: 8px;">
+          先在 FolioBox 项目编辑器里点击“导出 Figma”，再把下载的 JSON 文件导入这里。
+        </p>
+      </div>
+
+      <div class="card dropzone">
+        <p>支持 FolioBox 项目级单向导出 JSON</p>
+        <label class="button" for="payload-file">选择 JSON 文件</label>
+        <input id="payload-file" type="file" accept=".json,application/json" />
+        <p id="selected-file">尚未选择文件</p>
+      </div>
+
+      <div class="card">
+        <button id="import-btn" class="button" disabled>导入到当前页面</button>
+        <div id="status" class="status" style="margin-top: 12px;"></div>
+      </div>
+
+      <div class="card footnote">
+        <p>当前支持：Frame、文本、图片、基础形状。</p>
+        <p>当前限制：图片 crop 只保留 fit 模式，不做精确偏移还原。</p>
+      </div>
+    </div>
+
+    <script>
+      const fileInput = document.getElementById("payload-file");
+      const selectedFile = document.getElementById("selected-file");
+      const importButton = document.getElementById("import-btn");
+      const statusNode = document.getElementById("status");
+
+      let payload = null;
+      let importing = false;
+
+      function setStatus(text, tone) {
+        statusNode.textContent = text || "";
+        statusNode.className = `status${tone ? ` ${tone}` : ""}`;
+      }
+
+      function refreshButton() {
+        importButton.disabled = !payload || importing;
+        importButton.textContent = importing ? "导入中..." : "导入到当前页面";
+      }
+
+      fileInput.addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        payload = null;
+        setStatus("", "");
+        refreshButton();
+
+        if (!file) {
+          selectedFile.textContent = "尚未选择文件";
+          return;
+        }
+
+        selectedFile.textContent = file.name;
+
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (!parsed || parsed.kind !== "project-figma-export") {
+            throw new Error("这不是有效的 FolioBox 导出文件。");
+          }
+
+          payload = parsed;
+          setStatus(`已载入 ${parsed.project?.name || "项目"}，共 ${parsed.boards?.length || 0} 个画板。`, "");
+        } catch (error) {
+          payload = null;
+          setStatus(error instanceof Error ? error.message : "读取 JSON 失败。", "error");
+        }
+
+        refreshButton();
+      });
+
+      importButton.addEventListener("click", () => {
+        if (!payload || importing) return;
+        importing = true;
+        setStatus("正在把画板写入当前 Figma 页面...", "");
+        refreshButton();
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "import-payload",
+              payload,
+            },
+          },
+          "*"
+        );
+      });
+
+      window.onmessage = (event) => {
+        const message = event.data?.pluginMessage;
+        if (!message) return;
+
+        if (message.type === "import-success") {
+          importing = false;
+          setStatus(
+            `导入完成：${message.frameCount} 个画板${message.warningCount ? `，${message.warningCount} 条提示` : ""}。`,
+            "success"
+          );
+          refreshButton();
+        }
+
+        if (message.type === "import-error") {
+          importing = false;
+          setStatus(message.message || "导入失败。", "error");
+          refreshButton();
+        }
+      };
+    </script>
+  </body>
+</html>

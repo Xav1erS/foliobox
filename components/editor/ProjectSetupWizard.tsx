@@ -95,6 +95,12 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   structure: "项目结构",
 };
 
+function parseTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : 0;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProjectSetupWizard({
@@ -135,6 +141,7 @@ export function ProjectSetupWizard({
   const [activeSection, setActiveSection] = useState<SectionKey>("facts");
 
   const aiRunning = recognizingMaterials || suggestingStructure;
+  const aiUnderstandingRunning = recognizingMaterials;
   const structureReady = structureDraft !== null;
   const recognitionDone = materialRecognition !== null;
 
@@ -146,12 +153,19 @@ export function ProjectSetupWizard({
     () => computeSetupCompleteness({ facts, assets, materialRecognition }),
     [facts, assets, materialRecognition],
   );
+  const structureNeedsRefresh =
+    completeness.level === "not_ready" &&
+    structureReady &&
+    parseTimestamp(materialRecognition?.generatedAt) >
+      parseTimestamp(structureDraft?.generatedAt);
+  const shouldShowNotReadyCard =
+    completeness.level === "not_ready" && (!structureReady || structureNeedsRefresh);
 
   // Auto-scroll to AI section when AI completes, so user sees the summary
   // and "AI 希望了解更多" card before moving on to structure.
   const prevAiRunning = useRef(false);
   useEffect(() => {
-    if (prevAiRunning.current && !aiRunning && recognitionDone) {
+    if (prevAiRunning.current && !aiUnderstandingRunning && recognitionDone) {
       setTimeout(() => {
         sectionRefs.current.ai?.scrollIntoView({
           behavior: "smooth",
@@ -159,8 +173,8 @@ export function ProjectSetupWizard({
         });
       }, 300);
     }
-    prevAiRunning.current = aiRunning;
-  }, [aiRunning, recognitionDone]);
+    prevAiRunning.current = aiUnderstandingRunning;
+  }, [aiUnderstandingRunning, recognitionDone]);
 
   // Track active section via scroll
   useEffect(() => {
@@ -431,14 +445,12 @@ export function ProjectSetupWizard({
                 className="mb-4"
               />
             ) : null}
-            {aiRunning ? (
+            {aiUnderstandingRunning ? (
               <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                 <div>
                   <p className="text-sm text-white/80">
-                    {recognizingMaterials
-                      ? "AI 正在理解你的设计稿…"
-                      : "AI 正在生成项目结构建议…"}
+                    AI 正在理解你的设计稿…
                   </p>
                   <p className="mt-1 text-xs text-white/35">通常需要 10–30 秒</p>
                 </div>
@@ -477,13 +489,17 @@ export function ProjectSetupWizard({
                     </ul>
                   </div>
                 ) : null}
-                {completeness.level === "not_ready" && !structureDraft ? (
+                {shouldShowNotReadyCard ? (
                   <div className="rounded-2xl border border-amber-400/20 bg-amber-500/[0.04] p-5">
                     <p className="text-sm font-semibold text-amber-200">
-                      信息还不够，暂未生成章节结构
+                      {structureReady
+                        ? "当前结构建议可能已过期"
+                        : "信息还不够，暂未生成章节结构"}
                     </p>
                     <p className="mt-1.5 text-xs leading-relaxed text-amber-100/60">
-                      补充上方信息后重新理解，AI 才能给出更贴合的结构建议。也可以选择跳过建议，直接生成。
+                      {structureReady
+                        ? "最新这轮 AI 理解认为信息仍不足，当前结构可能不再贴合。你可以继续补充后重新理解，或跳过建议直接重生成结构。"
+                        : "补充上方信息后重新理解，AI 才能给出更贴合的结构建议。也可以选择跳过建议，直接生成。"}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       <button
@@ -562,6 +578,21 @@ export function ProjectSetupWizard({
             />
             {structureReady && structureDraft ? (
               <div className="space-y-4">
+                {suggestingStructure ? (
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+                    <div>
+                      <p className="text-sm text-white/80">AI 正在生成项目结构建议…</p>
+                      <p className="mt-1 text-xs text-white/35">通常需要 10–30 秒</p>
+                    </div>
+                  </div>
+                ) : null}
+                {structureNeedsRefresh ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.05] px-4 py-3 text-sm text-amber-200/90">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    基于最新理解，当前结构建议可能已过期。建议重新生成后再继续使用。
+                  </div>
+                ) : null}
                 {isStructureConfirmed ? (
                   <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300/85">
                     <Check className="h-4 w-4" />
@@ -615,7 +646,7 @@ export function ProjectSetupWizard({
                     {actionError}
                   </div>
                 ) : null}
-                {!isStructureConfirmed && onGenerateStructure ? (
+                {onGenerateStructure && !isStructureConfirmed && !structureNeedsRefresh ? (
                   <div className="flex justify-end">
                     <button
                       type="button"
@@ -668,6 +699,14 @@ export function ProjectSetupWizard({
                     </button>
                   </>
                 )}
+              </div>
+            ) : suggestingStructure ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+                <div>
+                  <p className="text-sm text-white/80">AI 正在生成项目结构建议…</p>
+                  <p className="mt-1 text-xs text-white/35">通常需要 10–30 秒</p>
+                </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/35">

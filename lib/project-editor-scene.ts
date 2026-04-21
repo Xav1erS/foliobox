@@ -409,7 +409,7 @@ export function createProjectImageNode(
     y: patch?.y ?? 160,
     width: patch?.width ?? 704,
     height: patch?.height ?? 560,
-    fit: patch?.fit ?? "fill",
+    fit: patch?.fit ?? "fit",
     crop: patch?.crop ?? { x: 0.5, y: 0.5, scale: 1 },
     note: patch?.note ?? null,
     roleTag: patch?.roleTag ?? null,

@@ -6,18 +6,15 @@ import {
   getProjectActionSummary,
   getPlanSummaryFromEntitlement,
 } from "@/lib/entitlement";
-import { ProjectEditorClient, type ProjectEditorInitialData } from "./ProjectEditorClient";
 import { ProjectEditorFabricClient } from "./ProjectEditorFabricClient";
+import type { ProjectEditorInitialData } from "./types";
 
 export default async function ProjectEditorPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ engine?: string }>;
 }) {
   const { id } = await params;
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const session = await getRequiredSession(`/projects/${id}/editor`);
 
   const [project, entitlementSummary, actionSummary, styleReferenceSets] = await Promise.all([
@@ -135,16 +132,9 @@ export default async function ProjectEditorPage({
   };
 
   return (
-    resolvedSearchParams?.engine === "legacy" ? (
-      <ProjectEditorClient
-        initialData={initialData}
-        planSummary={getPlanSummaryFromEntitlement(entitlementSummary)}
-      />
-    ) : (
-      <ProjectEditorFabricClient
-        initialData={initialData}
-        planSummary={getPlanSummaryFromEntitlement(entitlementSummary)}
-      />
-    )
+    <ProjectEditorFabricClient
+      initialData={initialData}
+      planSummary={getPlanSummaryFromEntitlement(entitlementSummary)}
+    />
   );
 }

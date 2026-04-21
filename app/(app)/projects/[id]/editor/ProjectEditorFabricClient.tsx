@@ -1,8 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
+import {
+  ALIBABA_PUHUITI_URL,
+  EDITOR_FONTS,
+  EDITOR_FONTS_BODY,
+  EDITOR_FONTS_DISPLAY,
+  GOOGLE_FONTS_URL,
+  PROJECT_BOARD_MAX,
+  PROJECT_IMAGE_ROLE_LABELS,
+  SHAPE_LABELS,
+  SMILEY_SANS_URL,
+  SURFACE_FIT_PADDING,
+  approximatelyEqual,
+  clamp,
+  editorFloatingSurfaceClass,
+  editorPanelCardClass,
+  editorPanelMutedCardClass,
+  editorPopupItemClass,
+  editorPopupSurfaceClass,
+  getBoardGroupRunLabel,
+  getBoardThumbnailAssetId,
+  getImageCropMeta,
+  getImageFrameMeta,
+  isEditableCanvasTarget,
+  newNodeId,
+  newStructureId,
+  parseJsonResponse,
+  readDownloadFilename,
+  type FabricSceneObject,
+} from "./editor-helpers";
 import {
   DndContext,
   PointerSensor,
@@ -22,9 +51,11 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowLeft,
   ChevronDown,
   Circle,
   Copy,
+  Download,
   GripVertical,
   FolderOpen,
   ImageIcon,
@@ -145,7 +176,7 @@ import {
 } from "@/lib/style-reference-presets";
 import { cn } from "@/lib/utils";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
-import type { ProjectEditorInitialData } from "./ProjectEditorClient";
+import type { ProjectEditorInitialData } from "./types";
 
 type FabricModule = typeof import("fabric");
 
@@ -172,12 +203,6 @@ type ActiveObjectMeta =
       kind: "image";
       id: string;
       assetId: string | null;
-      fit: "fill" | "fit";
-      crop: {
-        x: number;
-        y: number;
-        scale: number;
-      };
       opacity: number;
       x: number;
       y: number;
@@ -237,19 +262,20 @@ type GeneratePrecheck = {
   generationScope?: GenerationScope;
 };
 
-const PROJECT_IMAGE_ROLE_LABELS: Record<ProjectImageRoleTag, string> = {
-  main: "主讲",
-  support: "补充",
-  decorative: "装饰",
-  risk: "风险",
-};
-
-const SHAPE_LABELS: Record<ProjectShapeType, string> = {
-  rect: "矩形",
-  square: "正方形",
-  circle: "圆形",
-  triangle: "三角形",
-  line: "线段",
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    excludeAcceptAllOption?: boolean;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    createWritable: () => Promise<{
+      write: (data: Blob) => Promise<void>;
+      close: () => Promise<void>;
+    }>;
+  }>;
 };
 
 const LEFT_PANEL_ITEMS: Array<{
@@ -265,36 +291,6 @@ const LEFT_PANEL_ITEMS: Array<{
   { key: "boards", label: "画板", icon: LayoutTemplate, hint: "新增与切换画板" },
 ];
 
-type FabricSceneObject = FabricObject & {
-  data?: {
-    nodeId?: string;
-    nodeType?: "text" | "image" | "shape";
-    assetId?: string;
-    fit?: "fill" | "fit";
-    frameWidth?: number;
-    frameHeight?: number;
-    crop?: {
-      x: number;
-      y: number;
-      scale: number;
-    };
-    shapeType?: ProjectShapeType;
-    role?: ProjectBoardTextNode["role"];
-  };
-};
-
-function newNodeId(prefix: "text" | "image" | "shape") {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function newStructureId(prefix: "group" | "section") {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function useEffectEvent<T extends (...args: Parameters<T>) => ReturnType<T>>(handler: T): T {
   const handlerRef = useRef(handler);
 
@@ -303,114 +299,6 @@ function useEffectEvent<T extends (...args: Parameters<T>) => ReturnType<T>>(han
   });
 
   return useRef(((...args: Parameters<T>) => handlerRef.current(...args)) as T).current;
-}
-
-const SURFACE_FIT_PADDING = 48;
-
-// 正文字体
-const EDITOR_FONTS_BODY = [
-  { label: "思源黑体", value: "Noto Sans SC" },
-  { label: "思源宋体", value: "Noto Serif SC" },
-  { label: "阿里巴巴普惠体", value: "Alibaba PuHuiTi" },
-  { label: "站酷小薇体", value: "ZCOOL XiaoWei" },
-] as const;
-
-// 展示/艺术字体
-const EDITOR_FONTS_DISPLAY = [
-  { label: "得意黑", value: "Smiley Sans" },
-  { label: "站酷庆科黄油体", value: "ZCOOL QingKe HuangYou" },
-  { label: "Playfair Display", value: "Playfair Display" },
-  { label: "Cormorant Garamond", value: "Cormorant Garamond" },
-  { label: "Bebas Neue", value: "Bebas Neue" },
-  { label: "Syne", value: "Syne" },
-] as const;
-
-const EDITOR_FONTS = [...EDITOR_FONTS_BODY, ...EDITOR_FONTS_DISPLAY];
-
-const GOOGLE_FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+XiaoWei&family=ZCOOL+QingKe+HuangYou&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&family=Bebas+Neue&family=Syne:wght@400;700;800&display=swap";
-
-// 得意黑 + 阿里普惠体通过各自 CDN 加载（自托管字体，无 Google Fonts 收录）
-const SMILEY_SANS_URL =
-  "https://cdn.jsdelivr.net/gh/atelier-anchor/smiley-sans@1.1.1/demo/SmileySans-Oblique.woff2";
-const ALIBABA_PUHUITI_URL =
-  "https://puhuiti.oss-cn-hangzhou.aliyuncs.com/AlibabaPuHuiTi-2/AlibabaPuHuiTi-2-55-Regular/AlibabaPuHuiTi-2-55-Regular.woff2";
-// 画板数量硬上限：see spec-system-v3/04 §4.5。
-const PROJECT_BOARD_MAX = MAX_PROJECT_BOARDS;
-const editorPanelCardClass =
-  "rounded-[20px] border border-white/8 bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
-const editorPanelMutedCardClass =
-  "rounded-[18px] border border-white/8 bg-white/3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
-const editorFloatingSurfaceClass =
-  "rounded-[22px] border border-white/8 bg-card text-white shadow-[0_20px_48px_-28px_rgba(0,0,0,0.86)]";
-const editorPopupSurfaceClass =
-  "rounded-[20px] border border-white/8 bg-card text-white shadow-[0_24px_56px_-24px_rgba(0,0,0,0.9)]";
-const editorPopupItemClass =
-  "flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm text-white/72 transition-colors hover:bg-white/[0.07] hover:text-white";
-
-function isEditableCanvasTarget(target: FabricObject | null | undefined) {
-  if (!target) return false;
-  if (target.type === "activeSelection") return true;
-  const typed = target as FabricSceneObject;
-  return Boolean(typed.data?.nodeType) || target.type === "textbox";
-}
-
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(data.error ?? "请求失败");
-  }
-  return data;
-}
-
-function getBoardThumbnailAssetId(board: ProjectBoard) {
-  if (board.thumbnailAssetId) return board.thumbnailAssetId;
-  const imageNode = board.nodes.find(
-    (node): node is ProjectBoardImageNode => node.type === "image"
-  );
-  return imageNode?.assetId ?? null;
-}
-
-function getBoardGroupRunLabel(
-  run: ProjectBoardGroupRun,
-  options: { showUngrouped: boolean }
-) {
-  if (run.label) return run.label;
-  return options.showUngrouped ? "未分组" : null;
-}
-
-function getImageFrameMeta(object: FabricSceneObject) {
-  const scaledWidth =
-    typeof object.getScaledWidth === "function" ? object.getScaledWidth() : object.width ?? 0;
-  const scaledHeight =
-    typeof object.getScaledHeight === "function" ? object.getScaledHeight() : object.height ?? 0;
-  const fit = object.data?.fit ?? "fill";
-  const frameWidth =
-    typeof object.data?.frameWidth === "number" ? object.data.frameWidth : scaledWidth;
-  const frameHeight =
-    typeof object.data?.frameHeight === "number" ? object.data.frameHeight : scaledHeight;
-  const frameX =
-    fit === "fit" ? (object.left ?? 0) - Math.max(frameWidth - scaledWidth, 0) / 2 : object.left ?? 0;
-  const frameY =
-    fit === "fit" ? (object.top ?? 0) - Math.max(frameHeight - scaledHeight, 0) / 2 : object.top ?? 0;
-
-  return {
-    fit,
-    frameWidth,
-    frameHeight,
-    frameX,
-    frameY,
-    scaledWidth,
-    scaledHeight,
-  };
-}
-
-function getImageCropMeta(object: FabricSceneObject) {
-  return object.data?.crop ?? { x: 0.5, y: 0.5, scale: 1 };
-}
-
-function approximatelyEqual(a: number, b: number, tolerance = 0.5) {
-  return Math.abs(a - b) <= tolerance;
 }
 
 export function ProjectEditorFabricClient({
@@ -477,6 +365,8 @@ export function ProjectEditorFabricClient({
   >("saved");
   const [applyingStructure, setApplyingStructure] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [exportingFigma, setExportingFigma] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [checkingPrecheck, setCheckingPrecheck] = useState(false);
   const [generatePrecheck, setGeneratePrecheck] = useState<GeneratePrecheck | null>(null);
@@ -1064,70 +954,31 @@ export function ProjectEditorFabricClient({
     const naturalHeight = image.height || 1;
     const frameWidth = Math.max(1, options.frameWidth);
     const frameHeight = Math.max(1, options.frameHeight);
-    const crop = {
-      x: Math.min(Math.max(options.crop.x, 0), 1),
-      y: Math.min(Math.max(options.crop.y, 0), 1),
-      scale: Math.min(Math.max(options.crop.scale, 1), 4),
-    };
 
     if (!image.data) {
       image.data = {};
     }
-    image.data.fit = options.fit;
+    image.data.fit = "fit";
     image.data.frameWidth = frameWidth;
     image.data.frameHeight = frameHeight;
-    image.data.crop = crop;
+    image.data.crop = getImageCropMeta();
 
-    if (options.fit === "fit") {
-      const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
-      const renderWidth = naturalWidth * scale;
-      const renderHeight = naturalHeight * scale;
-      image.set({
-        left: options.frameX + (frameWidth - renderWidth) / 2,
-        top: options.frameY + (frameHeight - renderHeight) / 2,
-        width: naturalWidth,
-        height: naturalHeight,
-        cropX: 0,
-        cropY: 0,
-        scaleX: scale,
-        scaleY: scale,
-      });
-      return;
-    }
-
-    const baseScale = Math.max(frameWidth / naturalWidth, frameHeight / naturalHeight);
-    const visibleWidth = Math.min(
-      naturalWidth,
-      frameWidth / (baseScale * crop.scale)
-    );
-    const visibleHeight = Math.min(
-      naturalHeight,
-      frameHeight / (baseScale * crop.scale)
-    );
-    const cropX = Math.min(
-      Math.max(naturalWidth * crop.x - visibleWidth / 2, 0),
-      Math.max(naturalWidth - visibleWidth, 0)
-    );
-    const cropY = Math.min(
-      Math.max(naturalHeight * crop.y - visibleHeight / 2, 0),
-      Math.max(naturalHeight - visibleHeight, 0)
-    );
-
+    const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+    const renderWidth = naturalWidth * scale;
+    const renderHeight = naturalHeight * scale;
     image.set({
-      left: options.frameX,
-      top: options.frameY,
-      width: visibleWidth,
-      height: visibleHeight,
-      cropX,
-      cropY,
-      scaleX: frameWidth / visibleWidth,
-      scaleY: frameHeight / visibleHeight,
+      left: options.frameX + (frameWidth - renderWidth) / 2,
+      top: options.frameY + (frameHeight - renderHeight) / 2,
+      width: naturalWidth,
+      height: naturalHeight,
+      cropX: 0,
+      cropY: 0,
+      scaleX: scale,
+      scaleY: scale,
     });
   }
 
   function normalizeImageObjectAfterTransform(image: FabricSceneObject) {
-    const fit = image.data?.fit ?? "fill";
-    const crop = getImageCropMeta(image);
     const naturalWidth = image.width || 1;
     const naturalHeight = image.height || 1;
     const actualWidth =
@@ -1138,19 +989,6 @@ export function ProjectEditorFabricClient({
       typeof image.data?.frameWidth === "number" ? image.data.frameWidth : actualWidth;
     const storedFrameHeight =
       typeof image.data?.frameHeight === "number" ? image.data.frameHeight : actualHeight;
-
-    if (fit === "fill") {
-      applyImagePresentation(image, {
-        fit,
-        frameX: image.left ?? 0,
-        frameY: image.top ?? 0,
-        frameWidth: actualWidth,
-        frameHeight: actualHeight,
-        crop,
-      });
-      image.setCoords();
-      return;
-    }
 
     const storedScale = Math.min(storedFrameWidth / naturalWidth, storedFrameHeight / naturalHeight);
     const expectedRenderWidth = naturalWidth * storedScale;
@@ -1165,12 +1003,12 @@ export function ProjectEditorFabricClient({
     const nextFrameHeight = storedFrameHeight * nextRatio;
 
     applyImagePresentation(image, {
-      fit,
+      fit: "fit",
       frameX: (image.left ?? 0) - Math.max(nextFrameWidth - actualWidth, 0) / 2,
       frameY: (image.top ?? 0) - Math.max(nextFrameHeight - actualHeight, 0) / 2,
       frameWidth: nextFrameWidth,
       frameHeight: nextFrameHeight,
-      crop,
+      crop: getImageCropMeta(),
     });
     image.setCoords();
   }
@@ -1189,7 +1027,7 @@ export function ProjectEditorFabricClient({
         frameY: patch.y ?? frame.frameY,
         frameWidth: patch.width ?? frame.frameWidth,
         frameHeight: patch.height ?? frame.frameHeight,
-        crop: getImageCropMeta(activeObject),
+        crop: getImageCropMeta(),
       });
       activeObject.setCoords();
       canvas.requestRenderAll();
@@ -1444,6 +1282,72 @@ export function ProjectEditorFabricClient({
         text: error instanceof Error ? error.message : "画板保存失败，请稍后重试",
       });
       throw error;
+    }
+  }
+
+  async function handleExportToFigma() {
+    if (exportingFigma) return;
+
+    setExportingFigma(true);
+    setActionError("");
+    setActionMessage(null);
+
+    try {
+      await persistCurrentSceneForAction();
+      const response = await fetch(`/api/projects/${initialData.id}/export-figma`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "导出 Figma 文件失败，请稍后重试");
+      }
+
+      const fallbackName = `${initialData.name || "project"}-figma-export.json`;
+      const filename = readDownloadFilename(response, fallbackName);
+      const blob = await response.blob();
+      const pickerWindow = window as SaveFilePickerWindow;
+
+      if (pickerWindow.showSaveFilePicker) {
+        const handle = await pickerWindow.showSaveFilePicker({
+          suggestedName: filename,
+          excludeAcceptAllOption: false,
+          types: [
+            {
+              description: "FolioBox Figma 导出",
+              accept: {
+                "application/json": [".json"],
+              },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } else {
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+      }
+
+      setActionMessage({
+        tone: "info",
+        text: "Figma 导出文件已保存，可在 FolioBox Figma 插件中导入。",
+      });
+      setExportDialogOpen(false);
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "导出 Figma 文件失败，请稍后重试",
+      });
+    } finally {
+      setExportingFigma(false);
     }
   }
 
@@ -2030,8 +1934,6 @@ export function ProjectEditorFabricClient({
         kind: "image",
         id: data.nodeId ?? "image",
         assetId: data.assetId ?? null,
-        fit: frame.fit,
-        crop: getImageCropMeta(current),
         opacity: typeof current.opacity === "number" ? current.opacity : 1,
         x: Math.round(frame.frameX),
         y: Math.round(frame.frameY),
@@ -2176,7 +2078,7 @@ export function ProjectEditorFabricClient({
             width: Math.round(frame.frameWidth),
             height: Math.round(frame.frameHeight),
             fit: frame.fit,
-            crop: getImageCropMeta(object),
+            crop: getImageCropMeta(),
             note: meta.note ?? null,
             roleTag: meta.roleTag ?? null,
             zIndex: index + 1,
@@ -2382,18 +2284,18 @@ export function ProjectEditorFabricClient({
         nodeId: node.id,
         nodeType: "image",
         assetId: node.assetId,
-        fit: node.fit,
+        fit: "fit",
         frameWidth: node.width,
         frameHeight: node.height,
-        crop: node.crop,
+        crop: getImageCropMeta(),
       };
       applyImagePresentation(image, {
-        fit: node.fit,
+        fit: "fit",
         frameWidth: node.width,
         frameHeight: node.height,
         frameX: node.x,
         frameY: node.y,
-        crop: node.crop,
+        crop: getImageCropMeta(),
       });
       applyObjectChrome(image);
       canvas.add(image);
@@ -2589,7 +2491,6 @@ export function ProjectEditorFabricClient({
     // 注意：只依赖 activeBoardId + rebuildTick + canvasReady。
     // 画布内的编辑通过 syncActiveBoardFromCanvas 回写到 scene，但不应该触发画布重建。
     // 外部（AI 生成、结构应用等）改动 scene 后必须显式调用 requestActiveBoardRebuild()。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBoardId, canvasReady, boardRebuildTick, loadBoardIntoCanvas]);
 
   async function cloneActiveObject() {
@@ -2761,10 +2662,10 @@ export function ProjectEditorFabricClient({
       nodeId: newNodeId("image"),
       nodeType: "image",
       assetId,
-      fit: "fill",
+      fit: "fit",
       frameWidth: naturalWidth * scale,
       frameHeight: naturalHeight * scale,
-      crop: { x: 0.5, y: 0.5, scale: 1 },
+      crop: getImageCropMeta(),
     };
     applyObjectChrome(image);
     canvas.add(image);
@@ -2773,59 +2674,6 @@ export function ProjectEditorFabricClient({
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
     setActionMessage({ tone: "info", text: "图片已插入当前画板" });
-  }
-
-  function updateActiveImageFit(nextFit: "fill" | "fit") {
-    const canvas = canvasRef.current;
-    const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
-    if (!canvas || !activeObject || activeObject.type === "activeSelection") return;
-    if (activeObject.data?.nodeType !== "image") return;
-
-    const frame = getImageFrameMeta(activeObject);
-    applyImagePresentation(activeObject, {
-      fit: nextFit,
-      frameWidth: frame.frameWidth,
-      frameHeight: frame.frameHeight,
-      frameX: frame.frameX,
-      frameY: frame.frameY,
-      crop: getImageCropMeta(activeObject),
-    });
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    syncActiveBoardFromCanvas();
-    updateSelectionSummary(canvas);
-  }
-
-  function updateActiveImageCrop(
-    patch: Partial<{
-      x: number;
-      y: number;
-      scale: number;
-    }>
-  ) {
-    const canvas = canvasRef.current;
-    const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
-    if (!canvas || !activeObject || activeObject.type === "activeSelection") return;
-    if (activeObject.data?.nodeType !== "image") return;
-
-    const frame = getImageFrameMeta(activeObject);
-    const crop = getImageCropMeta(activeObject);
-    applyImagePresentation(activeObject, {
-      fit: frame.fit,
-      frameWidth: frame.frameWidth,
-      frameHeight: frame.frameHeight,
-      frameX: frame.frameX,
-      frameY: frame.frameY,
-      crop: {
-        x: patch.x ?? crop.x,
-        y: patch.y ?? crop.y,
-        scale: patch.scale ?? crop.scale,
-      },
-    });
-    activeObject.setCoords();
-    canvas.requestRenderAll();
-    syncActiveBoardFromCanvas();
-    updateSelectionSummary(canvas);
   }
 
   async function replaceActiveImageAsset(nextAssetId: string) {
@@ -2847,18 +2695,18 @@ export function ProjectEditorFabricClient({
     replacement.data = {
       ...activeObject.data,
       assetId: nextAssetId,
-      fit: frame.fit,
+      fit: "fit",
       frameWidth: frame.frameWidth,
       frameHeight: frame.frameHeight,
-      crop: getImageCropMeta(activeObject),
+      crop: getImageCropMeta(),
     };
     applyImagePresentation(replacement, {
-      fit: frame.fit,
+      fit: "fit",
       frameWidth: frame.frameWidth,
       frameHeight: frame.frameHeight,
       frameX: frame.frameX,
       frameY: frame.frameY,
-      crop: getImageCropMeta(activeObject),
+      crop: getImageCropMeta(),
     });
     applyObjectChrome(replacement);
 
@@ -3177,6 +3025,35 @@ export function ProjectEditorFabricClient({
       }
       secondaryAction={
         <div className="flex items-center gap-2">
+          {setupMode &&
+          (scene.boards.length > 1 ||
+            scene.boards.some((board) => board.nodes.length > 0)) ? (
+            <EditorChromeButton
+              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
+              onClick={() => {
+                setSetupMode(false);
+                setLeftPanel("boards");
+                setActionError("");
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回画布
+            </EditorChromeButton>
+          ) : null}
+          {setupMode ? null : (
+            <EditorChromeButton
+              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
+              onClick={() => setExportDialogOpen(true)}
+              disabled={exportingFigma}
+            >
+              {exportingFigma ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              导出 Figma
+            </EditorChromeButton>
+          )}
           {/* 画布模式：查看项目准备 */}
           {setupMode ? null : (
             <EditorChromeButton
@@ -4199,7 +4076,7 @@ export function ProjectEditorFabricClient({
               onUpdateAssetTitle={handleRenameAsset}
               onUpdateAssetNote={handleUpdateAssetNote}
               onDeleteAsset={(assetId) => void handleDeleteAsset(assetId)}
-              onReturnToCanvas={() => { setSetupMode(false); setActionError(""); }}
+              onReturnToCanvas={() => { setSetupMode(false); setLeftPanel("boards"); setActionError(""); }}
               onStructureChange={(next) => mutateStructureDraft(() => next)}
             />
           </div>
@@ -4714,100 +4591,13 @@ export function ProjectEditorFabricClient({
                               ) : null}
                               <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                 <p className="mb-2 text-xs tracking-[0.16em] text-white/34">显示</p>
-                                <label className="text-xs text-white/50">填充方式</label>
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                  {[
-                                    { key: "fill", label: "Fill" },
-                                    { key: "fit", label: "Fit" },
-                                  ].map((item) => (
-                                    <button
-                                      key={item.key}
-                                      type="button"
-                                      onClick={() =>
-                                        updateActiveImageFit(item.key as "fill" | "fit")
-                                      }
-                                      className={cn(
-                                        "rounded-xl border px-3 py-2 text-sm transition-colors",
-                                        activeMeta.fit === item.key
-                                          ? "border-white/16 bg-white/10 text-white"
-                                          : "border-white/8 bg-background text-white/64 hover:bg-white/5"
-                                      )}
-                                    >
-                                      {item.label}
-                                    </button>
-                                  ))}
-                                </div>
-                                {activeMeta.fit === "fill" ? (
-                                  <div className="mt-3 space-y-3">
-                                    <div>
-                                      <label className="text-xs text-white/50">裁切缩放</label>
-                                      <div className="mt-2 flex items-center gap-2">
-                                        <Input
-                                          type="range"
-                                          min={1}
-                                          max={3}
-                                          step={0.01}
-                                          value={activeMeta.crop.scale}
-                                          onChange={(event) =>
-                                            updateActiveImageCrop({
-                                              scale: Number(event.target.value),
-                                            })
-                                          }
-                                          className="h-8 flex-1"
-                                        />
-                                        <span className="w-12 shrink-0 text-right text-sm tabular-nums text-white/60">
-                                          {activeMeta.crop.scale.toFixed(2)}x
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="text-xs text-white/50">水平焦点</label>
-                                      <div className="mt-2 flex items-center gap-2">
-                                        <Input
-                                          type="range"
-                                          min={0}
-                                          max={1}
-                                          step={0.01}
-                                          value={activeMeta.crop.x}
-                                          onChange={(event) =>
-                                            updateActiveImageCrop({
-                                              x: Number(event.target.value),
-                                            })
-                                          }
-                                          className="h-8 flex-1"
-                                        />
-                                        <span className="w-10 shrink-0 text-right text-sm tabular-nums text-white/60">
-                                          {Math.round(activeMeta.crop.x * 100)}%
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="text-xs text-white/50">垂直焦点</label>
-                                      <div className="mt-2 flex items-center gap-2">
-                                        <Input
-                                          type="range"
-                                          min={0}
-                                          max={1}
-                                          step={0.01}
-                                          value={activeMeta.crop.y}
-                                          onChange={(event) =>
-                                            updateActiveImageCrop({
-                                              y: Number(event.target.value),
-                                            })
-                                          }
-                                          className="h-8 flex-1"
-                                        />
-                                        <span className="w-10 shrink-0 text-right text-sm tabular-nums text-white/60">
-                                          {Math.round(activeMeta.crop.y * 100)}%
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <p className="mt-3 text-xs leading-5 text-white/42">
-                                    当前是 Fit 模式，切到 Fill 后可裁切并调整焦点。
+                                <label className="text-xs text-white/50">图片显示方式</label>
+                                <div className="mt-2 rounded-[18px] border border-white/8 bg-background/50 p-3">
+                                  <p className="text-sm text-white">完整显示</p>
+                                  <p className="mt-1 text-xs leading-5 text-white/42">
+                                    图片会按原始比例完整显示，不再提供裁切和取景调整。
                                   </p>
-                                )}
+                                </div>
                                 <label className="mt-3 block text-xs text-white/50">透明度</label>
                                 <div className="mt-2 flex items-center gap-2">
                                   <Input
@@ -5266,8 +5056,68 @@ export function ProjectEditorFabricClient({
         </div>
       ) : null}
 
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="dark max-w-xl border-white/8 bg-card text-white">
+          <DialogHeader>
+            <DialogTitle>导出到 Figma</DialogTitle>
+            <DialogDescription className="text-white/58">
+              当前版本走的是“导出 JSON + Figma 插件导入”的单向流程，不是直接把文件写进 Figma。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm leading-6 text-white/72">
+            <div className="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3">
+              <p className="font-medium text-white">导出后怎么用</p>
+              <div className="mt-2 space-y-1.5 text-white/60">
+                <p>
+                  1. 先点击下方“另存为导出文件”，把当前项目保存成 <code>.json</code>。
+                </p>
+                <p>2. 在 Figma 中导入开发插件 `FolioBox Figma Import`。</p>
+                <p>
+                  3. 运行插件后，选择刚保存的 <code>.json</code> 文件，插件会在当前页面生成可编辑图层。
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-amber-300/14 bg-amber-400/8 px-4 py-3 text-amber-50/88">
+              <p className="font-medium text-amber-50">当前插件还是开发版</p>
+              <p className="mt-2 text-sm leading-6 text-amber-50/72">
+                现在的插件在仓库目录 <code>figma-plugin/manifest.json</code>，需要通过
+                <code>Plugins -&gt; Development -&gt; Import plugin from manifest...</code>
+                手动导入。正式面向用户时，应该把插件发布到 Figma Community 或内部组织分发，而不是让用户找仓库文件。
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setExportDialogOpen(false)}
+              disabled={exportingFigma}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleExportToFigma()}
+              disabled={exportingFigma}
+            >
+              {exportingFigma ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中
+                </>
+              ) : (
+                "另存为导出文件"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="max-w-2xl border-white/8 bg-card text-white">
+        <DialogContent className="dark max-w-2xl border-white/8 bg-card text-white">
           <DialogHeader>
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription className="text-white/56">
