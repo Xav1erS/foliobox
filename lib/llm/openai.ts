@@ -7,7 +7,13 @@ import {
   getOpenAIModelConfig,
   resolveOpenAIModel,
 } from "./model-routing";
-import type { GenerateOptions, ImageInput, LLMProvider } from "./provider";
+import type {
+  GenerateImageOptions,
+  GenerateOptions,
+  GeneratedImage,
+  ImageInput,
+  LLMProvider,
+} from "./provider";
 
 function getProxyUrl(): string | undefined {
   return (
@@ -285,6 +291,60 @@ export class OpenAIProvider implements LLMProvider {
         finalOptions,
         error
       );
+      throw error;
+    }
+  }
+
+  async generateImage(
+    prompt: string,
+    options?: GenerateImageOptions
+  ): Promise<GeneratedImage> {
+    const finalOptions = { ...this.defaultOptions, ...options };
+    const model = finalOptions.model ?? "gpt-image-2";
+    const startedAt = Date.now();
+    const outputFormat = finalOptions.outputFormat ?? "png";
+
+    try {
+      const response = await this.client.images.generate({
+        prompt,
+        model,
+        size: finalOptions.size ?? "1536x1024",
+        quality: finalOptions.quality ?? "low",
+        output_format: outputFormat,
+        background: finalOptions.background ?? "opaque",
+        n: 1,
+        user: finalOptions.track?.userId ?? undefined,
+      });
+
+      this.logUsage(
+        "generateImage",
+        model,
+        startedAt,
+        finalOptions,
+        {
+          prompt_tokens: response.usage?.input_tokens ?? 0,
+          completion_tokens: response.usage?.output_tokens ?? 0,
+          total_tokens: response.usage?.total_tokens ?? 0,
+        } as OpenAI.Completions.CompletionUsage
+      );
+
+      const image = response.data?.[0];
+      if (!image?.b64_json) {
+        throw new Error("Image generation returned no image");
+      }
+
+      return {
+        base64: image.b64_json,
+        mimeType:
+          outputFormat === "jpeg"
+            ? "image/jpeg"
+            : outputFormat === "webp"
+              ? "image/webp"
+              : "image/png",
+        revisedPrompt: image.revised_prompt ?? null,
+      };
+    } catch (error) {
+      await this.handleError("generateImage", model, startedAt, finalOptions, error);
       throw error;
     }
   }

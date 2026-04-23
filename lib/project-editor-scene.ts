@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { renderGeneratedProjectBoardNodes } from "./project-layout-templates";
+import { buildPrototypeLayoutNodes } from "./project-prototype-layout";
 import type { StyleProfile } from "./style-reference-presets";
 
 export const PROJECT_BOARD_WIDTH = 1920;
@@ -342,6 +344,27 @@ export const ProjectMaterialRecognitionSchema = z.object({
 
 export type ProjectMaterialRecognition = z.infer<typeof ProjectMaterialRecognitionSchema>;
 
+export const ProjectPrototypeInfoCardSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+});
+
+export type ProjectPrototypeInfoCard = z.infer<typeof ProjectPrototypeInfoCardSchema>;
+
+export const ProjectPrototypeBoardDraftSchema = z.object({
+  sectionId: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  narrative: z.string().optional().default(""),
+  keyPoints: z.array(z.string()).optional().default([]),
+  infoCards: z.array(ProjectPrototypeInfoCardSchema).optional().default([]),
+  visualBrief: z.string().optional().default(""),
+  preferredAssetIds: z.array(z.string()).optional().default([]),
+  missingAssetNote: z.string().optional().default(""),
+});
+
+export type ProjectPrototypeBoardDraft = z.infer<typeof ProjectPrototypeBoardDraftSchema>;
+
 export type GeneratedLayoutPageSeed = {
   boardId?: string;
   pageNumber: number;
@@ -576,6 +599,7 @@ function matchAssetIdForStructureSection(params: {
   usedAssetIds: Set<string>;
   recognition?: ProjectMaterialRecognition;
   boardIndex: number;
+  pageType?: ProjectPageType | null;
 }) {
   return matchAssetIdsForStructureSection({ ...params, count: 1 })[0] ?? null;
 }
@@ -587,10 +611,32 @@ function matchAssetIdsForStructureSection(params: {
   recognition?: ProjectMaterialRecognition;
   boardIndex: number;
   count: number;
+  pageType?: ProjectPageType | null;
 }) {
-  const { section, assets, usedAssetIds, recognition, boardIndex, count } = params;
+  const { section, assets, usedAssetIds, recognition, boardIndex, count, pageType } = params;
   const availableAssets = assets.filter((asset) => !usedAssetIds.has(asset.id));
   if (availableAssets.length === 0 || count <= 0) return [] as string[];
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+
+  function isLogoLikeAsset(asset: ProjectSceneSeedAsset) {
+    const meta = resolveProjectAssetMeta(asset.metaJson);
+    const text = [asset.title ?? "", meta.note ?? ""].join(" ").toLowerCase();
+    return /logo|图标|icon|favicon|品牌标识|应用图标|app icon/.test(text);
+  }
+
+  function canUseAssetForPageType(assetId: string) {
+    const asset = assetById.get(assetId);
+    if (!asset) return false;
+    if (
+      (pageType === "项目定位 / 背景页" ||
+        pageType === "项目定位 / 背景" ||
+        pageType === "作品定位 / 题材说明") &&
+      isLogoLikeAsset(asset)
+    ) {
+      return false;
+    }
+    return true;
+  }
 
   const keywords = section.suggestedAssets
     .map((item) => item.trim().toLowerCase())
@@ -600,6 +646,7 @@ function matchAssetIdsForStructureSection(params: {
     if (!assetId) return;
     if (usedAssetIds.has(assetId)) return;
     if (!assets.some((asset) => asset.id === assetId)) return;
+    if (!canUseAssetForPageType(assetId)) return;
     if (rankedIds.includes(assetId)) return;
     rankedIds.push(assetId);
   };
@@ -648,7 +695,31 @@ function getSectionSearchText(params: {
     .toLowerCase();
 }
 
-function inferProjectPageType(params: {
+function getSectionPrimarySearchText(params: {
+  group: ProjectStructureGroup;
+  section: ProjectStructureSection;
+}) {
+  const { group, section } = params;
+  return [
+    group.label,
+    group.rationale,
+    group.narrativeRole,
+    section.title,
+    section.purpose,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function getSectionSecondarySearchText(section: ProjectStructureSection) {
+  return [...section.recommendedContent, ...section.suggestedAssets].join(" ").toLowerCase();
+}
+
+function countKeywordHits(text: string, keywords: string[]) {
+  return keywords.reduce((sum, keyword) => (text.includes(keyword) ? sum + 1 : sum), 0);
+}
+
+export function inferProjectPageType(params: {
   group: ProjectStructureGroup;
   section: ProjectStructureSection;
   boardIndex: number;
@@ -657,8 +728,17 @@ function inferProjectPageType(params: {
 }): ProjectPageType {
   const { group, section, boardIndex, totalBoards } = params;
   const packageMode = params.packageMode ?? "DEEP";
-  const text = getSectionSearchText({ group, section });
+  const primaryText = getSectionPrimarySearchText({ group, section });
+  const secondaryText = getSectionSecondarySearchText(section);
+  const sectionText = [section.title, section.purpose].join(" ").toLowerCase();
+  const text = [primaryText, secondaryText].filter(Boolean).join(" ");
   const includes = (...keywords: string[]) => keywords.some((keyword) => text.includes(keyword));
+  const primaryIncludes = (...keywords: string[]) =>
+    keywords.some((keyword) => primaryText.includes(keyword));
+  const sectionIncludes = (...keywords: string[]) =>
+    keywords.some((keyword) => sectionText.includes(keyword));
+  const weightedScore = (...keywords: string[]) =>
+    countKeywordHits(primaryText, keywords) * 3 + countKeywordHits(secondaryText, keywords);
 
   if (packageMode === "SUPPORTIVE") {
     if (includes("角色", "职责", "说明")) return "简短说明 / 角色说明";
@@ -678,6 +758,73 @@ function inferProjectPageType(params: {
     if (boardIndex === 0) return "项目定位 / 背景";
     if (boardIndex === 1) return "问题与目标";
     return "核心方案 / 关键界面";
+  }
+
+  if (primaryIncludes("项目概览", "项目定位", "概览定位", "一句话定义")) {
+    return "项目定位 / 背景页";
+  }
+  if (primaryIncludes("用户场景", "关键洞察", "用户洞察", "用户研究", "用户旅程")) {
+    return "用户 / 流程 / 关键洞察";
+  }
+  if (primaryIncludes("核心任务模型", "任务模型", "通用任务模型")) {
+    if (includes("动作", "状态", "流程", "任务链", "输入", "输出", "参数", "校验")) {
+      return "流程 / 任务链优化页";
+    }
+    return "设计目标 / 设计策略";
+  }
+  if (primaryIncludes("关键界面验证", "关键界面", "关键模块")) {
+    return "关键模块优化";
+  }
+  if (primaryIncludes("上线结果与规范化", "规范化")) {
+    if (sectionIncludes("规范", "模板", "组件", "命名", "复用", "扩展", "映射")) {
+      return "全局结构优化";
+    }
+    return "结果 / 价值证明";
+  }
+
+  const scoredCandidates = [
+    {
+      type: "总结 / 反思" as const,
+      score: weightedScore("反思", "复盘", "总结"),
+    },
+    {
+      type: "项目定位 / 背景页" as const,
+      score: weightedScore("概览", "定位", "封面", "开场"),
+    },
+    {
+      type: "用户 / 流程 / 关键洞察" as const,
+      score: weightedScore("用户", "洞察", "研究", "旅程", "场景"),
+    },
+    {
+      type: "业务背景 / 问题背景" as const,
+      score: weightedScore("背景", "问题", "痛点", "业务"),
+    },
+    {
+      type: "全局结构优化" as const,
+      score: weightedScore("结构", "架构", "信息架构", "全局", "规范", "模板", "组件", "命名", "复用"),
+    },
+    {
+      type: "设计目标 / 设计策略" as const,
+      score: weightedScore("目标", "策略", "原则", "取舍", "方向", "模型"),
+    },
+    {
+      type: "流程 / 任务链优化页" as const,
+      score: weightedScore("流程", "任务链", "链路", "闭环", "动作", "状态", "输入", "输出", "校验"),
+    },
+    {
+      type: "关键模块优化" as const,
+      score: weightedScore("模块", "界面", "页面", "工具", "方案", "优化", "before", "after"),
+    },
+    {
+      type: "结果 / 价值证明" as const,
+      score: weightedScore("结果", "成果", "价值", "指标", "数据", "证明", "反馈", "上线", "product hunt"),
+    },
+  ];
+  const bestCandidate = scoredCandidates.reduce((best, candidate) =>
+    candidate.score > best.score ? candidate : best
+  );
+  if (bestCandidate.score > 0) {
+    return bestCandidate.type;
   }
 
   if (includes("反思", "复盘", "总结")) return "总结 / 反思";
@@ -727,364 +874,191 @@ function createPrototypeText(
   });
 }
 
-function buildPrototypeNodesForPageType(params: {
+function createPrototypeImage(
+  assetId: string,
+  patch?: Partial<ProjectBoardImageNode>
+) {
+  return createProjectImageNode(assetId, {
+    ...patch,
+    fit: patch?.fit ?? "fit",
+    placeholder: true,
+  });
+}
+
+function trimPrototypeCopy(text: string | null | undefined, maxChars: number) {
+  const normalized = (text ?? "").trim().replace(/\s+/g, " ");
+  if (!normalized) return "";
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+}
+
+function getPrototypeDefaultCards(pageType: ProjectPageType) {
+  if (pageType === "项目定位 / 背景页" || pageType === "项目定位 / 背景") {
+    return ["角色", "目标", "亮点"];
+  }
+  if (pageType === "结果 / 价值证明" || pageType === "结果 / 简短总结") {
+    return ["证据 1", "证据 2", "证据 3"];
+  }
+  if (pageType === "全局结构优化") {
+    return ["规则", "组件", "映射"];
+  }
+  return ["要点 1", "要点 2", "要点 3"];
+}
+
+function getFallbackPrototypeDraft(params: {
   pageType: ProjectPageType;
-  groupLabel: string;
+  sectionId: string;
   sectionTitle: string;
   purpose: string;
   recommendedContent: string[];
   matchedAssetTitle: string | null;
-}): ProjectBoardNode[] {
-  const { pageType, groupLabel, sectionTitle, purpose, recommendedContent, matchedAssetTitle } =
+}): ProjectPrototypeBoardDraft {
+  const { pageType, sectionId, sectionTitle, purpose, recommendedContent, matchedAssetTitle } =
     params;
-  const helperText = recommendedContent.slice(0, 3).join("\n");
-  const assetLabel = matchedAssetTitle ? `图位待生成\n建议素材：${matchedAssetTitle}` : "图位待生成";
-  const nodes: ProjectBoardNode[] = [
-    createPrototypeText({
-      role: "caption",
-      text: `${groupLabel} · ${pageType}`,
-      x: 120,
-      y: 88,
-      width: 760,
-      height: 30,
-      fontSize: 18,
-      fontWeight: 600,
-      lineHeight: 1.2,
-      zIndex: 1,
-    }),
-    createPrototypeText({
-      role: "title",
-      text: sectionTitle,
-      x: 120,
-      y: 136,
-      width: 760,
-      height: 128,
-      fontSize: 76,
-      fontWeight: 700,
-      lineHeight: 1.06,
-      zIndex: 2,
-    }),
-  ];
+  const cards = getPrototypeDefaultCards(pageType).map((label, index) => ({
+    label,
+    value: trimPrototypeCopy(recommendedContent[index], 20) || "待补充",
+  }));
 
-  if (pageType === "项目定位 / 背景页" || pageType === "项目定位 / 背景") {
-    nodes.push(
-      createPrototypeText({
-        role: "body",
-        text: purpose || "这一页先建立项目边界、角色和目标。",
-        x: 120,
-        y: 286,
-        width: 620,
-        height: 132,
-        fontSize: 28,
-        lineHeight: 1.45,
-        zIndex: 3,
-      }),
-      createPrototypeShape({ x: 1040, y: 132, width: 700, height: 688, zIndex: 4 }),
-      createPrototypeText({
-        role: "note",
-        text: assetLabel,
-        x: 1108,
-        y: 422,
-        width: 564,
-        height: 96,
-        fontSize: 24,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 5,
-      }),
-      createPrototypeShape({ x: 120, y: 760, width: 196, height: 156, zIndex: 4 }),
-      createPrototypeShape({ x: 338, y: 760, width: 196, height: 156, zIndex: 4 }),
-      createPrototypeShape({ x: 556, y: 760, width: 196, height: 156, zIndex: 4 }),
-      createPrototypeText({
-        role: "metric",
-        text: "角色\n待生成",
-        x: 148,
-        y: 800,
-        width: 140,
-        height: 82,
-        fontSize: 30,
-        lineHeight: 1.2,
-        align: "center",
-        zIndex: 5,
-      }),
-      createPrototypeText({
-        role: "metric",
-        text: "目标\n待生成",
-        x: 366,
-        y: 800,
-        width: 140,
-        height: 82,
-        fontSize: 30,
-        lineHeight: 1.2,
-        align: "center",
-        zIndex: 5,
-      }),
-      createPrototypeText({
-        role: "metric",
-        text: "成果\n待生成",
-        x: 584,
-        y: 800,
-        width: 140,
-        height: 82,
-        fontSize: 30,
-        lineHeight: 1.2,
-        align: "center",
-        zIndex: 5,
-      })
-    );
-    return nodes;
+  return {
+    sectionId,
+    title: sectionTitle,
+    summary: trimPrototypeCopy(purpose, 90) || "先把这一页要讲清楚的主线内容补齐。",
+    narrative: "",
+    keyPoints: recommendedContent.slice(0, 4).map((item) => trimPrototypeCopy(item, 28)),
+    infoCards: cards,
+    visualBrief: matchedAssetTitle ? `优先围绕「${matchedAssetTitle}」讲述` : "",
+    preferredAssetIds: [],
+    missingAssetNote: matchedAssetTitle
+      ? `建议优先使用：${matchedAssetTitle}`
+      : "缺少合适配图，先用文案与结构卡成立",
+  };
+}
+
+function resolvePrototypeDraft(params: {
+  pageType: ProjectPageType;
+  sectionId: string;
+  sectionTitle: string;
+  purpose: string;
+  recommendedContent: string[];
+  matchedAssetTitle: string | null;
+  contentDraft?: ProjectPrototypeBoardDraft | null;
+}) {
+  const fallback = getFallbackPrototypeDraft(params);
+  const draft = params.contentDraft;
+  if (!draft) return fallback;
+
+  const keyPoints = (draft.keyPoints ?? [])
+    .map((item) => trimPrototypeCopy(item, 28))
+    .filter(Boolean);
+  const infoCards = (draft.infoCards ?? [])
+    .map((card) => ({
+      label: trimPrototypeCopy(card.label, 8) || "要点",
+      value: trimPrototypeCopy(card.value, 22) || "待补充",
+    }))
+    .filter((card) => card.label || card.value);
+
+  return {
+    sectionId: draft.sectionId || fallback.sectionId,
+    title: trimPrototypeCopy(draft.title, 22) || fallback.title,
+    summary: trimPrototypeCopy(draft.summary, 110) || fallback.summary,
+    narrative: trimPrototypeCopy(draft.narrative, 140) || fallback.narrative,
+    keyPoints: keyPoints.length > 0 ? keyPoints : fallback.keyPoints,
+    infoCards: infoCards.length > 0 ? infoCards : fallback.infoCards,
+    visualBrief: trimPrototypeCopy(draft.visualBrief, 44) || fallback.visualBrief,
+    preferredAssetIds: draft.preferredAssetIds ?? fallback.preferredAssetIds,
+    missingAssetNote:
+      trimPrototypeCopy(draft.missingAssetNote, 44) || fallback.missingAssetNote,
+  } satisfies ProjectPrototypeBoardDraft;
+}
+
+function getPrototypeCardLines(draft: ProjectPrototypeBoardDraft, pageType: ProjectPageType) {
+  const labels = getPrototypeDefaultCards(pageType);
+  const cards = [...draft.infoCards];
+  for (const point of draft.keyPoints) {
+    if (cards.length >= 3) break;
+    cards.push({
+      label: labels[cards.length] ?? `要点 ${cards.length + 1}`,
+      value: trimPrototypeCopy(point, 20) || "待补充",
+    });
   }
-
-  if (pageType === "业务背景 / 问题背景" || pageType === "问题与目标") {
-    nodes.push(
-      createPrototypeShape({ x: 120, y: 300, width: 520, height: 560, zIndex: 3 }),
-      createPrototypeShape({ x: 680, y: 300, width: 500, height: 560, zIndex: 3 }),
-      createPrototypeShape({ x: 1220, y: 300, width: 580, height: 560, zIndex: 3 }),
-      createPrototypeText({
-        role: "body",
-        text: "背景区待生成",
-        x: 168,
-        y: 336,
-        width: 420,
-        height: 54,
-        fontSize: 28,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "body",
-        text: "问题区待生成",
-        x: 728,
-        y: 336,
-        width: 400,
-        height: 54,
-        fontSize: 28,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "note",
-        text: assetLabel,
-        x: 1292,
-        y: 536,
-        width: 436,
-        height: 96,
-        fontSize: 24,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 4,
-      })
-    );
-    return nodes;
+  while (cards.length < 3) {
+    cards.push({
+      label: labels[cards.length] ?? `要点 ${cards.length + 1}`,
+      value: "待补充",
+    });
   }
+  return cards.slice(0, 3).map((card) => `${card.label}\n${card.value}`);
+}
 
-  if (pageType === "用户 / 流程 / 关键洞察" || pageType === "全局结构优化") {
-    nodes.push(
-      createPrototypeShape({ x: 120, y: 300, width: 640, height: 600, zIndex: 3 }),
-      createPrototypeShape({ x: 812, y: 300, width: 988, height: 260, zIndex: 3 }),
-      createPrototypeShape({ x: 812, y: 604, width: 304, height: 296, zIndex: 3 }),
-      createPrototypeShape({ x: 1148, y: 604, width: 304, height: 296, zIndex: 3 }),
-      createPrototypeShape({ x: 1484, y: 604, width: 316, height: 296, zIndex: 3 }),
-      createPrototypeText({
-        role: "body",
-        text: pageType === "全局结构优化" ? "结构图位待生成" : "洞察 / 流程主区待生成",
-        x: 184,
-        y: 560,
-        width: 512,
-        height: 58,
-        fontSize: 30,
-        align: "center",
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "note",
-        text: helperText || "关键信息卡待生成",
-        x: 856,
-        y: 344,
-        width: 900,
-        height: 150,
-        fontSize: 24,
-        lineHeight: 1.45,
-        zIndex: 4,
-      })
+function buildPrototypeNodesForPageType(params: {
+  pageType: ProjectPageType;
+  groupLabel: string;
+  sectionId: string;
+  sectionTitle: string;
+  purpose: string;
+  recommendedContent: string[];
+  matchedAssetId: string | null;
+  matchedAssetTitle: string | null;
+  contentDraft?: ProjectPrototypeBoardDraft | null;
+}): ProjectBoardNode[] {
+  const {
+    pageType,
+    groupLabel,
+    sectionId,
+    sectionTitle,
+    purpose,
+    recommendedContent,
+    matchedAssetId,
+    matchedAssetTitle,
+    contentDraft,
+  } = params;
+  const draft = resolvePrototypeDraft({
+    pageType,
+    sectionId,
+    sectionTitle,
+    purpose,
+    recommendedContent,
+    matchedAssetTitle,
+    contentDraft,
+  });
+  const helperText = [draft.summary, draft.narrative].filter(Boolean).join("\n\n");
+  const assetLabel =
+    draft.missingAssetNote ||
+    (matchedAssetTitle ? `待补图\n建议素材：${matchedAssetTitle}` : "待补图");
+  const cardLines = getPrototypeCardLines(draft, pageType);
+  const hasVisual = Boolean(matchedAssetId);
+  const hasDenseKeyPoints = draft.keyPoints.length >= 4;
+  const contentSignal = [
+    draft.summary,
+    draft.narrative,
+    ...draft.keyPoints,
+    ...draft.infoCards.flatMap((card) => [card.label, card.value]),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const looksMetricHeavy =
+    /%|ROI|留存|转化|增长|提升|下降|缩短|上线|反馈|验证|复用|规范|组件|效率|用户|项目数|次数/i.test(
+      contentSignal
     );
-    return nodes;
-  }
-
-  if (
-    pageType === "设计目标 / 设计策略" ||
-    pageType === "流程 / 任务链优化页" ||
-    pageType === "before / after 或流程优化"
-  ) {
-    nodes.push(
-      createPrototypeShape({ x: 120, y: 300, width: 520, height: 220, zIndex: 3 }),
-      createPrototypeShape({ x: 120, y: 560, width: 520, height: 220, zIndex: 3 }),
-      createPrototypeShape({ x: 680, y: 300, width: 520, height: 220, zIndex: 3 }),
-      createPrototypeShape({ x: 680, y: 560, width: 520, height: 220, zIndex: 3 }),
-      createPrototypeShape({ x: 1240, y: 300, width: 560, height: 480, zIndex: 3 }),
-      createPrototypeText({
-        role: "body",
-        text: helperText || "策略卡 / 流程说明待生成",
-        x: 164,
-        y: 338,
-        width: 988,
-        height: 146,
-        fontSize: 24,
-        lineHeight: 1.45,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "note",
-        text: assetLabel,
-        x: 1316,
-        y: 494,
-        width: 410,
-        height: 92,
-        fontSize: 24,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 4,
-      })
-    );
-    return nodes;
-  }
-
-  if (
-    pageType === "关键模块优化" ||
-    pageType === "核心方案 / 关键界面" ||
-    pageType === "关键视觉或关键界面"
-  ) {
-    nodes.push(
-      createPrototypeShape({ x: 120, y: 300, width: 780, height: 520, zIndex: 3 }),
-      createPrototypeShape({ x: 1020, y: 300, width: 780, height: 520, zIndex: 3 }),
-      createPrototypeText({
-        role: "note",
-        text: pageType === "关键模块优化" ? "模块 A / Before" : assetLabel,
-        x: 212,
-        y: 534,
-        width: 596,
-        height: 84,
-        fontSize: 28,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "note",
-        text: pageType === "关键模块优化" ? "模块 B / After" : "补充图位待生成",
-        x: 1112,
-        y: 534,
-        width: 596,
-        height: 84,
-        fontSize: 28,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 4,
-      }),
-      createPrototypeShape({ x: 120, y: 860, width: 1680, height: 120, zIndex: 3 }),
-      createPrototypeText({
-        role: "body",
-        text: helperText || "说明位待生成",
-        x: 164,
-        y: 892,
-        width: 1592,
-        height: 52,
-        fontSize: 24,
-        zIndex: 4,
-      })
-    );
-    return nodes;
-  }
-
-  if (pageType === "结果 / 价值证明" || pageType === "结果 / 简短总结") {
-    nodes.push(
-      createPrototypeShape({ x: 120, y: 300, width: 260, height: 180, zIndex: 3 }),
-      createPrototypeShape({ x: 416, y: 300, width: 260, height: 180, zIndex: 3 }),
-      createPrototypeShape({ x: 712, y: 300, width: 260, height: 180, zIndex: 3 }),
-      createPrototypeShape({ x: 1008, y: 300, width: 792, height: 580, zIndex: 3 }),
-      createPrototypeText({
-        role: "metric",
-        text: "指标 A",
-        x: 184,
-        y: 358,
-        width: 132,
-        height: 48,
-        fontSize: 38,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "metric",
-        text: "指标 B",
-        x: 480,
-        y: 358,
-        width: 132,
-        height: 48,
-        fontSize: 38,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "metric",
-        text: "指标 C",
-        x: 776,
-        y: 358,
-        width: 132,
-        height: 48,
-        fontSize: 38,
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "note",
-        text: assetLabel,
-        x: 1120,
-        y: 556,
-        width: 568,
-        height: 96,
-        fontSize: 24,
-        lineHeight: 1.35,
-        align: "center",
-        zIndex: 4,
-      }),
-      createPrototypeText({
-        role: "body",
-        text: helperText || "结果说明待生成",
-        x: 120,
-        y: 548,
-        width: 820,
-        height: 220,
-        fontSize: 24,
-        lineHeight: 1.45,
-        zIndex: 4,
-      })
-    );
-    return nodes;
-  }
-
-  nodes.push(
-    createPrototypeShape({ x: 120, y: 300, width: 980, height: 620, zIndex: 3 }),
-    createPrototypeShape({ x: 1140, y: 300, width: 660, height: 300, zIndex: 3 }),
-    createPrototypeShape({ x: 1140, y: 620, width: 660, height: 300, zIndex: 3 }),
-    createPrototypeText({
-      role: "body",
-      text: purpose || "这一页用于收束项目主线。",
-      x: 176,
-      y: 360,
-      width: 868,
-      height: 186,
-      fontSize: 26,
-      lineHeight: 1.45,
-      zIndex: 4,
-    }),
-    createPrototypeText({
-      role: "note",
-      text: helperText || "反思 / 下一步待生成",
-      x: 1188,
-      y: 372,
-      width: 564,
-      height: 136,
-      fontSize: 24,
-      lineHeight: 1.45,
-      zIndex: 4,
-    })
+  return buildPrototypeLayoutNodes(
+    {
+      pageType,
+      groupLabel,
+      draft,
+      helperText,
+      assetLabel,
+      cardLines,
+      matchedAssetId,
+      hasDenseKeyPoints,
+      looksMetricHeavy,
+    },
+    {
+      createShape: createPrototypeShape,
+      createText: createPrototypeText,
+      createImage: createPrototypeImage,
+    }
   );
-  return nodes;
 }
 
 function getPrototypeBoardBackground(pageType: ProjectPageType) {
@@ -1099,9 +1073,12 @@ export function buildProjectSceneFromStructureSuggestion(params: {
   projectName?: string;
   recognition?: ProjectMaterialRecognition;
   packageMode?: ProjectPackageMode;
+  contentDrafts?: ProjectPrototypeBoardDraft[];
 }): ProjectEditorScene {
   const { suggestion, assets, projectName, recognition } = params;
   const packageMode = params.packageMode ?? inferPackageModeFromSuggestion(suggestion);
+  const contentDrafts = params.contentDrafts ?? [];
+  const draftBySectionId = new Map(contentDrafts.map((draft) => [draft.sectionId, draft]));
   const usedAssetIds = new Set<string>();
   const boards: ProjectBoard[] = [];
 
@@ -1118,17 +1095,7 @@ export function buildProjectSceneFromStructureSuggestion(params: {
       flatSectionCursor += 1;
       if (section.locked) return;
       if (unlockedLimit !== null && currentSectionIndex >= unlockedLimit) return;
-      const matchedAssetId = matchAssetIdForStructureSection({
-        section,
-        assets,
-        usedAssetIds,
-        recognition,
-        boardIndex: boards.length,
-      });
-
-      if (matchedAssetId) {
-        usedAssetIds.add(matchedAssetId);
-      }
+      const draft = draftBySectionId.get(section.id) ?? null;
       const pageType = inferProjectPageType({
         group,
         section,
@@ -1136,20 +1103,56 @@ export function buildProjectSceneFromStructureSuggestion(params: {
         totalBoards: suggestion.groups.reduce((sum, item) => sum + item.sections.length, 0),
         packageMode,
       });
+      const preferredAssetId = (draft?.preferredAssetIds ?? []).find(
+        (assetId) =>
+          matchAssetIdsForStructureSection({
+            section,
+            assets,
+            usedAssetIds,
+            recognition,
+            boardIndex: boards.length,
+            count: assets.length,
+            pageType,
+          }).includes(assetId)
+      ) ?? null;
+      const matchedAssetId =
+        preferredAssetId ??
+        matchAssetIdForStructureSection({
+          section,
+          assets,
+          usedAssetIds,
+          recognition,
+          boardIndex: boards.length,
+          pageType,
+        });
+
+      if (matchedAssetId) {
+        usedAssetIds.add(matchedAssetId);
+      }
       const nodes = buildPrototypeNodesForPageType({
         pageType,
         groupLabel: group.label,
+        sectionId: section.id,
         sectionTitle: section.title,
         purpose: section.purpose,
         recommendedContent: section.recommendedContent,
+        matchedAssetId,
         matchedAssetTitle:
           assets.find((asset) => asset.id === matchedAssetId)?.title ?? matchedAssetId ?? null,
+        contentDraft: draft,
       });
 
       // 收集 AI 内容建议：purpose 说明 + recommendedContent 要点
       const contentSuggestions: string[] = [];
-      if (section.purpose) contentSuggestions.push(section.purpose);
-      contentSuggestions.push(...section.recommendedContent);
+      if (draft?.summary) contentSuggestions.push(draft.summary);
+      if (draft?.narrative) contentSuggestions.push(draft.narrative);
+      if (draft?.keyPoints?.length) {
+        contentSuggestions.push(...draft.keyPoints);
+      } else {
+        if (section.purpose) contentSuggestions.push(section.purpose);
+        contentSuggestions.push(...section.recommendedContent);
+      }
+      if (draft?.missingAssetNote) contentSuggestions.push(draft.missingAssetNote);
 
       boards.push(
         createProjectBoard({
@@ -1157,7 +1160,9 @@ export function buildProjectSceneFromStructureSuggestion(params: {
             suggestion.groups.length > 1
               ? `${group.label} · ${section.title}`
               : section.title || `${projectName ?? "项目"} · ${sectionIndex + 1}`,
-          intent: `${group.label}：${section.purpose}`,
+          intent:
+            [draft?.summary, draft?.narrative].filter(Boolean).join(" ") ||
+            `${group.label}：${section.purpose}`,
           thumbnailAssetId: matchedAssetId,
           nodes,
           structureSource: {
@@ -1239,15 +1244,6 @@ function createGeneratedImage(
   });
 }
 
-function buildGeneratedBody(page: GeneratedLayoutPageSeed) {
-  const lines = [page.contentGuidance.trim(), ...page.keyPoints.slice(0, 3).map((item) => `• ${item}`)];
-  return lines.filter(Boolean).join("\n");
-}
-
-function buildGeneratedTitleText(page: GeneratedLayoutPageSeed, board: ProjectBoard) {
-  return page.titleSuggestion.trim() || board.name.trim() || board.structureSource?.sectionTitle || "项目页面";
-}
-
 function buildGeneratedNodesForBoard(params: {
   board: ProjectBoard;
   page: GeneratedLayoutPageSeed;
@@ -1258,607 +1254,15 @@ function buildGeneratedNodesForBoard(params: {
   supportAssetId: string | null;
   assetMap: Map<string, ProjectSceneSeedAsset>;
 }) {
-  const {
-    board,
-    page,
-    pageType,
-    styleProfile,
-    preservedNodes,
-    heroAssetId,
-    supportAssetId,
-    assetMap,
-  } = params;
-  const nodes: ProjectBoardNode[] = [];
-  const titleText = buildGeneratedTitleText(page, board);
-  const bodyText = buildGeneratedBody(page);
-  const hasPreservedTitle = preservedNodes.some(
-    (node) => node.type === "text" && node.role === "title"
-  );
-  const hasPreservedBody = preservedNodes.some(
-    (node) => node.type === "text" && node.role === "body"
-  );
-  const hasPreservedImage = preservedNodes.some((node) => node.type === "image");
-  const heroMeta = heroAssetId ? resolveProjectAssetMeta(assetMap.get(heroAssetId)?.metaJson) : null;
-  const supportMeta = supportAssetId
-    ? resolveProjectAssetMeta(assetMap.get(supportAssetId)?.metaJson)
-    : null;
-  const accentSoft = `${styleProfile.accentColor}14`;
-  const borderSoft = styleProfile.border;
-  const surface = styleProfile.surface;
-  const titleTone = styleProfile.titleTone;
-  const bodyTone = styleProfile.bodyTone;
-
-  nodes.push(
-    createGeneratedShape("rect", {
-      x: 0,
-      y: 0,
-      width: PROJECT_BOARD_WIDTH,
-      height: PROJECT_BOARD_HEIGHT,
-      fill: styleProfile.background,
-      stroke: null,
-      strokeWidth: 0,
-      rx: 0,
-      zIndex: 1,
-    }),
-    createGeneratedShape("rect", {
-      x: 56,
-      y: 56,
-      width: 1808,
-      height: 968,
-      fill: surface,
-      stroke: borderSoft,
-      strokeWidth: 1,
-      rx: 36,
-      zIndex: 2,
-    })
-  );
-
-  if (!hasPreservedTitle) {
-    nodes.push(
-      createGeneratedText({
-        role: "caption",
-        text: pageType,
-        x: 120,
-        y: 98,
-        width: 700,
-        height: 30,
-        fontSize: 18,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        color: bodyTone,
-        zIndex: 3,
-      }),
-      createGeneratedText({
-        role: "title",
-        text: titleText,
-        x: 120,
-        y: 144,
-        width: 820,
-        height: 126,
-        fontSize: 74,
-        fontWeight: 700,
-        lineHeight: 1.04,
-        color: titleTone,
-        zIndex: 4,
-      })
-    );
-  }
-
-  if (
-    pageType === "项目定位 / 背景页" ||
-    pageType === "项目定位 / 背景" ||
-    pageType === "作品定位 / 题材说明"
-  ) {
-    nodes.push(
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 300,
-        width: 360,
-        height: 220,
-        fill: accentSoft,
-        stroke: null,
-        strokeWidth: 0,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 510,
-        y: 300,
-        width: 420,
-        height: 220,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 550,
-        width: 810,
-        height: 310,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 32,
-        zIndex: 3,
-      })
-    );
-    if (!hasPreservedBody) {
-      nodes.push(
-        createGeneratedText({
-          role: "body",
-          text: bodyText,
-          x: 156,
-          y: 590,
-          width: 738,
-          height: 226,
-          fontSize: 28,
-          lineHeight: 1.45,
-          color: bodyTone,
-          zIndex: 4,
-        })
-      );
-    }
-    if (!hasPreservedImage && heroAssetId) {
-      nodes.push(
-        createGeneratedImage(heroAssetId, {
-          x: 1010,
-          y: 144,
-          width: 720,
-          height: 720,
-          note: heroMeta?.note ?? null,
-          roleTag: heroMeta?.roleTag ?? "main",
-          zIndex: 4,
-        })
-      );
-    }
-    return nodes;
-  }
-
-  if (
-    pageType === "业务背景 / 问题背景" ||
-    pageType === "问题与目标" ||
-    pageType === "用户 / 流程 / 关键洞察"
-  ) {
-    nodes.push(
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 300,
-        width: 470,
-        height: 600,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 30,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 630,
-        y: 300,
-        width: 470,
-        height: 600,
-        fill: accentSoft,
-        stroke: null,
-        strokeWidth: 0,
-        rx: 30,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 1140,
-        y: 300,
-        width: 660,
-        height: 600,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 30,
-        zIndex: 3,
-      })
-    );
-    if (!hasPreservedBody) {
-      nodes.push(
-        createGeneratedText({
-          role: "body",
-          text: bodyText,
-          x: 158,
-          y: 346,
-          width: 404,
-          height: 520,
-          fontSize: 26,
-          lineHeight: 1.46,
-          color: bodyTone,
-          zIndex: 4,
-        }),
-        createGeneratedText({
-          role: "note",
-          text: page.keyPoints.slice(0, 3).join("\n"),
-          x: 668,
-          y: 346,
-          width: 394,
-          height: 520,
-          fontSize: 28,
-          lineHeight: 1.48,
-          color: titleTone,
-          zIndex: 4,
-        })
-      );
-    }
-    if (!hasPreservedImage && heroAssetId) {
-      nodes.push(
-        createGeneratedImage(heroAssetId, {
-          x: 1182,
-          y: 342,
-          width: 576,
-          height: 516,
-          note: heroMeta?.note ?? null,
-          roleTag: heroMeta?.roleTag ?? "support",
-          zIndex: 4,
-        })
-      );
-    }
-    return nodes;
-  }
-
-  if (pageType === "设计目标 / 设计策略" || pageType === "流程 / 任务链优化页") {
-    nodes.push(
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 300,
-        width: 720,
-        height: 600,
-        fill: accentSoft,
-        stroke: null,
-        strokeWidth: 0,
-        rx: 34,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 890,
-        y: 300,
-        width: 910,
-        height: 240,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 890,
-        y: 580,
-        width: 910,
-        height: 320,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 28,
-        zIndex: 3,
-      })
-    );
-    if (!hasPreservedBody) {
-      nodes.push(
-        createGeneratedText({
-          role: "body",
-          text: bodyText,
-          x: 168,
-          y: 356,
-          width: 624,
-          height: 500,
-          fontSize: 27,
-          lineHeight: 1.48,
-          color: titleTone,
-          zIndex: 4,
-        }),
-        createGeneratedText({
-          role: "note",
-          text: page.keyPoints.slice(0, 3).join("\n"),
-          x: 938,
-          y: 640,
-          width: 814,
-          height: 214,
-          fontSize: 24,
-          lineHeight: 1.46,
-          color: bodyTone,
-          zIndex: 4,
-        })
-      );
-    }
-    if (!hasPreservedImage && heroAssetId) {
-      nodes.push(
-        createGeneratedImage(heroAssetId, {
-          x: 938,
-          y: 338,
-          width: 814,
-          height: 164,
-          note: heroMeta?.note ?? null,
-          roleTag: heroMeta?.roleTag ?? "support",
-          zIndex: 4,
-        })
-      );
-    }
-    return nodes;
-  }
-
-  if (
-    pageType === "关键模块优化" ||
-    pageType === "核心方案 / 关键界面" ||
-    pageType === "关键视觉或关键界面" ||
-    pageType === "before / after 或流程优化"
-  ) {
-    nodes.push(
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 300,
-        width: 770,
-        height: 520,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 30,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 910,
-        y: 300,
-        width: 890,
-        height: 520,
-        fill: accentSoft,
-        stroke: null,
-        strokeWidth: 0,
-        rx: 30,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 850,
-        width: 1680,
-        height: 120,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 24,
-        zIndex: 3,
-      })
-    );
-    if (!hasPreservedImage && heroAssetId) {
-      nodes.push(
-        createGeneratedImage(heroAssetId, {
-          x: 156,
-          y: 336,
-          width: pageType === "before / after 或流程优化" ? 318 : 698,
-          height: 448,
-          note: heroMeta?.note ?? null,
-          roleTag: heroMeta?.roleTag ?? "main",
-          zIndex: 4,
-        })
-      );
-      if ((pageType === "关键模块优化" || pageType === "before / after 或流程优化") && supportAssetId) {
-        nodes.push(
-          createGeneratedImage(supportAssetId, {
-            x: 480,
-            y: 336,
-            width: 318,
-            height: 448,
-            note: supportMeta?.note ?? null,
-            roleTag: supportMeta?.roleTag ?? "support",
-            zIndex: 4,
-          })
-        );
-      }
-      if (pageType !== "关键模块优化" && pageType !== "before / after 或流程优化") {
-        nodes.push(
-          createGeneratedImage(heroAssetId, {
-            x: 954,
-            y: 336,
-            width: 802,
-            height: 448,
-            note: heroMeta?.note ?? null,
-            roleTag: heroMeta?.roleTag ?? "main",
-            zIndex: 4,
-          })
-        );
-      }
-    }
-    if (!hasPreservedBody) {
-      nodes.push(
-        createGeneratedText({
-          role: "body",
-          text: bodyText,
-          x: pageType === "before / after 或流程优化" ? 954 : 954,
-          y: 352,
-          width: 776,
-          height: 420,
-          fontSize: 26,
-          lineHeight: 1.46,
-          color: titleTone,
-          zIndex: 5,
-        }),
-        createGeneratedText({
-          role: "note",
-          text: page.keyPoints.slice(0, 3).join("  ·  "),
-          x: 164,
-          y: 892,
-          width: 1592,
-          height: 46,
-          fontSize: 22,
-          lineHeight: 1.3,
-          color: bodyTone,
-          zIndex: 4,
-        })
-      );
-    }
-    return nodes;
-  }
-
-  if (pageType === "结果 / 价值证明" || pageType === "结果 / 简短总结") {
-    nodes.push(
-      createGeneratedShape("rect", {
-        x: 120,
-        y: 300,
-        width: 250,
-        height: 180,
-        fill: accentSoft,
-        stroke: null,
-        strokeWidth: 0,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 406,
-        y: 300,
-        width: 250,
-        height: 180,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 692,
-        y: 300,
-        width: 250,
-        height: 180,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 28,
-        zIndex: 3,
-      }),
-      createGeneratedShape("rect", {
-        x: 1000,
-        y: 300,
-        width: 800,
-        height: 600,
-        fill: "#ffffff",
-        stroke: borderSoft,
-        strokeWidth: 1,
-        rx: 30,
-        zIndex: 3,
-      })
-    );
-    if (!hasPreservedBody) {
-      nodes.push(
-        createGeneratedText({
-          role: "metric",
-          text: page.keyPoints[0] ?? "核心指标",
-          x: 152,
-          y: 356,
-          width: 186,
-          height: 60,
-          fontSize: 34,
-          lineHeight: 1.2,
-          color: titleTone,
-          zIndex: 4,
-        }),
-        createGeneratedText({
-          role: "metric",
-          text: page.keyPoints[1] ?? "业务反馈",
-          x: 438,
-          y: 356,
-          width: 186,
-          height: 60,
-          fontSize: 34,
-          lineHeight: 1.2,
-          color: titleTone,
-          zIndex: 4,
-        }),
-        createGeneratedText({
-          role: "metric",
-          text: page.keyPoints[2] ?? "效率提升",
-          x: 724,
-          y: 356,
-          width: 186,
-          height: 60,
-          fontSize: 34,
-          lineHeight: 1.2,
-          color: titleTone,
-          zIndex: 4,
-        }),
-        createGeneratedText({
-          role: "body",
-          text: bodyText,
-          x: 120,
-          y: 560,
-          width: 822,
-          height: 300,
-          fontSize: 26,
-          lineHeight: 1.45,
-          color: bodyTone,
-          zIndex: 4,
-        })
-      );
-    }
-    if (!hasPreservedImage && heroAssetId) {
-      nodes.push(
-        createGeneratedImage(heroAssetId, {
-          x: 1042,
-          y: 342,
-          width: 716,
-          height: 516,
-          note: heroMeta?.note ?? null,
-          roleTag: heroMeta?.roleTag ?? "main",
-          zIndex: 4,
-        })
-      );
-    }
-    return nodes;
-  }
-
-  nodes.push(
-    createGeneratedShape("rect", {
-      x: 120,
-      y: 300,
-      width: 960,
-      height: 600,
-      fill: accentSoft,
-      stroke: null,
-      strokeWidth: 0,
-      rx: 34,
-      zIndex: 3,
-    }),
-    createGeneratedShape("rect", {
-      x: 1120,
-      y: 300,
-      width: 680,
-      height: 600,
-      fill: "#ffffff",
-      stroke: borderSoft,
-      strokeWidth: 1,
-      rx: 34,
-      zIndex: 3,
-    })
-  );
-  if (!hasPreservedBody) {
-    nodes.push(
-      createGeneratedText({
-        role: "body",
-        text: bodyText,
-        x: 172,
-        y: 360,
-        width: 856,
-        height: 500,
-        fontSize: 28,
-        lineHeight: 1.5,
-        color: titleTone,
-        zIndex: 4,
-      }),
-      createGeneratedText({
-        role: "note",
-        text: page.keyPoints.slice(0, 3).join("\n"),
-        x: 1164,
-        y: 360,
-        width: 592,
-        height: 500,
-        fontSize: 24,
-        lineHeight: 1.5,
-        color: bodyTone,
-        zIndex: 4,
-      })
-    );
-  }
-  return nodes;
+  return renderGeneratedProjectBoardNodes({
+    ...params,
+    boardWidth: PROJECT_BOARD_WIDTH,
+    boardHeight: PROJECT_BOARD_HEIGHT,
+    createShape: createGeneratedShape,
+    createText: createGeneratedText,
+    createImage: createGeneratedImage,
+    resolveAssetMeta: resolveProjectAssetMeta,
+  });
 }
 
 export function boardHasPlaceholderNodes(board: ProjectBoard) {
@@ -1898,8 +1302,16 @@ export function applyGeneratedLayoutToScene(params: {
       const page = pageByBoardId.get(board.id) ?? orderedPages[pageCursor] ?? null;
       pageCursor += 1;
       const structureRef = findSuggestionSectionForBoard({ board, suggestion });
-      const heroAssetId = !board.nodes.some((node) => node.type === "image")
-        ? matchAssetIdForStructureSection({
+      const placeholderImageNode = board.nodes.find(
+        (node): node is ProjectBoardImageNode => node.type === "image" && node.placeholder
+      );
+      const hasManualImageNode = board.nodes.some(
+        (node) => node.type === "image" && !node.placeholder
+      );
+      const heroAssetId = hasManualImageNode
+        ? null
+        : placeholderImageNode?.assetId ??
+          matchAssetIdForStructureSection({
             section:
               structureRef?.section ?? {
                 id: board.id,
@@ -1912,8 +1324,8 @@ export function applyGeneratedLayoutToScene(params: {
             usedAssetIds,
             recognition: recognition ?? undefined,
             boardIndex: scene.boardOrder.indexOf(board.id),
-          })
-        : null;
+            pageType: board.pageType,
+          });
       if (heroAssetId) {
         usedAssetIds.add(heroAssetId);
       }
@@ -1926,6 +1338,7 @@ export function applyGeneratedLayoutToScene(params: {
               recognition: recognition ?? undefined,
               boardIndex: scene.boardOrder.indexOf(board.id),
               count: 1,
+              pageType: board.pageType,
             })[0] ?? null
           : null;
       if (supportAssetId) {

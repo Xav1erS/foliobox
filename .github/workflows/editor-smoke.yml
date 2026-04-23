@@ -1,0 +1,129 @@
+name: Editor Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+env:
+  AUTH_SECRET: test-auth-secret
+  AUTH_URL: http://127.0.0.1:3001
+  NEXTAUTH_URL: http://127.0.0.1:3001
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/foliobox_ci?schema=public
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/foliobox_ci?schema=public
+  EMAIL_FROM: noreply@foliobox.test
+  EMAIL_SERVER_HOST: localhost
+  EMAIL_SERVER_PORT: "1025"
+  EMAIL_SERVER_USER: test
+  EMAIL_SERVER_PASSWORD: test
+  NEXT_TELEMETRY_DISABLED: "1"
+  PLAYWRIGHT_BASE_URL: http://127.0.0.1:3001
+  PLAYWRIGHT_TEST_SECRET: editor-smoke-secret
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: foliobox_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d foliobox_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Push schema
+        run: npm run db:push
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  portfolio-editor-smoke:
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: foliobox_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d foliobox_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Push schema
+        run: npm run db:push
+      - name: Portfolio editor smoke
+        run: npm run test:e2e:portfolio-editor-smoke
+
+  project-editor-smoke:
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: foliobox_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d foliobox_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Push schema
+        run: npm run db:push
+      - name: Project editor smoke
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY is not set; skipping Project Editor smoke."
+            exit 0
+          fi
+          npm run test:e2e:project-editor-smoke

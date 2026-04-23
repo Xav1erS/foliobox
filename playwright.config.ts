@@ -5,6 +5,8 @@ import path from "path";
 // 加载本地环境变量（包含 PLAYWRIGHT_TEST_SECRET）
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 
+const playwrightBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3001";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/global-setup.ts",
@@ -22,7 +24,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
+    baseURL: playwrightBaseUrl,
 
     // 所有测试默认使用保存的登录态
     storageState: "playwright/.auth/user.json",
@@ -41,10 +43,13 @@ export default defineConfig({
   ],
 
   // 本地跑测试时自动启动 dev server
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true, // 已有 dev server 则复用，不重复启动
-    timeout: 120_000,
-  },
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1"
+      ? undefined
+      : {
+          command: "npm run dev:playwright",
+          url: playwrightBaseUrl,
+          reuseExistingServer: false,
+          timeout: 120_000,
+        },
 });

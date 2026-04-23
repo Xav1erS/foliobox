@@ -1,0 +1,428 @@
+
+> foliobox@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.124:3000
+   - Environments: .env.development.local, .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1935ms
+ ✓ Compiled /middleware in 258ms (115 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 2.6s (734 modules)
+ GET /login?next=%2Fprojects 200 in 2887ms
+ ○ Compiling /api/projects/[id]/structure/apply ...
+ ✓ Compiled /api/projects/[id]/structure/apply in 1673ms (1141 modules)
+ POST /api/projects/cmo4ft25l0001le04njtnr2hu/structure/apply 401 in 2461ms
+ ○ Compiling /projects/[id]/editor ...
+ ✓ Compiled /projects in 1903ms (1662 modules)
+ GET /projects 200 in 1421ms
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 5473ms
+ ✓ Compiled /api/blob/file in 181ms (1664 modules)
+ GET /api/blob/file?source=project-assets%2F1776731671438-c60197c0-1961-4790-aab1-4f354f173a8d-logo.png 200 in 1326ms
+ GET /api/blob/file?source=project-assets%2F1776522897627-bd71d437-c408-4a59-af3e-a45df8283f27--03.png 200 in 1574ms
+ GET /api/blob/file?source=project-assets%2F1776522897626-c8ec6291-2fdd-43af-84c6-13439a955011--01.png 200 in 1595ms
+ GET /api/blob/file?source=project-assets%2F1776522897627-ef9dbc2d-154a-4c77-bcda-ee973c88f4ba--02.png 200 in 1616ms
+ GET /api/blob/file?source=project-assets%2F1776522879954-6bd8143b-b416-4869-b22f-b18f48649c8e--.png 200 in 1732ms
+[llm] {
+  provider: 'openai',
+  method: 'generateStructuredWithImages',
+  task: 'project_prototype_generation',
+  model: 'gpt-5.4-mini',
+  elapsedMs: 17468,
+  promptTokens: 17008,
+  completionTokens: 2435,
+  totalTokens: 19443
+}
+ POST /api/projects/cmo4ft25l0001le04njtnr2hu/structure/apply 200 in 20699ms
+ GET /api/blob/file?source=project-assets%2F1776731671438-c60197c0-1961-4790-aab1-4f354f173a8d-logo.png 200 in 989ms
+ GET /api/blob/file?source=project-assets%2F1776522897627-bd71d437-c408-4a59-af3e-a45df8283f27--03.png 200 in 1210ms
+ GET /api/blob/file?source=project-assets%2F1776522879954-6bd8143b-b416-4869-b22f-b18f48649c8e--.png 200 in 1077ms
+ ✓ Compiled /api/projects/[id]/layout/scene in 199ms (1653 modules)
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 2578ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1870ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1819ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1938ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1754ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1847ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1897ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1827ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 2723ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 2562ms
+ PUT /api/projects/cmo4ft25l0001le04njtnr2hu/layout/scene 200 in 1975ms
+ ✓ Compiled in 496ms (495 modules)
+ ✓ Compiled in 443ms (495 modules)
+ ✓ Compiled in 245ms (495 modules)
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 3199ms
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 2894ms
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 3301ms
+ ✓ Compiled in 622ms (1372 modules)
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 2026ms
+ ✓ Compiled in 241ms (496 modules)
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 1687ms
+ ✓ Compiled in 247ms (496 modules)
+ ✓ Compiled /_not-found in 484ms (1363 modules)
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 404 in 627ms
+ ⨯ Failed to generate static paths for /projects/[id]/editor:
+[Error: Cannot find module './vendor-chunks/@swc.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 2598ms
+ ✓ Compiled in 217ms (496 modules)
+ ✓ Compiled in 213ms (496 modules)
+ ✓ Compiled /_not-found in 355ms (1377 modules)
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\_not-found\page.js'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\admin\\Documents\\GitHub\\foliobox\\.next\\server\\app\\_not-found\\page.js'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 828ms (1723 modules)
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 2783ms
+ ✓ Compiled in 282ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\admin\\Documents\\GitHub\\foliobox\\.next\\server\\app\\(app)\\projects\\[id]\\editor\\page.js',
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 366ms
+ ✓ Compiled in 250ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\admin\\Documents\\GitHub\\foliobox\\.next\\server\\app\\(app)\\projects\\[id]\\editor\\page.js',
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 247ms
+ ✓ Compiled in 624ms (1718 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 614ms
+ ✓ Compiled in 183ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 582ms
+ ✓ Compiled in 227ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 518ms
+ ✓ Compiled in 253ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 532ms
+ ✓ Compiled in 189ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 576ms
+ ✓ Compiled in 174ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 547ms
+ ✓ Compiled in 188ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 570ms
+ ✓ Compiled in 190ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 557ms
+ ✓ Compiled in 171ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 556ms
+ ✓ Compiled in 198ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/undici.js'
+Require stack:
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\webpack-runtime.js
+- C:\Users\admin\Documents\GitHub\foliobox\.next\server\app\(app)\projects\[id]\editor\page.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\require.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\load-components.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\build\utils.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\admin\Documents\GitHub\foliobox\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/projects/cmo4ft25l0001le04njtnr2hu/editor'
+}
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 500 in 508ms
+ ✓ Compiled in 259ms (648 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /projects/cmo4ft25l0001le04njtnr2hu/editor 200 in 4368ms
+ ✓ Compiled in 182ms (648 modules)
+ ✓ Compiled in 526ms (1718 modules)
+ ✓ Compiled in 360ms (1718 modules)
+ ✓ Compiled in 393ms (1718 modules)
+ ✓ Compiled in 472ms (1718 modules)
+ ✓ Compiled in 511ms (1718 modules)
+ ✓ Compiled in 368ms (1718 modules)
+ ✓ Compiled in 146ms (648 modules)
+ ✓ Compiled in 268ms (648 modules)
+ ✓ Compiled in 149ms (648 modules)
+ ✓ Compiled in 143ms (648 modules)
+ ✓ Compiled in 168ms (648 modules)
+ ✓ Compiled in 175ms (648 modules)
+ ✓ Compiled in 158ms (648 modules)
+ ✓ Compiled in 189ms (648 modules)
+ ✓ Compiled in 167ms (648 modules)
+ ✓ Compiled in 156ms (648 modules)
+ ✓ Compiled in 395ms (1718 modules)
+ ✓ Compiled in 339ms (1718 modules)
+ ✓ Compiled in 334ms (1718 modules)
+ ✓ Compiled in 275ms (1718 modules)
+ ✓ Compiled in 298ms (1718 modules)
+ ✓ Compiled in 464ms (1718 modules)
+ ✓ Compiled in 504ms (1718 modules)
+ ✓ Compiled in 607ms (1718 modules)
+ ✓ Compiled in 209ms (648 modules)
+ ✓ Compiled in 618ms (1718 modules)
+ ✓ Compiled in 483ms (1718 modules)
+ ✓ Compiled in 455ms (1718 modules)
+ ✓ Compiled in 462ms (1718 modules)
+ ✓ Compiled in 162ms (648 modules)
+ ✓ Compiled in 150ms (648 modules)
+ ✓ Compiled in 237ms (648 modules)
+ ✓ Compiled in 161ms (648 modules)
+ ✓ Compiled in 156ms (648 modules)
+ ✓ Compiled in 197ms (648 modules)
+ ✓ Compiled in 140ms (648 modules)
+ ✓ Compiled in 152ms (648 modules)
+ ✓ Compiled in 123ms (648 modules)
+ ✓ Compiled in 191ms (648 modules)
+ ✓ Compiled in 201ms (648 modules)
+ ✓ Compiled in 665ms (1718 modules)
+ ✓ Compiled in 160ms (648 modules)

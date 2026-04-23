@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requirePlan } from "@/lib/entitlement";
-import type { PortfolioPackagingContent } from "@/lib/portfolio-editor";
+import { resolvePortfolioEditorState, resolvePortfolioPackagingContent } from "@/lib/portfolio-editor";
+import {
+  getPortfolioPublishBlockReason,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 import {
   PortfolioPdfRendererUnavailableError,
   renderPortfolioPdf,
@@ -24,25 +28,59 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const portfolio = await db.portfolio.findFirst({
     where: { id, userId: session.user.id },
-    select: { id: true, name: true, contentJson: true },
+    select: { id: true, name: true, projectIds: true, outlineJson: true, contentJson: true },
   });
 
   if (!portfolio) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (!portfolio.contentJson) {
-    return NextResponse.json({ error: "请先生成作品集包装结果" }, { status: 400 });
-  }
-
-  const content = portfolio.contentJson as PortfolioPackagingContent | null;
-  if (!content?.pages?.length) {
-    return NextResponse.json({ error: "请先生成作品集包装结果" }, { status: 400 });
+  const selectedProjects = await db.project.findMany({
+    where: { id: { in: portfolio.projectIds }, userId: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      packageMode: true,
+      updatedAt: true,
+      layoutJson: true,
+      facts: {
+        select: {
+          background: true,
+          resultSummary: true,
+        },
+      },
+    },
+  });
+  const orderedProjects = portfolio.projectIds
+    .map((projectId) => selectedProjects.find((project) => project.id === projectId) ?? null)
+    .filter(Boolean)
+    .map((project) => ({
+      id: project!.id,
+      name: project!.name,
+      stage: project!.stage,
+      packageMode: project!.packageMode,
+      updatedAt: project!.updatedAt.toISOString(),
+      layoutJson: project!.layoutJson,
+      background: project!.facts?.background ?? null,
+      resultSummary: project!.facts?.resultSummary ?? null,
+    }));
+  const content = resolvePortfolioPackagingContent(portfolio.contentJson);
+  const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    projects: orderedProjects,
+    packaging: content,
+  });
+  const blockReason = getPortfolioPublishBlockReason({ packaging: content, validation });
+  if (blockReason) {
+    return NextResponse.json({ error: blockReason }, { status: 400 });
   }
 
   try {
     const pdfBuffer = await renderPortfolioPdf({
       portfolioName: portfolio.name,
-      content,
+      content: content!,
     });
     const filename = `${portfolio.name.replace(/[\\/:*?"<>|]/g, "-") || "portfolio"}.pdf`;
 

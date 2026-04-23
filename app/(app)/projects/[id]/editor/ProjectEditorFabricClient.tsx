@@ -22,12 +22,10 @@ import {
   editorPopupItemClass,
   editorPopupSurfaceClass,
   getBoardGroupRunLabel,
-  getBoardThumbnailAssetId,
   getImageCropMeta,
   getImageFrameMeta,
   isEditableCanvasTarget,
   newNodeId,
-  newStructureId,
   parseJsonResponse,
   readDownloadFilename,
   type FabricSceneObject,
@@ -56,7 +54,6 @@ import {
   Circle,
   Copy,
   Download,
-  GripVertical,
   FolderOpen,
   ImageIcon,
   LayoutTemplate,
@@ -138,7 +135,6 @@ import type { PlanSummaryCopy } from "@/lib/entitlement";
 import type { LayoutJson } from "@/app/api/projects/[id]/layout/generate/route";
 import {
   boardHasPlaceholderNodes,
-  createProjectBoard,
   createProjectImageNode,
   getSceneBoardGroupRuns,
   isPrototypeBoard,
@@ -164,8 +160,6 @@ import {
   type ProjectLayoutValidation,
   type ProjectMaterialRecognition,
   type ProjectBoardNode,
-  type ProjectStructureGroup,
-  type ProjectStructureSection,
   type ProjectStructureSuggestion,
   type ProjectBoardTextNode,
   type ProjectEditorScene,
@@ -182,6 +176,7 @@ import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 import type { ProjectEditorInitialData } from "./types";
 
 type FabricModule = typeof import("fabric");
+type ProjectAsset = ProjectEditorInitialData["assets"][number];
 
 type ActiveObjectMeta =
   | { kind: "none" }
@@ -230,6 +225,11 @@ type ActiveObjectMeta =
       height: number;
     };
 
+function isAIGeneratedAsset(metaJson: ProjectAsset["metaJson"]) {
+  if (!metaJson || typeof metaJson !== "object") return false;
+  return Boolean((metaJson as Record<string, unknown>).aiGenerated);
+}
+
 type LayerItem = {
   id: string;
   label: string;
@@ -245,7 +245,16 @@ type ContextMenuState = {
   y: number;
 };
 
-type LeftPanelKey = "project" | "assets" | "structure" | "layers" | "boards";
+type RenderableFabricCanvas = {
+  clear: () => void;
+  add: (object: FabricObject) => unknown;
+  requestRenderAll: () => void;
+  renderAll?: () => void;
+  backgroundColor?: unknown;
+  discardActiveObject?: () => void;
+};
+
+type LeftPanelKey = "project" | "assets" | "layers" | "boards";
 
 type GeneratePrecheck = {
   actionType: string;
@@ -296,43 +305,53 @@ function getProjectValidationMeta(
   }
   if (resolved.cause === "user_modified_regression" || resolved.projectState === "not_ready") {
     return {
-      label: "你修改后需调整",
-      shortLabel: "需调整",
-      summary: resolved.summary || "当前仍有未达标画板，建议先调整。",
+      label: hasPrototypeBoards ? "需先补内容" : "你修改后需调整",
+      shortLabel: hasPrototypeBoards ? "需补内容" : "需调整",
+      summary:
+        resolved.summary ||
+        (hasPrototypeBoards
+          ? "当前内容稿还没讲清楚，建议先补内容再继续。"
+          : "当前仍有未达标画板，建议先调整。"),
       className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
     };
   }
   if (resolved.cause === "missing_user_material" || resolved.projectState === "pass_with_notes") {
     return {
-      label: hasPrototypeBoards ? "原型需补充信息" : "需要补充信息",
-      shortLabel: "需补充",
-      summary: resolved.summary || "当前仍建议补充素材或信息。",
+      label: hasPrototypeBoards ? "建议先补图文" : "需要补充信息",
+      shortLabel: hasPrototypeBoards ? "需补图文" : "需补充",
+      summary:
+        resolved.summary ||
+        (hasPrototypeBoards ? "当前内容稿基本成立，但仍建议补充图文信息。" : "当前仍建议补充素材或信息。"),
       className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
     };
   }
   if (resolved.projectState === "pass") {
     return {
-      label: hasPrototypeBoards ? "原型已通过" : "已通过",
-      shortLabel: hasPrototypeBoards ? "原型通过" : "已通过",
+      label: hasPrototypeBoards ? "可生成排版" : "已通过",
+      shortLabel: hasPrototypeBoards ? "可生成" : "已通过",
       summary:
         resolved.summary ||
         (hasPrototypeBoards
-          ? "当前原型已通过自动校验，可继续生成排版。"
+          ? "当前内容稿已讲清主线，可以继续生成排版。"
           : "当前项目已达到可进入作品集的基础质量线。"),
       className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/86",
     };
   }
 
   return {
-    label: hasPrototypeBoards ? "原型待检查" : "待检查",
+    label: hasPrototypeBoards ? "待补内容" : "待检查",
     shortLabel: "待检查",
     summary: resolved.summary || "当前结果尚未完成自动校验。",
     className: "border-white/10 bg-white/5 text-white/62",
   };
 }
 
-function getBoardQualityMeta(boardValidation: ProjectBoardValidation | null | undefined) {
+function getBoardQualityMeta(
+  board: ProjectBoard,
+  boardValidation: ProjectBoardValidation | null | undefined
+) {
   if (!boardValidation) return null;
+  const prototypeBoard = isPrototypeBoard(board);
   if (boardValidation.cause === "system_generation_failed") {
     return {
       label: "系统生成未完成，已回退",
@@ -347,24 +366,24 @@ function getBoardQualityMeta(boardValidation: ProjectBoardValidation | null | un
   }
   if (boardValidation.cause === "missing_user_material") {
     return {
-      label: "需要补充信息",
+      label: prototypeBoard ? "需补图文" : "需要补充信息",
       className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
     };
   }
   if (boardValidation.status === "block") {
     return {
-      label: "需调整",
+      label: prototypeBoard ? "需先补内容" : "需调整",
       className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
     };
   }
   if (boardValidation.status === "warn") {
     return {
-      label: "有提示",
+      label: prototypeBoard ? "需补图文" : "有提示",
       className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
     };
   }
   return {
-    label: "已通过",
+    label: prototypeBoard ? "可生成" : "已通过",
     className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/86",
   };
 }
@@ -390,13 +409,12 @@ const LEFT_PANEL_ITEMS: Array<{
   label: string;
   icon: typeof FolderOpen;
   hint: string;
-}> = [
-  { key: "project", label: "项目", icon: FolderOpen, hint: "项目背景与上下文" },
-  { key: "assets", label: "素材", icon: ImageIcon, hint: "上传设计图并插入当前画板" },
-  { key: "structure", label: "结构", icon: Sparkles, hint: "基于背景和素材生成结构建议" },
-  { key: "layers", label: "图层", icon: Layers, hint: "对象层级与管理" },
-  { key: "boards", label: "画板", icon: LayoutTemplate, hint: "新增与切换画板" },
-];
+  }> = [
+    { key: "project", label: "项目", icon: FolderOpen, hint: "项目背景与上下文" },
+    { key: "assets", label: "素材", icon: ImageIcon, hint: "上传设计图并插入当前画板" },
+    { key: "layers", label: "图层", icon: Layers, hint: "对象层级与管理" },
+    { key: "boards", label: "画板", icon: LayoutTemplate, hint: "查看结构摘要并切换画板" },
+  ];
 
 function isUserCanceledFileSave(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError";
@@ -453,6 +471,9 @@ export function ProjectEditorFabricClient({
     const legacyConfirmed = Boolean(initialData.layout?.structureSuggestion?.confirmedAt);
     return !(setupCompleted || legacyConfirmed);
   });
+  const [setupFocusSection, setSetupFocusSection] = useState<
+    "facts" | "assets" | "ai" | "structure"
+  >("facts");
   const [confirmingStructure, setConfirmingStructure] = useState(false);
   const [surfaceScale, setSurfaceScale] = useState(1);
   const [liveThumbnails, setLiveThumbnails] = useState<Record<string, string>>({});
@@ -569,8 +590,8 @@ export function ProjectEditorFabricClient({
     [activeBoard, boardValidationMap]
   );
   const activeBoardQualityMeta = useMemo(
-    () => getBoardQualityMeta(activeBoardValidation),
-    [activeBoardValidation]
+    () => (activeBoard ? getBoardQualityMeta(activeBoard, activeBoardValidation) : null),
+    [activeBoard, activeBoardValidation]
   );
   const projectValidationMeta = useMemo(
     () => getProjectValidationMeta(projectValidation, scene),
@@ -580,6 +601,14 @@ export function ProjectEditorFabricClient({
     () =>
       projectValidation.projectState !== "not_ready" &&
       !scene.boards.some((board) => isPrototypeBoard(board)),
+    [projectValidation.projectState, scene.boards]
+  );
+  const canGenerateCurrentProject = useMemo(
+    () =>
+      !(
+        scene.boards.some((board) => isPrototypeBoard(board)) &&
+        projectValidation.projectState === "not_ready"
+      ),
     [projectValidation.projectState, scene.boards]
   );
   const visibleAssets = useMemo(() => {
@@ -607,12 +636,10 @@ export function ProjectEditorFabricClient({
     return new Map(
       scene.boards.map((board) => {
         const live = liveThumbnails[board.id];
-        if (live) return [board.id, live] as const;
-        const assetId = getBoardThumbnailAssetId(board);
-        return [board.id, assetId ? assetMap.get(assetId)?.imageUrl ?? null : null] as const;
+        return [board.id, live ?? null] as const;
       })
     );
-  }, [assetMap, scene.boards, liveThumbnails]);
+  }, [scene.boards, liveThumbnails]);
   const boardGroupRuns = useMemo(() => getSceneBoardGroupRuns(scene), [scene]);
   const showBoardGroupHeaders = useMemo(
     () =>
@@ -627,6 +654,10 @@ export function ProjectEditorFabricClient({
         : { mode: "current", boardIds: [scene.activeBoardId] },
     [scene.activeBoardId, scene.boardOrder, scene.generationScope.mode]
   );
+  const generationScopeRef = useRef<GenerationScope>(normalizedGenerationScope);
+  useEffect(() => {
+    generationScopeRef.current = normalizedGenerationScope;
+  }, [normalizedGenerationScope]);
   const generationBoardIds = useMemo(
     () => getGenerationScopeBoardIds({ ...scene, generationScope: normalizedGenerationScope }),
     [normalizedGenerationScope, scene]
@@ -714,15 +745,10 @@ export function ProjectEditorFabricClient({
     activeMeta.kind === "image" && activeMeta.assetId
       ? assetMap.get(activeMeta.assetId) ?? null
       : null;
-  const hasStructureInputs =
-    assets.length > 0 ||
-    Boolean(projectFactsDraft.audience) ||
-    Boolean(projectFactsDraft.industry.trim()) ||
-    Boolean(projectFactsDraft.background.trim()) ||
-    Boolean(projectFactsDraft.businessGoal.trim()) ||
-    Boolean(projectFactsDraft.resultSummary.trim());
-  const canSuggestStructure =
-    hasStructureInputs && Boolean(materialRecognition || structureSuggestion);
+  const selectedImageAssetMeta = useMemo(
+    () => (selectedImageAsset ? resolveProjectAssetMeta(selectedImageAsset.metaJson) : null),
+    [selectedImageAsset]
+  );
   const factsSaveLabel =
     factsSaveState === "saving"
       ? "正在保存"
@@ -739,16 +765,6 @@ export function ProjectEditorFabricClient({
         : saveState === "dirty"
           ? "画板待保存"
           : "画板已保存";
-  const structureSaveLabel =
-    structureSaveState === "saving"
-      ? "结构保存中"
-      : structureSaveState === "error"
-        ? "结构保存失败"
-        : structureSaveState === "dirty"
-          ? "结构待保存"
-        : structureDraft?.status === "confirmed"
-            ? "结构已确认"
-            : "结构已保存";
   const topStatusLabel =
     saveState === "saved" && factsSaveState === "saved"
       ? `已保存 · ${projectValidationMeta.shortLabel}`
@@ -760,23 +776,6 @@ export function ProjectEditorFabricClient({
 
   function toggleLeftPanel(panel: LeftPanelKey) {
     setLeftPanel((current) => (current === panel ? null : panel));
-  }
-
-  function createBoard() {
-    if (scene.boards.length >= PROJECT_BOARD_MAX) return;
-    const board = createProjectBoard({
-      name: `画板 ${scene.boards.length + 1}`,
-      intent: "",
-    });
-    setScene((current) =>
-      normalizeProjectEditorScene({
-        ...current,
-        activeBoardId: board.id,
-        boardOrder: [...current.boardOrder, board.id],
-        boards: [...current.boards, board],
-      })
-    );
-    setLeftPanel("boards");
   }
 
   function deleteBoard(boardId: string) {
@@ -832,6 +831,8 @@ export function ProjectEditorFabricClient({
       return;
     }
     try {
+      canvas.renderAll?.();
+      canvas.requestRenderAll();
       const srcCanvas = canvas.lowerCanvasEl;
       const srcW = canvas.getWidth();
       const srcH = canvas.getHeight();
@@ -897,17 +898,22 @@ export function ProjectEditorFabricClient({
   }
 
   function setGenerationMode(mode: GenerationScope["mode"]) {
+    const nextScope: GenerationScope =
+      mode === "all"
+        ? { mode: "all", boardIds: scene.boardOrder }
+        : { mode: "current", boardIds: [scene.activeBoardId] };
+    generationScopeRef.current = nextScope;
     setScene((current) => {
       if (mode === "all") {
         return normalizeProjectEditorScene({
           ...current,
-          generationScope: { mode: "all", boardIds: current.boardOrder },
+          generationScope: nextScope,
         });
       }
 
       return normalizeProjectEditorScene({
         ...current,
-        generationScope: { mode: "current", boardIds: [current.activeBoardId] },
+        generationScope: nextScope,
       });
     });
   }
@@ -969,7 +975,7 @@ export function ProjectEditorFabricClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             styleSelection: getResolvedStyleSelection(),
-            generationScope: normalizedGenerationScope,
+            generationScope: generationScopeRef.current,
           }),
         })
       );
@@ -983,6 +989,10 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleOpenGenerate() {
+    if (!canGenerateCurrentProject) {
+      setActionError(projectValidationMeta.summary);
+      return;
+    }
     setGenerateOpen(true);
     await refreshGeneratePrecheck();
   }
@@ -1112,10 +1122,10 @@ export function ProjectEditorFabricClient({
     if (!image.data) {
       image.data = {};
     }
-    image.data.fit = "fit";
+    image.data.fit = options.fit;
     image.data.frameWidth = frameWidth;
     image.data.frameHeight = frameHeight;
-    image.data.crop = getImageCropMeta();
+    image.data.crop = options.crop;
 
     const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
     const renderWidth = naturalWidth * scale;
@@ -1680,9 +1690,10 @@ export function ProjectEditorFabricClient({
       };
       await saveStructureDraft(confirmedSuggestion);
 
-      // 2. 创建原型画板（服务端落板，确保阶段 1 不走 LLM / 不计高成本配额）
+      // 2. 创建低保真内容稿画板（服务端落板）
       const data = await parseJsonResponse<{
         layoutJson: LayoutJson;
+        assets?: ProjectEditorInitialData["assets"];
         rolledBack?: boolean;
         message?: string;
       }>(
@@ -1692,26 +1703,31 @@ export function ProjectEditorFabricClient({
           body: JSON.stringify({ markSetupCompleted: true }),
         })
       );
+      const nextAssets = data.assets ?? assets;
       const nextScene = resolveProjectEditorScene(data.layoutJson, {
-        assets,
+        assets: nextAssets,
         projectName: initialData.name,
       });
       setLayout(data.layoutJson);
+      setAssets(nextAssets);
       setScene(nextScene);
       requestActiveBoardRebuild();
       lastSavedSceneRef.current = JSON.stringify(nextScene);
 
       if (data.rolledBack) {
-        setActionError(data.message ?? "创建画板未完成，已保留原内容。");
+        setActionError(data.message ?? "创建内容稿未完成，已保留原内容。");
         return;
       }
 
       // 3. 进入画布编辑模式
       setSetupMode(false);
       setLeftPanel("boards");
-      setActionMessage({ tone: "info", text: "已创建原型画板，可继续进入排版。" });
+      setActionMessage({
+        tone: "info",
+        text: data.message ?? "已创建低保真内容稿，可继续进入排版。",
+      });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "创建画板失败，请稍后重试");
+      setActionError(error instanceof Error ? error.message : "创建内容稿失败，请稍后重试");
     } finally {
       setConfirmingStructure(false);
     }
@@ -1800,132 +1816,6 @@ export function ProjectEditorFabricClient({
     setStructureSaveState("dirty");
   }
 
-  function updateStructureGroup(
-    groupId: string,
-    patch: Partial<ProjectStructureGroup>
-  ) {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: current.groups.map((group) =>
-        group.id === groupId ? { ...group, ...patch } : group
-      ),
-    }));
-  }
-
-  function updateStructureSection(
-    groupId: string,
-    sectionId: string,
-    patch: Partial<ProjectStructureSection>
-  ) {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: current.groups.map((group) =>
-        group.id !== groupId
-          ? group
-          : {
-              ...group,
-              sections: group.sections.map((section) =>
-                section.id === sectionId ? { ...section, ...patch } : section
-              ),
-            }
-      ),
-    }));
-  }
-
-  function deleteStructureGroup(groupId: string) {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: current.groups.filter((group) => group.id !== groupId),
-    }));
-  }
-
-  function mergeStructureGroupIntoPrevious(groupId: string) {
-    mutateStructureDraft((current) => {
-      const groupIndex = current.groups.findIndex((group) => group.id === groupId);
-      if (groupIndex <= 0) return current;
-      const previous = current.groups[groupIndex - 1];
-      const target = current.groups[groupIndex];
-      return {
-        ...current,
-        groups: current.groups.flatMap((group, index) => {
-          if (index === groupIndex - 1) {
-            return [
-              {
-                ...previous,
-                sections: [...previous.sections, ...target.sections],
-              },
-            ];
-          }
-          if (index === groupIndex) return [];
-          return [group];
-        }),
-      };
-    });
-  }
-
-  function addStructureGroup() {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: [
-        ...current.groups,
-        {
-          id: newStructureId("group"),
-          label: `新分组 ${current.groups.length + 1}`,
-          rationale: "补充这一组要讲清的主线。",
-          narrativeRole: "承接",
-          sections: [
-            {
-              id: newStructureId("section"),
-              title: "新小节",
-              purpose: "说明这个小节要承载的信息。",
-              recommendedContent: [],
-              suggestedAssets: [],
-            },
-          ],
-        },
-      ],
-    }));
-  }
-
-  function addStructureSection(groupId: string) {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: current.groups.map((group) =>
-        group.id !== groupId
-          ? group
-          : {
-              ...group,
-              sections: [
-                ...group.sections,
-                {
-                  id: newStructureId("section"),
-                  title: `小节 ${group.sections.length + 1}`,
-                  purpose: "说明这个小节要讲什么。",
-                  recommendedContent: [],
-                  suggestedAssets: [],
-                },
-              ],
-            }
-      ),
-    }));
-  }
-
-  function deleteStructureSection(groupId: string, sectionId: string) {
-    mutateStructureDraft((current) => ({
-      ...current,
-      groups: current.groups
-        .map((group) =>
-          group.id !== groupId
-            ? group
-            : {
-                ...group,
-                sections: group.sections.filter((section) => section.id !== sectionId),
-              }
-        )
-        .filter((group) => group.sections.length > 0),
-    }));
-  }
-
   async function saveStructureDraft(nextSuggestion?: ProjectStructureSuggestion) {
     const suggestion = nextSuggestion ?? structureDraft;
     if (!suggestion) return;
@@ -1976,13 +1866,13 @@ export function ProjectEditorFabricClient({
     if (structureDraft.status !== "confirmed") {
       setActionMessage({
         tone: "error",
-        text: "请先确认当前结构，再按结构创建画板组。",
+        text: "请先确认当前结构，再按结构创建内容稿。",
       });
       return;
     }
 
     const shouldContinue = window.confirm(
-      "这会按当前确认结构重建画板列表，并替换当前画板内容。确认继续吗？"
+      "这会按当前确认结构重建内容稿列表，并替换当前内容稿。确认继续吗？"
     );
     if (!shouldContinue) return;
 
@@ -1993,6 +1883,7 @@ export function ProjectEditorFabricClient({
     try {
       const data = await parseJsonResponse<{
         layoutJson: LayoutJson;
+        assets?: ProjectEditorInitialData["assets"];
         rolledBack?: boolean;
         message?: string;
       }>(
@@ -2001,11 +1892,13 @@ export function ProjectEditorFabricClient({
           headers: { "Content-Type": "application/json" },
         })
       );
+      const nextAssets = data.assets ?? assets;
       const nextScene = resolveProjectEditorScene(data.layoutJson, {
-        assets,
+        assets: nextAssets,
         projectName: initialData.name,
       });
       setLayout(data.layoutJson);
+      setAssets(nextAssets);
       setScene(nextScene);
       requestActiveBoardRebuild();
       setLeftPanel("boards");
@@ -2014,12 +1907,12 @@ export function ProjectEditorFabricClient({
         tone: data.rolledBack ? "error" : "info",
         text:
           data.message ??
-          (data.rolledBack ? "创建画板未完成，已保留原内容。" : "已按当前结构创建画板组。"),
+          (data.rolledBack ? "创建内容稿未完成，已保留原内容。" : "已按当前结构创建内容稿。"),
       });
     } catch (error) {
       setActionMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "结构落板失败，请稍后重试",
+        text: error instanceof Error ? error.message : "重新创建内容稿失败，请稍后重试",
       });
     } finally {
       setApplyingStructure(false);
@@ -2094,7 +1987,7 @@ export function ProjectEditorFabricClient({
       if (data.skipped) {
         setActionMessage({
           tone: "info",
-          text: "当前范围内没有原型画板；已跳过已生成画板，本次没有额外计次。",
+          text: "当前范围内没有可继续生成的内容稿画板；已跳过已生成画板，本次没有额外计次。",
         });
       } else if (data.reused) {
         setActionMessage({ tone: "info", text: "命中可复用排版结果，本次没有额外计次。" });
@@ -2136,14 +2029,13 @@ export function ProjectEditorFabricClient({
   }, [structureSuggestion]);
 
   useEffect(() => {
-    if (!selectedImageAsset) return;
-    const meta = resolveProjectAssetMeta(selectedImageAsset.metaJson);
+    if (!selectedImageAsset || !selectedImageAssetMeta) return;
     setImageDetailsDraft({
       title: selectedImageAsset.title ?? "",
-      note: meta.note ?? "",
-      roleTag: meta.roleTag ?? "none",
+      note: selectedImageAssetMeta.note ?? "",
+      roleTag: selectedImageAssetMeta.roleTag ?? "none",
     });
-  }, [selectedImageAsset]);
+  }, [selectedImageAsset, selectedImageAssetMeta]);
 
   function scheduleFitSurface(explicitScale?: number) {
     if (fitFrameRef.current !== null) {
@@ -2423,19 +2315,20 @@ export function ProjectEditorFabricClient({
     );
   }
 
-  const loadBoardIntoCanvas = useEffectEvent(async (board: ProjectBoard) => {
-    const canvas = canvasRef.current;
-    const fabric = fabricRef.current;
-    if (!canvas || !fabric) return;
-
-    hydratingRef.current = true;
-    boardLoadTokenRef.current += 1;
-    const token = boardLoadTokenRef.current;
+  async function populateCanvasFromBoard(params: {
+    canvas: RenderableFabricCanvas;
+    fabric: FabricModule;
+    board: ProjectBoard;
+    abortIfStale?: () => boolean;
+  }) {
+    const { canvas, fabric, board, abortIfStale } = params;
 
     canvas.clear();
     canvas.backgroundColor = board.frame.background || "#ffffff";
 
     for (const node of board.nodes.sort((a, b) => a.zIndex - b.zIndex)) {
+      if (abortIfStale?.()) return false;
+
       if (node.type === "text") {
         const textbox = new fabric.Textbox(node.text, {
           left: node.x,
@@ -2462,7 +2355,6 @@ export function ProjectEditorFabricClient({
 
       if (node.type === "shape") {
         let shape: FabricSceneObject | null = null;
-        // Resolve fill: prefer gradient over solid if present
         let resolvedFill: unknown = node.fill;
         if (node.gradient) {
           const opts = gradientConfigToFabricOptions(node.gradient);
@@ -2537,37 +2429,108 @@ export function ProjectEditorFabricClient({
         });
         cache.set(url, imgEl);
       }
-      if (token !== boardLoadTokenRef.current) return;
-      const image = new fabric.FabricImage(imgEl) as unknown as FabricSceneObject;
+      if (abortIfStale?.()) return false;
 
+      const image = new fabric.FabricImage(imgEl) as unknown as FabricSceneObject;
       image.data = {
         nodeId: node.id,
         nodeType: "image",
         assetId: node.assetId,
-        fit: "fit",
+        fit: node.fit,
         frameWidth: node.width,
         frameHeight: node.height,
-        crop: getImageCropMeta(),
+        crop: node.crop,
         placeholder: node.placeholder,
       };
       applyImagePresentation(image, {
-        fit: "fit",
+        fit: node.fit,
         frameWidth: node.width,
         frameHeight: node.height,
         frameX: node.x,
         frameY: node.y,
-        crop: getImageCropMeta(),
+        crop: node.crop,
       });
       applyObjectChrome(image);
       canvas.add(image);
     }
 
-    canvas.discardActiveObject();
+    canvas.discardActiveObject?.();
+    canvas.renderAll?.();
     canvas.requestRenderAll();
+    return true;
+  }
+
+  const loadBoardIntoCanvas = useEffectEvent(async (board: ProjectBoard) => {
+    const canvas = canvasRef.current;
+    const fabric = fabricRef.current;
+    if (!canvas || !fabric) return;
+
+    hydratingRef.current = true;
+    boardLoadTokenRef.current += 1;
+    const token = boardLoadTokenRef.current;
+
+    const rendered = await populateCanvasFromBoard({
+      canvas,
+      fabric,
+      board,
+      abortIfStale: () => token !== boardLoadTokenRef.current,
+    });
+    if (!rendered) return;
+
     updateSelectionSummary(canvas);
     hydratingRef.current = false;
     scheduleFitSurface();
     scheduleThumbnailCapture();
+  });
+
+  const renderBoardThumbnail = useEffectEvent(async (board: ProjectBoard) => {
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+
+    const surface = document.createElement("canvas");
+    surface.width = PROJECT_BOARD_WIDTH;
+    surface.height = PROJECT_BOARD_HEIGHT;
+    const thumbnailCanvas = new fabric.StaticCanvas(surface, {
+      width: PROJECT_BOARD_WIDTH,
+      height: PROJECT_BOARD_HEIGHT,
+      backgroundColor: board.frame.background || "#ffffff",
+    }) as unknown as RenderableFabricCanvas & { dispose?: () => void };
+
+    try {
+      const rendered = await populateCanvasFromBoard({
+        canvas: thumbnailCanvas,
+        fabric,
+        board,
+      });
+      if (!rendered) return;
+      thumbnailCanvas.renderAll?.();
+      thumbnailCanvas.requestRenderAll();
+
+      const dstW = 220;
+      const scale = dstW / PROJECT_BOARD_WIDTH;
+      const dstH = Math.round(PROJECT_BOARD_HEIGHT * scale);
+      const offscreen = document.createElement("canvas");
+      offscreen.width = dstW;
+      offscreen.height = dstH;
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) return;
+
+      ctx.fillStyle = board.frame.background || "#ffffff";
+      ctx.fillRect(0, 0, dstW, dstH);
+      ctx.drawImage(surface, 0, 0, dstW, dstH);
+
+      const dataUrl = offscreen.toDataURL("image/jpeg", 0.7);
+      setLiveThumbnails((prev) =>
+        prev[board.id] === dataUrl ? prev : { ...prev, [board.id]: dataUrl }
+      );
+    } catch (error) {
+      console.error("[thumb] warm failed", {
+        boardId: board.id,
+        error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      });
+    } finally {
+      thumbnailCanvas.dispose?.();
+    }
   });
 
   const handleCanvasResize = useEffectEvent(() => {
@@ -2756,6 +2719,25 @@ export function ProjectEditorFabricClient({
     // 画布内的编辑通过 syncActiveBoardFromCanvas 回写到 scene，但不应该触发画布重建。
     // 外部（AI 生成、结构应用等）改动 scene 后必须显式调用 requestActiveBoardRebuild()。
   }, [activeBoardId, canvasReady, boardRebuildTick, loadBoardIntoCanvas]);
+
+  useEffect(() => {
+    if (setupMode || !canvasReady) return;
+    let cancelled = false;
+
+    async function warmBoardThumbnails() {
+      for (const board of scene.boards) {
+        if (cancelled) return;
+        if (liveThumbnails[board.id]) continue;
+        if (board.id === activeBoardId) continue;
+        await renderBoardThumbnail(board);
+      }
+    }
+
+    void warmBoardThumbnails();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBoardId, canvasReady, liveThumbnails, renderBoardThumbnail, scene.boards, setupMode]);
 
   async function cloneActiveObject() {
     const canvas = canvasRef.current;
@@ -3280,7 +3262,8 @@ export function ProjectEditorFabricClient({
           <Button
             className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
             onClick={() => void handleOpenGenerate()}
-            disabled={generating}
+            disabled={generating || !canGenerateCurrentProject}
+            title={!canGenerateCurrentProject ? projectValidationMeta.summary : undefined}
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             生成排版
@@ -3320,16 +3303,17 @@ export function ProjectEditorFabricClient({
             </EditorChromeButton>
           )}
           {/* 画布模式：查看项目准备 */}
-          {setupMode ? null : (
-            <EditorChromeButton
-              className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
-              onClick={() => {
-                setSetupMode(true);
-                setActionError("");
-                // 进入向导时重置到项目面板，避免结构/图层面板并行暴露
-                setLeftPanel("project");
-              }}
-            >
+            {setupMode ? null : (
+              <EditorChromeButton
+                className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
+                onClick={() => {
+                  setSetupMode(true);
+                  setSetupFocusSection("facts");
+                  setActionError("");
+                  // 进入向导时重置到项目面板，避免结构/图层面板并行暴露
+                  setLeftPanel("project");
+                }}
+              >
               项目准备
             </EditorChromeButton>
           )}
@@ -3637,7 +3621,63 @@ export function ProjectEditorFabricClient({
                   {featuredAssets.length > 0 ? (
                     <EditorRailSection title="当前画板已用">
                       <div className="grid grid-cols-2 gap-3">
-                        {featuredAssets.map((asset) => (
+                        {featuredAssets.map((asset) => {
+                          const meta = resolveProjectAssetMeta(asset.metaJson);
+                          const aiGenerated = isAIGeneratedAsset(asset.metaJson);
+                          return (
+                            <button
+                              key={asset.id}
+                              type="button"
+                              onClick={() => void addAssetToCanvas(asset.id)}
+                              className="group overflow-hidden rounded-[16px] border border-white/8 bg-white/3 text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/6 hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
+                            >
+                              <div className="aspect-4/3 overflow-hidden bg-black/30">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={buildPrivateBlobProxyUrl(asset.imageUrl)}
+                                  alt={asset.title ?? "素材"}
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                                />
+                              </div>
+                              <div className="px-3 py-2.5">
+                                <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
+                                  {asset.title ?? "未命名素材"}
+                                </p>
+                                {aiGenerated ? (
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    <Badge
+                                      variant="outline"
+                                      className="rounded-full border-amber-500/22 bg-amber-500/10 text-[10px] text-amber-100"
+                                    >
+                                      AI 生成
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className="rounded-full border-white/8 bg-white/4 text-[10px] text-white/66"
+                                    >
+                                      待确认
+                                    </Badge>
+                                  </div>
+                                ) : null}
+                                {meta.roleTag ? (
+                                  <p className="mt-1 text-[11px] text-white/44">
+                                    {PROJECT_IMAGE_ROLE_LABELS[meta.roleTag as ProjectImageRoleTag]}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </EditorRailSection>
+                  ) : null}
+
+                  <EditorRailSection title="项目素材库">
+                    <div className="grid grid-cols-2 gap-3">
+                      {libraryAssets.map((asset) => {
+                        const meta = resolveProjectAssetMeta(asset.metaJson);
+                        const aiGenerated = isAIGeneratedAsset(asset.metaJson);
+                        return (
                           <button
                             key={asset.id}
                             type="button"
@@ -3656,51 +3696,31 @@ export function ProjectEditorFabricClient({
                               <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
                                 {asset.title ?? "未命名素材"}
                               </p>
-                              {resolveProjectAssetMeta(asset.metaJson).roleTag ? (
+                              {aiGenerated ? (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="rounded-full border-amber-500/22 bg-amber-500/10 text-[10px] text-amber-100"
+                                  >
+                                    AI 生成
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="rounded-full border-white/8 bg-white/4 text-[10px] text-white/66"
+                                  >
+                                    待确认
+                                  </Badge>
+                                </div>
+                              ) : null}
+                              {meta.roleTag ? (
                                 <p className="mt-1 text-[11px] text-white/44">
-                                  {PROJECT_IMAGE_ROLE_LABELS[
-                                    resolveProjectAssetMeta(asset.metaJson).roleTag as ProjectImageRoleTag
-                                  ]}
+                                  {PROJECT_IMAGE_ROLE_LABELS[meta.roleTag as ProjectImageRoleTag]}
                                 </p>
                               ) : null}
                             </div>
                           </button>
-                        ))}
-                      </div>
-                    </EditorRailSection>
-                  ) : null}
-
-                  <EditorRailSection title="项目素材库">
-                    <div className="grid grid-cols-2 gap-3">
-                      {libraryAssets.map((asset) => (
-                        <button
-                          key={asset.id}
-                          type="button"
-                          onClick={() => void addAssetToCanvas(asset.id)}
-                          className="group overflow-hidden rounded-[16px] border border-white/8 bg-white/3 text-left transition-all duration-200 hover:border-white/[0.14] hover:bg-white/6 hover:shadow-[0_18px_32px_-24px_rgba(0,0,0,0.82)]"
-                        >
-                          <div className="aspect-4/3 overflow-hidden bg-black/30">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={buildPrivateBlobProxyUrl(asset.imageUrl)}
-                              alt={asset.title ?? "素材"}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                            />
-                          </div>
-                          <div className="px-3 py-2.5">
-                            <p className="truncate text-xs font-medium text-white/80 transition-colors group-hover:text-white">
-                              {asset.title ?? "未命名素材"}
-                            </p>
-                            {resolveProjectAssetMeta(asset.metaJson).roleTag ? (
-                              <p className="mt-1 text-[11px] text-white/44">
-                                {PROJECT_IMAGE_ROLE_LABELS[
-                                  resolveProjectAssetMeta(asset.metaJson).roleTag as ProjectImageRoleTag
-                                ]}
-                              </p>
-                            ) : null}
-                          </div>
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                     {visibleAssets.length === 0 ? (
                       <div className="rounded-[18px] border border-dashed border-white/10 bg-white/2 px-4 py-6 text-sm text-white/46">
@@ -3708,478 +3728,6 @@ export function ProjectEditorFabricClient({
                       </div>
                     ) : null}
                   </EditorRailSection>
-                </>
-              ) : null}
-
-              {leftPanel === "structure" ? (
-                <>
-                  <EditorRailSection title="导入后轻识别">
-                    <div className="space-y-3">
-                      <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                        <p className="text-sm font-medium text-white">识别素材</p>
-                        <p className="mt-1.5 text-xs leading-6 text-white/42">
-                          先判断这批图更像什么、哪些适合主讲、还缺什么。
-                        </p>
-                        <Button
-                          type="button"
-                          onClick={() => void handleRecognizeMaterials()}
-                          disabled={!hasStructureInputs || recognizingMaterials}
-                          className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
-                        >
-                          {recognizingMaterials ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              识别中
-                            </>
-                          ) : materialRecognition ? (
-                            <>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              重新识别这批素材
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              识别这批素材
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      {!hasStructureInputs ? (
-                        <EditorEmptyState>
-                          先填写项目背景或上传设计图，系统才有足够上下文做轻识别。
-                        </EditorEmptyState>
-                      ) : null}
-
-                      {materialRecognition ? (
-                        <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
-                          <div>
-                            <p className="text-sm font-medium text-white">{materialRecognition.summary}</p>
-                            <p className="mt-2 text-xs text-white/34">
-                              更新于{" "}
-                              {materialRecognition.generatedAt
-                                ? new Date(materialRecognition.generatedAt).toLocaleString("zh-CN")
-                                : "刚刚"}
-                            </p>
-                          </div>
-                          {materialRecognition.recognizedTypes.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {materialRecognition.recognizedTypes.map((type) => (
-                                <span
-                                  key={type}
-                                  className="rounded-full border border-white/8 bg-white/3 px-2.5 py-1 text-xs text-white/58"
-                                >
-                                  {type}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                          <div className="space-y-2 text-xs leading-6 text-white/52">
-                            <p>
-                              主讲素材：
-                              {materialRecognition.heroAssetIds.length > 0
-                                ? materialRecognition.heroAssetIds
-                                    .map((id) => assetMap.get(id)?.title ?? id)
-                                    .join("、")
-                                : " 暂无明确主讲素材"}
-                            </p>
-                            <p>
-                              缺失信息：
-                              {materialRecognition.missingInfo.length > 0
-                                ? materialRecognition.missingInfo.join("、")
-                                : " 当前没有明显缺口"}
-                            </p>
-                            <p>下一步：{materialRecognition.suggestedNextStep}</p>
-                          </div>
-                          {materialRecognition.lastIncrementalDiff ? (
-                            <div className="rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3">
-                              <p className="text-xs font-medium text-white">最近一次变化</p>
-                              <p className="mt-1.5 text-xs leading-6 text-white/48">
-                                {materialRecognition.lastIncrementalDiff.summary}
-                              </p>
-                              {materialRecognition.lastIncrementalDiff.changes.length > 0 ? (
-                                <div className="mt-3 space-y-1.5">
-                                  {materialRecognition.lastIncrementalDiff.changes.map((change) => (
-                                    <p key={change} className="text-xs leading-5 text-white/38">
-                                      • {change}
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : null}
-                              <p className="mt-3 text-xs text-white/34">
-                                {materialRecognition.lastIncrementalDiff.shouldRefreshStructure
-                                  ? "这次增量建议刷新结构建议。"
-                                  : "这次增量还不需要重做结构。"}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </EditorRailSection>
-
-                  <EditorRailSection title="结构建议">
-                    <div className="space-y-3">
-                      <div className={cn(editorPanelCardClass, "px-4 py-4")}>
-                        <p className="text-sm font-medium text-white">生成结构建议</p>
-                        <p className="mt-1.5 text-xs leading-6 text-white/42">
-                          先起一版结构草稿，再决定怎么落成画板。
-                        </p>
-                        <Button
-                          type="button"
-                          onClick={() => void handleSuggestStructure()}
-                          disabled={!canSuggestStructure || suggestingStructure}
-                          className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100 disabled:bg-white/20 disabled:text-white/50"
-                        >
-                          {suggestingStructure ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              生成中
-                            </>
-                          ) : structureSuggestion ? (
-                            <>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              重新生成结构建议
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              生成结构建议
-                            </>
-                          )}
-                        </Button>
-                        {!materialRecognition ? (
-                          <p className="mt-3 text-xs leading-5 text-white/34">
-                            先识别素材，再起结构草稿。
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </EditorRailSection>
-
-                  {structureDraft ? (
-                    <>
-                      <EditorRailSection title="结构摘要">
-                        <div className={cn(editorPanelCardClass, "space-y-3 p-4")}>
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium text-white">确认当前结构</p>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className="rounded-full border-white/8 bg-white/3 text-white/66"
-                            >
-                              {structureDraft.status === "confirmed" ? "已确认" : "草稿"}
-                            </Badge>
-                          </div>
-
-                          <div className="space-y-3 rounded-[18px] border border-white/6 bg-white/2 p-3.5">
-                            <div>
-                              <label className="text-xs text-white/44">结构总述</label>
-                              <Textarea
-                                value={structureDraft.summary}
-                                onChange={(event) =>
-                                  mutateStructureDraft((current) => ({
-                                    ...current,
-                                    summary: event.target.value,
-                                  }))
-                                }
-                                className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-white/44">叙事弧线</label>
-                              <Input
-                                value={structureDraft.narrativeArc}
-                                onChange={(event) =>
-                                  mutateStructureDraft((current) => ({
-                                    ...current,
-                                    narrativeArc: event.target.value,
-                                  }))
-                                }
-                                className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              onClick={() => void saveStructureDraft()}
-                              disabled={structureSaveState === "saving"}
-                              className="h-10 rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
-                            >
-                              {structureSaveState === "saving" ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  保存中
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="mr-2 h-4 w-4" />
-                                  保存结构
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void confirmStructureDraft()}
-                              disabled={structureSaveState === "saving"}
-                              className="h-10 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
-                            >
-                              <Check className="mr-2 h-4 w-4" />
-                              确认当前结构
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void applyStructureToBoards()}
-                              disabled={
-                                structureSaveState === "saving" ||
-                                applyingStructure ||
-                                structureDraft.status !== "confirmed" ||
-                                structureDraft.groups.length === 0
-                              }
-                              className="h-10 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
-                            >
-                              {applyingStructure ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  落板中
-                                </>
-                              ) : (
-                                <>
-                                  <LayoutTemplate className="mr-2 h-4 w-4" />
-                                  按当前结构创建画板组
-                                </>
-                              )}
-                            </Button>
-                            <span className="text-xs text-white/34">{structureSaveLabel}</span>
-                          </div>
-
-                          {typeof structureDraft.unlockedChapterLimit === "number" ? (
-                            <p className="flex items-start gap-1.5 rounded-[14px] border border-white/6 bg-white/3 px-3 py-2 text-xs leading-5 text-white/60">
-                              <Lock className="mt-0.5 h-3 w-3 flex-none" />
-                              免费层仅落地前 {structureDraft.unlockedChapterLimit} 章对应的画板；升级后可一键补齐剩余章节，不再消耗次数。
-                            </p>
-                          ) : null}
-
-                          <p className="text-xs text-white/30">
-                            更新于{" "}
-                            {structureDraft.generatedAt
-                              ? new Date(structureDraft.generatedAt).toLocaleString("zh-CN")
-                              : "刚刚"}
-                          </p>
-                        </div>
-                      </EditorRailSection>
-
-                      <EditorRailSection title="结构分组">
-                        <div className="space-y-3">
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={addStructureGroup}
-                              className="h-9 rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              新增分组
-                            </Button>
-                          </div>
-                          {structureDraft.groups.map((group, index) => (
-                            <div
-                              key={group.id}
-                              className="rounded-[22px] border border-white/8 bg-secondary p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs tracking-[0.16em] text-white/30">
-                                    GROUP {index + 1}
-                                  </p>
-                                  <Input
-                                    value={group.label}
-                                    onChange={(event) =>
-                                      updateStructureGroup(group.id, {
-                                        label: event.target.value,
-                                      })
-                                    }
-                                    className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm font-semibold text-white"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant="outline"
-                                    className="rounded-full border-white/8 bg-white/3 text-white/66"
-                                  >
-                                    {group.narrativeRole}
-                                  </Badge>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => mergeStructureGroupIntoPrevious(group.id)}
-                                    disabled={index === 0}
-                                    className="h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white disabled:text-white/20"
-                                  >
-                                    <GripVertical className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => deleteStructureGroup(group.id)}
-                                    className="h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="mt-3 space-y-3">
-                                <div>
-                                  <label className="text-xs text-white/40">分组作用</label>
-                                  <Input
-                                    value={group.narrativeRole}
-                                    onChange={(event) =>
-                                      updateStructureGroup(group.id, {
-                                        narrativeRole: event.target.value,
-                                      })
-                                    }
-                                    className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-white/40">保留理由</label>
-                                  <Textarea
-                                    value={group.rationale}
-                                    onChange={(event) =>
-                                      updateStructureGroup(group.id, {
-                                        rationale: event.target.value,
-                                      })
-                                    }
-                                    className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="mt-4 space-y-2.5">
-                                {group.sections.map((section) => {
-                                  const isLocked = Boolean(section.locked);
-                                  return (
-                                  <div
-                                    key={section.id}
-                                    className={cn(
-                                      "rounded-[18px] border border-white/6 bg-white/2 px-3.5 py-3",
-                                      isLocked && "opacity-80"
-                                    )}
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <label className="text-xs text-white/34">小节标题</label>
-                                          {isLocked ? (
-                                            <Badge
-                                              variant="outline"
-                                              className="h-5 gap-1 rounded-full border-white/10 bg-white/5 px-2 text-[10px] text-white/70"
-                                            >
-                                              <Lock className="h-3 w-3" />
-                                              升级查看细节
-                                            </Badge>
-                                          ) : null}
-                                        </div>
-                                        <Input
-                                          value={section.title}
-                                          onChange={(event) =>
-                                            updateStructureSection(group.id, section.id, {
-                                              title: event.target.value,
-                                            })
-                                          }
-                                          disabled={isLocked}
-                                          className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
-                                        />
-                                      </div>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => deleteStructureSection(group.id, section.id)}
-                                        disabled={isLocked}
-                                        className="mt-5 h-9 w-9 rounded-xl text-white/56 hover:bg-white/6 hover:text-white"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                    {isLocked ? (
-                                      <p className="mt-3 rounded-[14px] border border-white/6 bg-white/3 px-3 py-2 text-xs leading-5 text-white/60">
-                                        免费层仅解锁前 {structureDraft.unlockedChapterLimit ?? 2} 章的细节与落板。升级后可查看本章内容指导并一键补齐剩余章节。
-                                      </p>
-                                    ) : (
-                                      <>
-                                        <div className="mt-3">
-                                          <label className="text-xs text-white/34">这一小节要讲什么</label>
-                                          <Textarea
-                                            value={section.purpose}
-                                            onChange={(event) =>
-                                              updateStructureSection(group.id, section.id, {
-                                                purpose: event.target.value,
-                                              })
-                                            }
-                                            className="mt-1.5 min-h-[84px] rounded-[18px] border-white/8 bg-secondary text-white"
-                                          />
-                                        </div>
-                                        <div className="mt-3">
-                                          <label className="text-xs text-white/34">建议内容点</label>
-                                          <Textarea
-                                            value={section.recommendedContent.join("\n")}
-                                            onChange={(event) =>
-                                              updateStructureSection(group.id, section.id, {
-                                                recommendedContent: event.target.value
-                                                  .split("\n")
-                                                  .map((item) => item.trim())
-                                                  .filter(Boolean),
-                                              })
-                                            }
-                                            placeholder="每行一条建议内容点"
-                                            className="mt-1.5 min-h-[88px] rounded-[18px] border-white/8 bg-secondary text-white"
-                                          />
-                                        </div>
-                                        <div className="mt-3">
-                                          <label className="text-xs text-white/34">建议素材</label>
-                                          <Input
-                                            value={section.suggestedAssets.join("、")}
-                                            onChange={(event) =>
-                                              updateStructureSection(group.id, section.id, {
-                                                suggestedAssets: event.target.value
-                                                  .split(/[,，]/)
-                                                  .map((item) => item.trim())
-                                                  .filter(Boolean),
-                                              })
-                                            }
-                                            placeholder="用逗号分隔建议素材标题或类型"
-                                            className="mt-1.5 h-10 rounded-xl border-white/8 bg-secondary text-white"
-                                          />
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                  );
-                                })}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => addStructureSection(group.id)}
-                                  className="h-9 w-full rounded-xl border-white/8 bg-white/3 text-white hover:bg-white/6"
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  在这一组里新增小节
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </EditorRailSection>
-                    </>
-                  ) : null}
                 </>
               ) : null}
 
@@ -4221,15 +3769,103 @@ export function ProjectEditorFabricClient({
 
               {leftPanel === "boards" ? (
                 <>
-                  <EditorRailSection title="画板管理">
+                  <EditorRailSection title="结构与画板">
                     <div className="space-y-3">
-                      <EditorChromeButton
-                        className="h-10 w-full justify-center"
-                        onClick={createBoard}
-                        disabled={scene.boards.length >= PROJECT_BOARD_MAX}
-                      >
-                        新建画板
-                      </EditorChromeButton>
+                      {!structureDraft ? (
+                        <div className={cn(editorPanelCardClass, "px-4 py-4")}>
+                          <p className="text-sm font-medium text-white">还没有结构建议</p>
+                          <p className="mt-1.5 text-xs leading-6 text-white/42">
+                            先回到项目准备生成结构，再按结构创建内容稿。
+                          </p>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setSetupMode(true);
+                              setSetupFocusSection("structure");
+                              setActionError("");
+                              setLeftPanel("project");
+                            }}
+                            className="mt-4 h-10 w-full rounded-xl bg-white text-neutral-950 hover:bg-neutral-100"
+                          >
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            去项目准备调整结构
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className={cn(editorPanelCardClass, "space-y-2.5 p-3.5")}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-white">当前结构</p>
+                              <p className="mt-1 text-xs text-white/48">
+                                {structureDraft.groups.length} 个章节 ·{" "}
+                                {structureDraft.groups.reduce((sum, group) => sum + group.sections.length, 0)} 页
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 rounded-full border-white/8 bg-white/3 text-white/66"
+                            >
+                              {structureDraft.status === "confirmed" ? "已确认" : "草稿"}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58">
+                              {materialRecognition ? "AI 理解已完成" : "待 AI 理解"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] leading-5 text-white/42">
+                            新增页面请先调整结构，再重新创建内容稿。
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setSetupMode(true);
+                                setSetupFocusSection("structure");
+                                setActionError("");
+                                setLeftPanel("project");
+                              }}
+                              className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              调整结构
+                            </Button>
+                            {structureDraft.status !== "confirmed" ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void confirmStructureDraft()}
+                                disabled={structureSaveState === "saving"}
+                                className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
+                              >
+                                <Check className="mr-2 h-4 w-4" />
+                                确认结构
+                              </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void applyStructureToBoards()}
+                              disabled={
+                                applyingStructure ||
+                                structureDraft.status !== "confirmed" ||
+                                structureDraft.groups.length === 0
+                              }
+                              className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
+                            >
+                              {applyingStructure ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  重建中
+                                </>
+                              ) : (
+                                "重新创建内容稿"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between px-1 text-xs text-white/52">
                         <span>已用画板</span>
                         <span className="text-white/78">
@@ -4329,22 +3965,25 @@ export function ProjectEditorFabricClient({
               recognizingMaterials={recognizingMaterials}
               suggestingStructure={suggestingStructure}
               confirmingStructure={confirmingStructure}
+              applyingStructure={applyingStructure}
               uploadingAssets={uploadingAssets}
               actionError={actionError}
               hasExistingBoards={
                 scene.boards.length > 1 ||
                 scene.boards.some((board) => board.nodes.length > 0)
               }
-              onAiUnderstand={() => void handleWizardAiUnderstand()}
-              onGenerateStructure={() => void handleSuggestStructure()}
-              onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
-              onUploadAssets={handleOpenAssetUpload}
-              onUpdateAssetTitle={handleRenameAsset}
-              onUpdateAssetNote={handleUpdateAssetNote}
-              onDeleteAsset={(assetId) => void handleDeleteAsset(assetId)}
-              onReturnToCanvas={() => { setSetupMode(false); setLeftPanel("boards"); setActionError(""); }}
-              onStructureChange={(next) => mutateStructureDraft(() => next)}
-            />
+                onAiUnderstand={() => void handleWizardAiUnderstand()}
+                onGenerateStructure={() => void handleSuggestStructure()}
+                onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
+                onApplyStructure={() => void applyStructureToBoards()}
+                onUploadAssets={handleOpenAssetUpload}
+                onUpdateAssetTitle={handleRenameAsset}
+                onUpdateAssetNote={handleUpdateAssetNote}
+                onDeleteAsset={(assetId) => void handleDeleteAsset(assetId)}
+                focusedSection={setupFocusSection}
+                onReturnToCanvas={() => { setSetupMode(false); setLeftPanel("boards"); setActionError(""); }}
+                onStructureChange={(next) => mutateStructureDraft(() => next)}
+              />
           </div>
         ) : (
         <div
@@ -4761,6 +4400,22 @@ export function ProjectEditorFabricClient({
                               {selectedImageAsset ? (
                                 <div className={cn(editorPanelMutedCardClass, "p-3")}>
                                   <p className="mb-2 text-xs tracking-[0.16em] text-white/34">素材语义</p>
+                                  {isAIGeneratedAsset(selectedImageAsset.metaJson) ? (
+                                    <div className="mb-3 flex flex-wrap gap-1.5">
+                                      <Badge
+                                        variant="outline"
+                                        className="rounded-full border-amber-500/22 bg-amber-500/10 text-[10px] text-amber-100"
+                                      >
+                                        AI 生成
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className="rounded-full border-white/8 bg-white/4 text-[10px] text-white/66"
+                                      >
+                                        待确认
+                                      </Badge>
+                                    </div>
+                                  ) : null}
                                   <label className="text-xs text-white/50">图片名称</label>
                                   <Input
                                     value={imageDetailsDraft.title}
@@ -4836,6 +4491,7 @@ export function ProjectEditorFabricClient({
                                           className="focus:bg-white/[0.07] focus:text-white"
                                         >
                                           {asset.title ?? "未命名素材"}
+                                          {isAIGeneratedAsset(asset.metaJson) ? " · AI 生成" : ""}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -5160,10 +4816,14 @@ export function ProjectEditorFabricClient({
                             ) : null}
                             {activeBoard.pageType || isPrototypeBoard(activeBoard) || activeBoard.phase ? (
                               <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                                <p className="text-[11px] tracking-[0.14em] text-white/34">阶段状态</p>
+                                <p className="text-[11px] tracking-[0.14em] text-white/34">当前状态</p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                   <p className="text-sm text-white/78">
-                                    {isPrototypeBoard(activeBoard) ? "原型" : activeBoard.phase === "generated" ? "已生成" : "手动"}
+                                    {isPrototypeBoard(activeBoard)
+                                      ? "内容稿"
+                                      : activeBoard.phase === "generated"
+                                        ? "已生成排版"
+                                        : "手动页"}
                                   </p>
                                   {activeBoard.pageType ? (
                                     <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] text-white/56">
@@ -5174,7 +4834,7 @@ export function ProjectEditorFabricClient({
                               </div>
                             ) : null}
                             <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                              <p className="text-[11px] tracking-[0.14em] text-white/34">质量状态</p>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">下一步</p>
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 {activeBoardQualityMeta ? (
                                   <span
@@ -5190,17 +4850,12 @@ export function ProjectEditorFabricClient({
                                     待检查
                                   </span>
                                 )}
-                                <span
-                                  className={cn(
-                                    "inline-flex h-6 items-center rounded-full border px-2 text-[10px]",
-                                    projectValidationMeta.className
-                                  )}
-                                >
-                                  {projectValidationMeta.label}
-                                </span>
                               </div>
                               <p className="mt-2 text-xs leading-5 text-white/54">
-                                {activeBoardValidation?.message ?? projectValidationMeta.summary}
+                                {activeBoardValidation?.message ??
+                                  (isPrototypeBoard(activeBoard)
+                                    ? "这页内容稿已讲清主线，可以继续生成排版。"
+                                    : "这页已达到可继续精修的基础质量线。")}
                               </p>
                             </div>
                           </div>
@@ -5462,15 +5117,15 @@ export function ProjectEditorFabricClient({
       </Dialog>
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="dark max-w-2xl border-white/8 bg-card text-white">
-          <DialogHeader>
+        <DialogContent className="dark flex max-h-[calc(100vh-4rem)] max-w-2xl flex-col overflow-hidden border-white/8 bg-card text-white">
+          <DialogHeader className="shrink-0">
             <DialogTitle>生成排版</DialogTitle>
             <DialogDescription className="text-white/56">
-              系统只会处理当前范围内仍处于原型态的画板；已生成或手动改过的内容会明确跳过，不会被静默覆盖。
+              系统只会处理当前范围内仍处于内容稿态的画板；已生成或手动改过的内容会明确跳过，不会被静默覆盖。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 text-sm text-white/70">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-1 text-sm text-white/70">
             <Card className="border-white/8 bg-white/3 shadow-none">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -5491,7 +5146,7 @@ export function ProjectEditorFabricClient({
                       mode: "current",
                       label: "当前画板",
                       detail: activeBoard
-                        ? `${activeBoard.name} · ${isPrototypeBoard(activeBoard) ? "原型可生成" : "已生成将跳过"}`
+                        ? `${activeBoard.name} · ${isPrototypeBoard(activeBoard) ? "内容稿可生成" : "已生成将跳过"}`
                         : "当前页",
                     },
                     {
@@ -5499,8 +5154,8 @@ export function ProjectEditorFabricClient({
                       label: "全部画板",
                       detail:
                         skippedLockedBoardsInScope.length > 0
-                          ? `${prototypeBoardsInScope.length} 张原型会参与，${generatedBoardsInScope.length} 张已生成会跳过`
-                          : `${prototypeBoardsInScope.length} 张原型会参与，${generatedBoardsInScope.length} 张已生成会跳过`,
+                          ? `${prototypeBoardsInScope.length} 张内容稿会参与，${generatedBoardsInScope.length} 张已生成会跳过`
+                          : `${prototypeBoardsInScope.length} 张内容稿会参与，${generatedBoardsInScope.length} 张已生成会跳过`,
                     },
                   ].map((item) => (
                     <button
@@ -5581,7 +5236,7 @@ export function ProjectEditorFabricClient({
                         {generatePrecheck.suggestedMode === "reuse"
                           ? "当前命中了可复用排版结果。"
                           : generatePrecheck.suggestedMode === "skip"
-                            ? "当前范围内没有可继续生成的原型画板。"
+                            ? "当前范围内没有可继续生成的内容稿画板。"
                           : generatePrecheck.suggestedMode === "block"
                             ? generatePrecheck.blockReason === "active_project_limit"
                               ? "当前账期可激活 Project 已用完。"
@@ -5643,7 +5298,7 @@ export function ProjectEditorFabricClient({
                     ) : null}
                     {typeof generatePrecheck.prototypeBoardCount === "number" ? (
                       <p className="text-xs leading-5 text-white/46">
-                        本次范围内可生成原型画板 {generatePrecheck.prototypeBoardCount} 张，
+                        本次范围内可生成内容稿画板 {generatePrecheck.prototypeBoardCount} 张，
                         已生成跳过 {generatePrecheck.skippedGeneratedBoardCount ?? 0} 张。
                       </p>
                     ) : null}
@@ -5723,7 +5378,7 @@ export function ProjectEditorFabricClient({
             </Card>
           </div>
 
-          <DialogFooter className="gap-2 sm:space-x-0">
+          <DialogFooter className="shrink-0 gap-2 border-t border-white/8 pt-4 sm:space-x-0">
             <Button
               variant="outline"
               className="rounded-full border-white/8 bg-white/3 text-white hover:bg-white/8"
@@ -5893,7 +5548,7 @@ function getBoardPhaseMeta(board: ProjectBoard) {
   }
   if (isPrototypeBoard(board)) {
     return {
-      label: "原型",
+      label: "内容稿",
       className: "border-amber-300/18 bg-amber-300/10 text-amber-100/82",
     };
   }
@@ -5933,7 +5588,7 @@ function BoardListRow({
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
   const phaseMeta = getBoardPhaseMeta(board);
-  const qualityMeta = getBoardQualityMeta(boardValidation);
+  const qualityMeta = getBoardQualityMeta(board, boardValidation);
   const secondaryText =
     (board.structureSource?.sectionTitle ??
       board.structureSource?.groupLabel ??
@@ -6073,7 +5728,7 @@ function FilmstripCard({
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
   const phaseMeta = getBoardPhaseMeta(board);
-  const qualityMeta = getBoardQualityMeta(boardValidation);
+  const qualityMeta = getBoardQualityMeta(board, boardValidation);
 
   return (
     <div

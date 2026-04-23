@@ -13,6 +13,8 @@ export type LLMTask =
   | "project_package_recommendation" // 包装模式推荐（判断层）
   | "project_material_recognition" // 项目素材轻识别（判断层）
   | "project_structure_suggestion" // 项目结构建议（结构层）
+  | "project_prototype_generation" // 项目低保真内容稿（结构层）
+  | "project_visual_asset_generation" // 项目叙事视觉资产补全（结构层）
   | "project_layout_generation";  // 项目排版生成（包装层）
 
 export interface LLMTrackContext {
@@ -44,6 +46,19 @@ export interface ImageInput {
   mimeType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
 }
 
+export interface GeneratedImage {
+  base64: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  revisedPrompt?: string | null;
+}
+
+export interface GenerateImageOptions extends GenerateOptions {
+  size?: "auto" | "1024x1024" | "1536x1024" | "1024x1536";
+  quality?: "low" | "medium" | "high" | "auto";
+  outputFormat?: "png" | "jpeg" | "webp";
+  background?: "transparent" | "opaque" | "auto";
+}
+
 export interface LLMProvider {
   /**
    * Generate a free-form text response.
@@ -69,6 +84,14 @@ export interface LLMProvider {
     schema: z.ZodSchema<T>,
     options?: GenerateOptions
   ): Promise<T>;
+
+  /**
+   * Generate a single image asset from a prompt.
+   */
+  generateImage(
+    prompt: string,
+    options?: GenerateImageOptions
+  ): Promise<GeneratedImage>;
 }
 
 /**
@@ -88,4 +111,6 @@ export const TASK_MODEL_TIER: Record<LLMTask, "primary" | "lite"> = {
   project_package_recommendation: "lite",
   project_material_recognition: "lite",
   project_structure_suggestion: "lite",
+  project_prototype_generation: "primary",
+  project_visual_asset_generation: "primary",
 };

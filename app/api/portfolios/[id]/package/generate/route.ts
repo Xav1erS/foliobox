@@ -12,10 +12,18 @@ import {
   writePrecheckLog,
 } from "@/lib/generation-precheck";
 import {
+  mergePortfolioEditorState,
   resolvePortfolioEditorState,
+  resolvePortfolioPackagingContent,
   type PortfolioPackagingContent,
   type PortfolioPackagingPage,
 } from "@/lib/portfolio-editor";
+import {
+  buildPortfolioPackagingProjectSnapshots,
+  resolvePortfolioProjectAdmissions,
+  stampPortfolioValidationFailure,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 import {
   resolveStyleProfile,
   type StyleReferenceSelection,
@@ -33,6 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   const body = (await request.json().catch(() => ({}))) as {
     styleSelection?: StyleReferenceSelection | null;
   };
@@ -53,6 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       name: true,
       projectIds: true,
       outlineJson: true,
+      contentJson: true,
     },
   });
 
@@ -63,9 +73,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "请先选入至少一个项目" }, { status: 400 });
   }
 
-  const [entitlementSummary, portfolioActionSummary] = await Promise.all([
+  const [entitlementSummary, portfolioActionSummary, selectedProjects] = await Promise.all([
     getEntitlementSummary(session.user.id),
     getPortfolioActionSummary(session.user.id, portfolio.id),
+    db.project.findMany({
+      where: { id: { in: portfolio.projectIds }, userId: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        packageMode: true,
+        updatedAt: true,
+        layoutJson: true,
+        facts: {
+          select: {
+            background: true,
+            resultSummary: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const actionType = portfolioActionSummary.packagingGenerations.used > 0
@@ -76,26 +103,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? portfolioActionSummary.packagingRegenerations
       : portfolioActionSummary.packagingGenerations;
 
-  const selectedProjects = await db.project.findMany({
-    where: { id: { in: portfolio.projectIds }, userId: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      stage: true,
-      packageMode: true,
-      layoutJson: true,
-      facts: {
-        select: {
-          background: true,
-          resultSummary: true,
-        },
-      },
-    },
-  });
-
   const orderedProjects = portfolio.projectIds
-    .map((projectId) => selectedProjects.find((project) => project.id === projectId))
+    .map((projectId) => selectedProjects.find((project) => project.id === projectId) ?? null)
     .filter(Boolean);
+  const orderedProjectInputs = orderedProjects.map((project) => ({
+    id: project!.id,
+    name: project!.name,
+    stage: project!.stage,
+    packageMode: project!.packageMode,
+    updatedAt: project!.updatedAt.toISOString(),
+    layoutJson: project!.layoutJson,
+    background: project!.facts?.background ?? null,
+    resultSummary: project!.facts?.resultSummary ?? null,
+  }));
+  const admissionsByProjectId = new Map(
+    resolvePortfolioProjectAdmissions(orderedProjectInputs).map((item) => [item.projectId, item])
+  );
+  const eligibleProjects = orderedProjects.filter((project) => {
+    const status = admissionsByProjectId.get(project!.id)?.status ?? "block";
+    return status === "pass" || status === "warn";
+  });
+  const eligibleProjectInputs = orderedProjectInputs.filter((project) => {
+    const status = admissionsByProjectId.get(project.id)?.status ?? "block";
+    return status === "pass" || status === "warn";
+  });
 
   const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
   const requestHash = hashGenerationInput({
@@ -110,7 +141,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })),
     styleSelection,
   });
-  const reusable = await findReusableGeneratedDraft({
+  let reusable = await findReusableGeneratedDraft({
     userId: session.user.id,
     objectType: "portfolio",
     objectId: portfolio.id,
@@ -124,53 +155,81 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { status: 403 }
     );
   }
+  if (eligibleProjects.length === 0) {
+    return NextResponse.json(
+      { error: "当前选入项目都还不适合进入作品集，建议先回 Project Editor 完成项目包装。" },
+      { status: 400 }
+    );
+  }
 
   if (reusable) {
-    await writePrecheckLog({
-      userId: session.user.id,
-      objectType: "portfolio",
-      objectId: portfolio.id,
-      actionType,
-      budgetStatus: "healthy",
-      suggestedMode: "reuse",
-      reusableDraftId: reusable.draft.id,
+    const reusablePackaging = resolvePortfolioPackagingContent(reusable.draft.contentJson);
+    const reusableValidation = validatePortfolioPackaging({
+      selectedProjectIds: portfolio.projectIds,
+      fixedPages: editorState.fixedPages,
+      projects: orderedProjectInputs,
+      packaging: reusablePackaging,
     });
 
-    await db.generationTask.create({
-      data: {
+    if (reusableValidation.portfolioState !== "not_ready" && reusablePackaging) {
+      await writePrecheckLog({
         userId: session.user.id,
         objectType: "portfolio",
         objectId: portfolio.id,
         actionType,
-        usageClass: "high_cost",
-        status: "reused",
-        reusedFromTaskId: reusable.task.id,
-        requestHash,
-        provider: reusable.task.provider,
-        model: reusable.task.model,
-        wasSuccessful: true,
-        countedToBudget: false,
-      },
-    });
-
-    const packaging = reusable.draft.contentJson as PortfolioPackagingContent;
-    await db.portfolio.update({
-      where: { id: portfolio.id },
-      data: {
-        contentJson: reusable.draft.contentJson as Prisma.InputJsonValue,
-        status: "EDITOR",
-      },
-    });
-
-    return NextResponse.json({
-      packaging,
-      reused: true,
-      precheck: {
+        budgetStatus: "healthy",
         suggestedMode: "reuse",
-        failureCounts: false,
-        consumesQuota: false,
-      },
-    });
+        reusableDraftId: reusable.draft.id,
+      });
+
+      await db.generationTask.create({
+        data: {
+          userId: session.user.id,
+          objectType: "portfolio",
+          objectId: portfolio.id,
+          actionType,
+          usageClass: "high_cost",
+          status: "reused",
+          reusedFromTaskId: reusable.task.id,
+          requestHash,
+          provider: reusable.task.provider,
+          model: reusable.task.model,
+          wasSuccessful: true,
+          countedToBudget: false,
+        },
+      });
+
+      await db.portfolio.update({
+        where: { id: portfolio.id },
+        data: {
+          contentJson: reusablePackaging as unknown as Prisma.InputJsonValue,
+          outlineJson: mergePortfolioEditorState(portfolio.outlineJson, {
+            validation: reusableValidation,
+          }) as unknown as Prisma.InputJsonValue,
+          status: "EDITOR",
+        },
+      });
+
+      return NextResponse.json({
+        packaging: reusablePackaging,
+        validation: reusableValidation,
+        reused: true,
+        precheck: {
+          suggestedMode: "reuse",
+          failureCounts: false,
+          consumesQuota: false,
+        },
+      });
+    }
+
+    reusable = null;
+  }
+
+  if (!reusable && actionQuota.remaining <= 0) {
+    return NextResponse.json(
+      { error: "quota_exceeded", summary: entitlementSummary },
+      { status: 403 }
+    );
   }
 
   const pages: PortfolioPackagingPage[] = [];
@@ -193,7 +252,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     });
 
-  orderedProjects.forEach((project, index) => {
+  eligibleProjects.forEach((project, index) => {
     const layout = project?.layoutJson as
       | { narrativeSummary?: string; totalPages?: number }
       | null;
@@ -219,23 +278,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   const packaging: PortfolioPackagingContent = {
-    narrativeSummary: `这份作品集以 ${orderedProjects
+    narrativeSummary: `这份作品集以 ${eligibleProjects
       .slice(0, 2)
       .map((project) => project?.name)
       .filter(Boolean)
       .join("、")} 为核心案例，结合固定页组织出完整的开场、主体与收束节奏。`,
     pages,
     qualityNotes: [
-      orderedProjects.some((project) => !project?.layoutJson)
+      eligibleProjects.some((project) => !project?.layoutJson)
         ? "仍有项目缺少稳定排版结果，后续可优先补齐项目级 narrative。"
         : "当前项目都具备基础排版结果，可继续细化页面顺序与内容密度。",
-      `当前项目包装模式分布：${orderedProjects
+      eligibleProjects.length < orderedProjects.length
+        ? `当前有 ${orderedProjects.length - eligibleProjects.length} 个项目暂不建议纳入本次包装，系统已先跳过。`
+        : "当前已选项目都可进入整份作品集包装。",
+      `当前项目包装模式分布：${eligibleProjects
         .map((project) => `${project?.name}（${packageModeLabel(project?.packageMode)}）`)
         .join("、")}`,
     ],
     generatedAt: new Date().toISOString(),
     styleProfile,
+    projectSnapshots: buildPortfolioPackagingProjectSnapshots(eligibleProjectInputs),
   };
+
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    projects: orderedProjectInputs,
+    packaging,
+  });
 
   const task = await db.generationTask.create({
     data: {
@@ -266,10 +336,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       suggestedMode: "continue",
     });
 
+    if (validation.portfolioState === "not_ready") {
+      const fallbackPackaging = resolvePortfolioPackagingContent(portfolio.contentJson);
+      const fallbackValidation = stampPortfolioValidationFailure({
+        packaging: fallbackPackaging,
+        validation: validatePortfolioPackaging({
+          selectedProjectIds: portfolio.projectIds,
+          fixedPages: editorState.fixedPages,
+          projects: orderedProjectInputs,
+          packaging: fallbackPackaging,
+        }),
+        summary: "本次作品集包装未完成，已保留原内容。",
+      });
+
+      await db.portfolio.update({
+        where: { id: portfolio.id },
+        data: {
+          outlineJson: mergePortfolioEditorState(portfolio.outlineJson, {
+            validation: fallbackValidation,
+          }) as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      await db.generationTask.update({
+        where: { id: task.id },
+        data: { status: "failed", wasSuccessful: false, countedToBudget: false },
+      });
+
+      return NextResponse.json({
+        rolledBack: true,
+        message: "本次作品集包装未完成，已保留原内容。",
+        validation: fallbackValidation,
+      });
+    }
+
     await db.portfolio.update({
       where: { id: portfolio.id },
       data: {
         contentJson: packaging as unknown as Prisma.InputJsonValue,
+        outlineJson: mergePortfolioEditorState(portfolio.outlineJson, {
+          validation,
+        }) as unknown as Prisma.InputJsonValue,
         status: "EDITOR",
       },
     });
@@ -292,7 +399,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       data: { status: "done", wasSuccessful: true, countedToBudget: true },
     });
 
-    return NextResponse.json({ packaging, taskId: task.id, draftId: draft.id });
+    return NextResponse.json({ packaging, validation, taskId: task.id, draftId: draft.id });
   } catch (error) {
     await db.generationTask.update({
       where: { id: task.id },

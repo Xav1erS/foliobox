@@ -52,6 +52,8 @@ import type {
   PortfolioDiagnosis,
   PortfolioPackagingContent,
   PortfolioPackagingPage,
+  PortfolioProjectAdmission,
+  PortfolioValidation,
 } from "@/lib/portfolio-editor";
 import {
   STYLE_PRESETS,
@@ -69,6 +71,7 @@ type PortfolioProject = {
   layout: { narrativeSummary?: string; totalPages?: number } | null;
   background: string | null;
   resultSummary: string | null;
+  admission: PortfolioProjectAdmission;
 };
 
 type StyleReferenceSetOption = {
@@ -87,6 +90,9 @@ type GeneratePrecheck = {
   activeProjectRemaining: number;
   actionRemaining: number;
   reusableDraftId: string | null;
+  eligibleProjectCount: number;
+  blockedProjectCount: number;
+  warnProjectCount: number;
 };
 
 export type PortfolioEditorInitialData = {
@@ -98,6 +104,7 @@ export type PortfolioEditorInitialData = {
   fixedPages: FixedPageConfig[];
   diagnosis: PortfolioDiagnosis | null;
   packaging: PortfolioPackagingContent | null;
+  validation: PortfolioValidation | null;
   allProjects: PortfolioProject[];
   packagingQuota: EntitlementQuotaUsage;
   actionSummary: {
@@ -131,6 +138,84 @@ function portfolioVerdictLabel(verdict: PortfolioDiagnosis["overallVerdict"] | u
   if (verdict === "needs_work") return "仍需补强";
   if (verdict === "insufficient") return "信息不足";
   return "待判断";
+}
+
+function getFallbackPortfolioValidation(): PortfolioValidation {
+  return {
+    portfolioState: "unknown",
+    portfolioVerdict: null,
+    cause: null,
+    summary: "当前还没有作品集包装结果，建议先生成整份包装。",
+    updatedAt: "",
+    packagingHash: "",
+    projects: [],
+  };
+}
+
+function getProjectAdmissionMeta(admission: PortfolioProjectAdmission) {
+  if (admission.status === "review") {
+    return {
+      label: "待同步",
+      className: "border-amber-300/40 bg-amber-400/12 text-amber-100",
+    };
+  }
+  if (admission.status === "block") {
+    return {
+      label: "暂不建议进入",
+      className: "border-red-300/40 bg-red-400/12 text-red-100",
+    };
+  }
+  if (admission.status === "warn") {
+    return {
+      label: "需要补充信息",
+      className: "border-amber-300/40 bg-amber-400/12 text-amber-100",
+    };
+  }
+  return {
+    label: "可进入",
+    className: "border-emerald-300/40 bg-emerald-400/12 text-emerald-100",
+  };
+}
+
+function getPortfolioValidationMeta(validation: PortfolioValidation, hasPackaging: boolean) {
+  if (!hasPackaging || validation.portfolioState === "unknown") {
+    return {
+      label: "待包装",
+      shortLabel: "待包装",
+      className: "border-white/12 bg-white/6 text-white/72",
+      summary: validation.summary || "当前还没有作品集包装结果，建议先生成整份包装。",
+    };
+  }
+  if (validation.cause === "project_sync_required") {
+    return {
+      label: "待同步 / 待复核",
+      shortLabel: "待同步",
+      className: "border-amber-300/40 bg-amber-400/12 text-amber-100",
+      summary: validation.summary,
+    };
+  }
+  if (validation.portfolioState === "not_ready") {
+    return {
+      label: "暂不建议发布",
+      shortLabel: "未达标",
+      className: "border-red-300/40 bg-red-400/12 text-red-100",
+      summary: validation.summary,
+    };
+  }
+  if (validation.portfolioState === "pass_with_notes") {
+    return {
+      label: "需要补充信息",
+      shortLabel: "需补充",
+      className: "border-amber-300/40 bg-amber-400/12 text-amber-100",
+      summary: validation.summary,
+    };
+  }
+  return {
+    label: "已通过",
+    shortLabel: "已通过",
+    className: "border-emerald-300/40 bg-emerald-400/12 text-emerald-100",
+    summary: validation.summary || "当前作品集已达到发布前基础质量线。",
+  };
 }
 
 function pageRoleLabel(role: string) {
@@ -169,6 +254,7 @@ export function PortfolioEditorClient({
   const [fixedPages, setFixedPages] = useState(initialData.fixedPages);
   const [diagnosis, setDiagnosis] = useState(initialData.diagnosis);
   const [packaging, setPackaging] = useState(initialData.packaging);
+  const [validation, setValidation] = useState<PortfolioValidation | null>(initialData.validation);
   const [packagingQuota, setPackagingQuota] = useState(initialData.packagingQuota);
   const [savingName, setSavingName] = useState(false);
   const [updatingStructure, setUpdatingStructure] = useState(false);
@@ -208,6 +294,36 @@ export function PortfolioEditorClient({
   const availableProjects = useMemo(
     () => initialData.allProjects.filter((project) => !selectedProjectIds.includes(project.id)),
     [initialData.allProjects, selectedProjectIds]
+  );
+  const resolvedValidation = useMemo(
+    () => validation ?? getFallbackPortfolioValidation(),
+    [validation]
+  );
+  const validationMeta = useMemo(
+    () => getPortfolioValidationMeta(resolvedValidation, Boolean(packaging?.pages?.length)),
+    [packaging?.pages?.length, resolvedValidation]
+  );
+  const blockedSelectedCount = useMemo(
+    () => selectedProjects.filter((project) => project.admission.status === "block").length,
+    [selectedProjects]
+  );
+  const reviewProjects = useMemo(
+    () => selectedProjects.filter((project) => project.admission.status === "review"),
+    [selectedProjects]
+  );
+  const attentionProjects = useMemo(
+    () =>
+      selectedProjects.filter(
+        (project) =>
+          project.admission.status === "block" || project.admission.status === "warn"
+      ),
+    [selectedProjects]
+  );
+  const canOpenPublish = useMemo(
+    () =>
+      Boolean(packaging?.pages?.length) &&
+      resolvedValidation.portfolioState !== "not_ready",
+    [packaging?.pages?.length, resolvedValidation.portfolioState]
   );
   const pages = useMemo(() => {
     if (packaging?.pages?.length) return packaging.pages;
@@ -294,10 +410,15 @@ export function PortfolioEditorClient({
       {
         label: "整份包装",
         done: Boolean(packaging),
-        detail: packaging ? `已生成 ${packaging.pages.length} 个页面单元` : "还没有包装结果",
+        detail: packaging ? `${validationMeta.label} · ${packaging.pages.length} 个页面单元` : "还没有包装结果",
+      },
+      {
+        label: "发布质量",
+        done: Boolean(packaging) && resolvedValidation.portfolioState === "pass",
+        detail: validationMeta.summary,
       },
     ],
-    [diagnosis, enabledFixedPages.length, packaging, selectedProjects.length]
+    [diagnosis, enabledFixedPages.length, packaging, resolvedValidation.portfolioState, selectedProjects.length, validationMeta.label, validationMeta.summary]
   );
   const narrativeNotes = useMemo(() => {
     if (packaging?.qualityNotes?.length) return packaging.qualityNotes.slice(0, 4);
@@ -308,14 +429,20 @@ export function PortfolioEditorClient({
     if (selectedProjects.length === 0) {
       return "先从项目池选入 2-4 个最能代表能力面的项目。";
     }
+    if (reviewProjects.length > 0) {
+      return `当前有 ${reviewProjects.length} 个项目已经更新，建议先回到对应 Project Editor 确认内容，再重新诊断或重新生成包装。`;
+    }
+    if (blockedSelectedCount > 0 && !packaging) {
+      return `当前有 ${blockedSelectedCount} 个项目暂不建议进入作品集，建议先回 Project Editor 调整。`;
+    }
     if (!diagnosis) {
       return "先运行一次作品集诊断，确认当前项目组合、固定页和整体节奏是否成立。";
     }
     if (!packaging) {
       return diagnosis.suggestions[0] ?? "当前可以继续生成作品集包装，拿到整份作品集的页面节奏建议。";
     }
-    return "当前已经拿到作品集包装结果，可以继续细调项目顺序、固定页，并进入发布与导出。";
-  }, [diagnosis, packaging, selectedProjects.length]);
+    return validationMeta.summary;
+  }, [blockedSelectedCount, diagnosis, packaging, reviewProjects.length, selectedProjects.length, validationMeta.summary]);
 
   async function parseJsonResponse(response: Response) {
     const data = await response.json().catch(() => ({}));
@@ -344,6 +471,7 @@ export function PortfolioEditorClient({
       name: string;
       status: string;
       projectIds: string[];
+      outlineJson?: { validation?: PortfolioValidation | null } | null;
       contentJson?: PortfolioPackagingContent | null;
     };
 
@@ -351,6 +479,7 @@ export function PortfolioEditorClient({
     setStatus(portfolio.status);
     setSelectedProjectIds(portfolio.projectIds);
     setPackaging((portfolio.contentJson as PortfolioPackagingContent | null) ?? null);
+    setValidation(portfolio.outlineJson?.validation ?? null);
   }
 
   async function handleSaveName() {
@@ -431,10 +560,16 @@ export function PortfolioEditorClient({
           }),
         })
       );
+      const portfolio = data.portfolio as {
+        status: string;
+        outlineJson?: { validation?: PortfolioValidation | null } | null;
+        contentJson?: PortfolioPackagingContent | null;
+      };
       setFixedPages(nextPages);
-      setStatus((data.portfolio as { status: string }).status);
+      setStatus(portfolio.status);
       setDiagnosis(null);
-      setPackaging(null);
+      setPackaging((portfolio.contentJson as PortfolioPackagingContent | null) ?? null);
+      setValidation(portfolio.outlineJson?.validation ?? null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "更新固定页失败");
     } finally {
@@ -451,6 +586,7 @@ export function PortfolioEditorClient({
         await fetch(`/api/portfolios/${initialData.id}/diagnose`, { method: "POST" })
       );
       setDiagnosis(data.diagnosis as PortfolioDiagnosis);
+      setValidation((data.validation as PortfolioValidation | null) ?? null);
       setStatus(selectedProjectIds.length > 0 ? "OUTLINE" : "DRAFT");
       router.refresh();
     } catch (error) {
@@ -516,6 +652,13 @@ export function PortfolioEditorClient({
           body: JSON.stringify({ styleSelection: getResolvedStyleSelection() }),
         })
       );
+      setValidation((data.validation as PortfolioValidation | null) ?? null);
+      if ((data as { rolledBack?: boolean }).rolledBack) {
+        setActionError(
+          (data as { message?: string }).message ?? "本次作品集包装未完成，已保留原内容。"
+        );
+        return;
+      }
       setPackaging(data.packaging as PortfolioPackagingContent);
       setStatus("EDITOR");
       setGenerateOpen(false);
@@ -542,7 +685,11 @@ export function PortfolioEditorClient({
         backHref="/portfolios"
         backLabel="全部作品集"
         statusLabel={portfolioStatusLabel(status)}
-        statusMeta={packaging ? `${packaging.pages.length} pages` : `${selectedProjects.length} projects`}
+        statusMeta={
+          packaging
+            ? `${packaging.pages.length} pages · ${validationMeta.shortLabel}`
+            : `${selectedProjects.length} projects · ${validationMeta.shortLabel}`
+        }
         primaryAction={
           <Button
             className="h-9 px-4"
@@ -603,6 +750,7 @@ export function PortfolioEditorClient({
                   <EditorInfoList
                     items={[
                       { label: "当前状态", value: portfolioStatusLabel(status) },
+                      { label: "发布质量", value: validationMeta.label },
                       { label: "包装剩余", value: `${packagingQuota.remaining} / ${packagingQuota.limit}` },
                       { label: "已选项目", value: `${selectedProjects.length} 个` },
                       { label: "固定页", value: `${enabledFixedPages.length} 个启用` },
@@ -670,6 +818,28 @@ export function PortfolioEditorClient({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-white">{project.name}</p>
                             <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
+                            <p className="mt-2">
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                                  getProjectAdmissionMeta(project.admission).className
+                                )}
+                              >
+                                {getProjectAdmissionMeta(project.admission).label}
+                              </span>
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-white/56">
+                              {project.admission.message}
+                            </p>
+                            <div className="mt-3">
+                              <Link
+                                href={`/projects/${project.id}/editor`}
+                                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[11px] font-medium text-white/72 transition-colors hover:bg-white/10 hover:text-white"
+                              >
+                                回到项目编辑器
+                                <ArrowRight className="h-3 w-3" />
+                              </Link>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1">
                             <EditorChromeButton
@@ -721,6 +891,16 @@ export function PortfolioEditorClient({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-white">{project.name}</p>
                           <p className="mt-1 text-xs text-white/46">{projectStageLabel(project)}</p>
+                          <p className="mt-2">
+                            <span
+                              className={cn(
+                                "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                                getProjectAdmissionMeta(project.admission).className
+                              )}
+                            >
+                              {getProjectAdmissionMeta(project.admission).label}
+                            </span>
+                          </p>
                         </div>
                         <Plus className="h-4 w-4 shrink-0 text-white/46" />
                       </EditorSurfaceButton>
@@ -957,6 +1137,7 @@ export function PortfolioEditorClient({
                   items={[
                     { label: "对象类型", value: "Portfolio" },
                     { label: "当前状态", value: portfolioStatusLabel(status) },
+                    { label: "发布质量", value: validationMeta.label },
                     { label: "已选项目", value: `${selectedProjects.length} 个` },
                     { label: "固定页", value: `${enabledFixedPages.length} 个` },
                   ]}
@@ -967,6 +1148,16 @@ export function PortfolioEditorClient({
                 {selectedCanvasProject ? (
                   <EditorPanelCard>
                     <p className="text-sm font-medium text-white">{selectedCanvasProject.name}</p>
+                    <p className="mt-2">
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                          getProjectAdmissionMeta(selectedCanvasProject.admission).className
+                        )}
+                      >
+                        {getProjectAdmissionMeta(selectedCanvasProject.admission).label}
+                      </span>
+                    </p>
                     <p className="mt-2 text-sm leading-6 text-white/56">
                       {selectedCanvasProject.layout?.narrativeSummary ??
                         selectedCanvasProject.resultSummary ??
@@ -986,12 +1177,89 @@ export function PortfolioEditorClient({
               <EditorRailSection title="Current Conclusion">
                 <EditorPanelCard>
                   <p className="text-sm leading-7 text-white/74">
-                    {packaging?.narrativeSummary ??
+                    {validationMeta.summary ??
+                      packaging?.narrativeSummary ??
                       diagnosis?.summary ??
                       "先运行作品集诊断，系统会判断当前项目组合、固定页和整体节奏是否足以进入整份包装。"}
                   </p>
                 </EditorPanelCard>
               </EditorRailSection>
+
+              <EditorRailSection title="质量状态">
+                <EditorPanelCard>
+                  <p className="text-sm font-medium text-white">{validationMeta.label}</p>
+                  <p className="mt-2 text-sm leading-6 text-white/56">{validationMeta.summary}</p>
+                </EditorPanelCard>
+              </EditorRailSection>
+
+              {reviewProjects.length > 0 ? (
+                <EditorRailSection title="待同步项目">
+                  <div className="space-y-3">
+                    {reviewProjects.map((project) => (
+                      <EditorPanelCard key={project.id} className="bg-white/2">
+                        <p className="text-sm font-medium text-white">{project.name}</p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">
+                          {project.admission.message}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button asChild variant="outline" className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white">
+                            <Link href={`/projects/${project.id}/editor`}>
+                              回到项目编辑器
+                            </Link>
+                          </Button>
+                        </div>
+                      </EditorPanelCard>
+                    ))}
+                    <EditorPanelCard className="bg-white/2">
+                      <p className="text-sm leading-6 text-white/56">
+                        项目确认完成后，回到这里重新诊断或重新生成包装，系统会刷新当前作品集的项目快照。
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white"
+                          onClick={handleRunDiagnosis}
+                          disabled={diagnosing}
+                        >
+                          {diagnosing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                          重新诊断
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white"
+                          onClick={handleOpenGenerate}
+                          disabled={checkingPrecheck || generatingPackaging || selectedProjects.length === 0}
+                        >
+                          {(checkingPrecheck || generatingPackaging) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                          重新生成包装
+                        </Button>
+                      </div>
+                    </EditorPanelCard>
+                  </div>
+                </EditorRailSection>
+              ) : null}
+
+              {reviewProjects.length === 0 && attentionProjects.length > 0 ? (
+                <EditorRailSection title="需先处理项目">
+                  <div className="space-y-3">
+                    {attentionProjects.map((project) => (
+                      <EditorPanelCard key={project.id} className="bg-white/2">
+                        <p className="text-sm font-medium text-white">{project.name}</p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">
+                          {project.admission.message}
+                        </p>
+                        <div className="mt-3">
+                          <Button asChild variant="outline" className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white">
+                            <Link href={`/projects/${project.id}/editor`}>
+                              回到项目编辑器
+                            </Link>
+                          </Button>
+                        </div>
+                      </EditorPanelCard>
+                    ))}
+                  </div>
+                </EditorRailSection>
+              ) : null}
 
               <EditorRailSection title="AI 结果">
                 {diagnosis ? (
@@ -1035,13 +1303,39 @@ export function PortfolioEditorClient({
               <EditorRailSection title="下一步结论">
                 <p className="text-sm leading-6 text-white/56">{nextStepConclusion}</p>
                 <div className="mt-4 space-y-2">
-                  <Link
-                    href={`/portfolios/${initialData.id}/publish`}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/5 hover:text-white"
-                  >
-                    打开发布与导出页
-                    <ArrowRight className="h-3.5 w-3.5 text-white/34" />
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white"
+                      onClick={handleRunDiagnosis}
+                      disabled={diagnosing}
+                    >
+                      {diagnosing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      重新诊断
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 border-white/10 bg-white/6 text-white hover:bg-white/10 hover:text-white"
+                      onClick={handleOpenGenerate}
+                      disabled={checkingPrecheck || generatingPackaging || selectedProjects.length === 0}
+                    >
+                      {(checkingPrecheck || generatingPackaging) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                      重新生成包装
+                    </Button>
+                  </div>
+                  {canOpenPublish ? (
+                    <Link
+                      href={`/portfolios/${initialData.id}/publish`}
+                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-sm font-medium text-white/72 transition-colors hover:bg-white/5 hover:text-white"
+                    >
+                      打开发布与导出页
+                      <ArrowRight className="h-3.5 w-3.5 text-white/34" />
+                    </Link>
+                  ) : (
+                    <div className="rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-sm text-white/56">
+                      当前还不能进入发布与导出：{validationMeta.summary}
+                    </div>
+                  )}
                 </div>
               </EditorRailSection>
             </TabsContent>
@@ -1080,15 +1374,15 @@ export function PortfolioEditorClient({
       ) : null}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-4rem)] flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>生成作品集包装</DialogTitle>
             <DialogDescription>
               系统会根据当前项目顺序、固定页和项目结论，生成整份作品集的包装节奏建议。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 text-sm text-neutral-600">
+          <div className="flex-1 space-y-3 overflow-y-auto pr-1 text-sm text-neutral-600">
             <Card className="shadow-none">
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -1132,6 +1426,13 @@ export function PortfolioEditorClient({
                 <div className="space-y-1">
                   <p>已选项目：{selectedProjects.length} 个</p>
                   <p>已启用固定页：{fixedPages.filter((page) => page.enabled).length} 个</p>
+                  {generatePrecheck ? (
+                    <>
+                      <p>可直接进入包装：{generatePrecheck.eligibleProjectCount} 个</p>
+                      <p>需先补信息：{generatePrecheck.warnProjectCount} 个</p>
+                      <p>暂不建议纳入：{generatePrecheck.blockedProjectCount} 个</p>
+                    </>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -1234,9 +1535,23 @@ export function PortfolioEditorClient({
                 </CardContent>
               </Card>
             ) : null}
+            {generatePrecheck?.blockedProjectCount ? (
+              <Card className="border-amber-200 bg-amber-50 text-amber-900 shadow-none">
+                <CardContent className="p-4">
+                  当前有 {generatePrecheck.blockedProjectCount} 个项目暂不建议进入作品集，系统会先跳过它们。
+                </CardContent>
+              </Card>
+            ) : null}
+            {generatePrecheck?.suggestedMode === "block" && generatePrecheck.eligibleProjectCount === 0 ? (
+              <Card className="border-red-200 bg-red-50 text-red-700 shadow-none">
+                <CardContent className="p-4">
+                  当前没有可进入作品集的项目，建议先回 Project Editor 完成项目排版与质量调整。
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
 
-          <DialogFooter className="gap-2 sm:space-x-0">
+          <DialogFooter className="shrink-0 gap-2 border-t border-neutral-200 pt-4 sm:space-x-0">
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>
               取消
             </Button>

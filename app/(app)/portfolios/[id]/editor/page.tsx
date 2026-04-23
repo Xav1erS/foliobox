@@ -10,7 +10,14 @@ import {
   resolvePortfolioEditorState,
   type PortfolioDiagnosis,
   type PortfolioPackagingContent,
+  type PortfolioProjectAdmission,
+  type PortfolioValidation,
+  resolvePortfolioPackagingContent,
 } from "@/lib/portfolio-editor";
+import {
+  resolvePortfolioProjectAdmissions,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 import {
   PortfolioEditorClient,
   type PortfolioEditorInitialData,
@@ -72,6 +79,27 @@ export default async function PortfolioEditorPage({
   if (!portfolio) notFound();
 
   const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
+  const packaging = resolvePortfolioPackagingContent(portfolio.contentJson);
+  const portfolioProjects = allProjects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    stage: project.stage,
+    packageMode: project.packageMode,
+    updatedAt: project.updatedAt.toISOString(),
+    layoutJson: project.layoutJson,
+    layout: project.layoutJson as { narrativeSummary?: string; totalPages?: number } | null,
+    background: project.facts?.background ?? null,
+    resultSummary: project.facts?.resultSummary ?? null,
+  }));
+  const admissionsByProjectId = new Map(
+    resolvePortfolioProjectAdmissions(portfolioProjects).map((item) => [item.projectId, item])
+  );
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    projects: portfolioProjects,
+    packaging,
+  });
 
   const initialData: PortfolioEditorInitialData = {
     id: portfolio.id,
@@ -81,16 +109,18 @@ export default async function PortfolioEditorPage({
     selectedProjectIds: portfolio.projectIds,
     fixedPages: editorState.fixedPages,
     diagnosis: editorState.diagnosis as PortfolioDiagnosis | null,
-    packaging: portfolio.contentJson as PortfolioPackagingContent | null,
-    allProjects: allProjects.map((project) => ({
+    packaging: packaging as PortfolioPackagingContent | null,
+    validation: validation as PortfolioValidation | null,
+    allProjects: portfolioProjects.map((project) => ({
       id: project.id,
       name: project.name,
       stage: project.stage,
       packageMode: project.packageMode,
-      updatedAt: project.updatedAt.toISOString(),
-      layout: project.layoutJson as { narrativeSummary?: string; totalPages?: number } | null,
-      background: project.facts?.background ?? null,
-      resultSummary: project.facts?.resultSummary ?? null,
+      updatedAt: project.updatedAt,
+      layout: project.layout,
+      background: project.background,
+      resultSummary: project.resultSummary,
+      admission: admissionsByProjectId.get(project.id) as PortfolioProjectAdmission,
     })),
     packagingQuota: entitlementSummary.quotas.portfolioPackagings,
     actionSummary,

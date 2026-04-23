@@ -40,5 +40,22 @@ describe("portfolio editor state", () => {
 
     expect(merged.diagnosis).toBeNull();
   });
+
+  it("parses validation from outlineJson", () => {
+    const state = resolvePortfolioEditorState({
+      validation: {
+        portfolioState: "pass_with_notes",
+        portfolioVerdict: "可发布，但建议先补充",
+        cause: "missing_user_material",
+        summary: "仍有项目需要补信息。",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+        packagingHash: "hash-1",
+        projects: [],
+      },
+    });
+
+    expect(state.validation?.portfolioState).toBe("pass_with_notes");
+    expect(state.validation?.summary).toBe("仍有项目需要补信息。");
+  });
 });
 

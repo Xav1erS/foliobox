@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hasRemainingQuota, requirePlan } from "@/lib/entitlement";
-import type { PortfolioPackagingContent } from "@/lib/portfolio-editor";
+import { resolvePortfolioEditorState, resolvePortfolioPackagingContent } from "@/lib/portfolio-editor";
+import {
+  getPortfolioPublishBlockReason,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 import { renderPortfolioPublishedHtml } from "@/lib/portfolio-publishing";
 
 function generateSlug(): string {
@@ -31,6 +35,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     select: {
       id: true,
       name: true,
+      projectIds: true,
+      outlineJson: true,
       contentJson: true,
       status: true,
     },
@@ -52,14 +58,54 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const content = portfolio.contentJson as PortfolioPackagingContent | null;
-  if (!content?.pages?.length) {
-    return NextResponse.json({ error: "请先生成作品集包装结果" }, { status: 400 });
+  const [selectedProjects] = await Promise.all([
+    db.project.findMany({
+      where: { id: { in: portfolio.projectIds }, userId: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        packageMode: true,
+        updatedAt: true,
+        layoutJson: true,
+        facts: {
+          select: {
+            background: true,
+            resultSummary: true,
+          },
+        },
+      },
+    }),
+  ]);
+  const orderedProjects = portfolio.projectIds
+    .map((projectId) => selectedProjects.find((project) => project.id === projectId) ?? null)
+    .filter(Boolean)
+    .map((project) => ({
+      id: project!.id,
+      name: project!.name,
+      stage: project!.stage,
+      packageMode: project!.packageMode,
+      updatedAt: project!.updatedAt.toISOString(),
+      layoutJson: project!.layoutJson,
+      background: project!.facts?.background ?? null,
+      resultSummary: project!.facts?.resultSummary ?? null,
+    }));
+  const content = resolvePortfolioPackagingContent(portfolio.contentJson);
+  const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    projects: orderedProjects,
+    packaging: content,
+  });
+  const blockReason = getPortfolioPublishBlockReason({ packaging: content, validation });
+  if (blockReason) {
+    return NextResponse.json({ error: blockReason }, { status: 400 });
   }
 
   const publishedHtml = renderPortfolioPublishedHtml({
     portfolioName: portfolio.name,
-    content,
+    content: content!,
   });
 
   let slug = existingPublished?.slug ?? generateSlug();

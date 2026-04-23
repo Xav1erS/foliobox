@@ -4,14 +4,48 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, FileDown, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { PortfolioValidation } from "@/lib/portfolio-editor";
+
+function getPortfolioValidationMeta(validation: PortfolioValidation, hasPackaging: boolean) {
+  if (!hasPackaging || validation.portfolioState === "unknown") {
+    return {
+      label: "待包装",
+      summary: validation.summary || "当前还没有作品集包装结果。",
+    };
+  }
+  if (validation.cause === "project_sync_required") {
+    return {
+      label: "待同步 / 待复核",
+      summary: validation.summary,
+    };
+  }
+  if (validation.portfolioState === "not_ready") {
+    return {
+      label: "暂不建议发布",
+      summary: validation.summary,
+    };
+  }
+  if (validation.portfolioState === "pass_with_notes") {
+    return {
+      label: "需要补充信息",
+      summary: validation.summary,
+    };
+  }
+  return {
+    label: "已通过",
+    summary: validation.summary || "当前作品集已达到发布前基础质量线。",
+  };
+}
 
 export function PortfolioPublishClient({
   portfolioId,
   hasPackaging,
+  validation,
   initialSlug,
 }: {
   portfolioId: string;
   hasPackaging: boolean;
+  validation: PortfolioValidation;
   initialSlug: string | null;
 }) {
   const [slug, setSlug] = useState(initialSlug);
@@ -20,6 +54,8 @@ export function PortfolioPublishClient({
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState("");
   const publicUrl = slug ? `/p/${slug}` : null;
+  const validationMeta = getPortfolioValidationMeta(validation, hasPackaging);
+  const canPublish = hasPackaging && validation.portfolioState !== "not_ready";
 
   async function parseJsonResponse(
     response: Response,
@@ -47,9 +83,12 @@ export function PortfolioPublishClient({
     setPublishing(true);
     setMessage("");
     try {
-      const data = await parseJsonResponse(await fetch(`/api/portfolios/${portfolioId}/publish`, {
-        method: "POST",
-      }), "publish");
+      const data = await parseJsonResponse(
+        await fetch(`/api/portfolios/${portfolioId}/publish`, {
+          method: "POST",
+        }),
+        "publish"
+      );
       setSlug(data.slug as string);
       setMessage("作品集已发布，可以直接打开公开链接。");
     } catch (error) {
@@ -127,12 +166,12 @@ export function PortfolioPublishClient({
         </div>
         <div className="app-panel-highlight px-4 py-4 text-white">
           <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/40">
-            Export
+            Output
           </p>
           <p className="mt-2 text-base font-medium leading-7">
-            {hasPackaging
-              ? "当前已经具备导出条件，可以直接生成正式 PDF。"
-              : "先回编辑器生成作品集包装，再来发布公开链接或导出 PDF。"}
+            {canPublish
+              ? "当前已经具备输出条件，可以继续发布公开链接或导出正式 PDF。"
+              : validationMeta.summary}
           </p>
         </div>
       </div>
@@ -165,11 +204,11 @@ export function PortfolioPublishClient({
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={handlePublish} disabled={publishing || !hasPackaging}>
+            <Button onClick={handlePublish} disabled={publishing || !canPublish}>
               {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
               发布公开链接
             </Button>
-            <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf || !hasPackaging}>
+            <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf || !canPublish}>
               {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
               导出 PDF
             </Button>
@@ -202,9 +241,9 @@ export function PortfolioPublishClient({
               </p>
             </div>
             <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-4">
-              <p className="text-sm font-medium text-white">PDF 导出</p>
+              <p className="text-sm font-medium text-white">发布质量</p>
               <p className="mt-2 text-sm leading-6 text-white/68">
-                {hasPackaging ? "已满足导出条件。" : "等待作品集包装结果。"}
+                {validationMeta.label}
               </p>
             </div>
             {publicUrl ? (
@@ -217,22 +256,22 @@ export function PortfolioPublishClient({
         </div>
       </div>
 
-      {!hasPackaging ? (
+      {!canPublish ? (
         <div className="rounded-[24px] border border-amber-400/18 bg-amber-500/[0.08] px-4 py-4 text-sm text-amber-100">
-          <p className="font-medium">当前还没有作品集包装结果。</p>
-          <p className="mt-1 leading-6 text-amber-100/78">先回编辑器生成作品集包装，再来发布或导出。</p>
+          <p className="font-medium">{validationMeta.label}</p>
+          <p className="mt-1 leading-6 text-amber-100/78">{validationMeta.summary}</p>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
-              <p className="font-medium text-amber-50">1. 选项目</p>
-              <p className="mt-1 leading-6 text-amber-100/74">先挑 2-4 个最能代表能力面的项目。</p>
+              <p className="font-medium text-amber-50">1. 回编辑器</p>
+              <p className="mt-1 leading-6 text-amber-100/74">先同步项目更新、补齐问题项目，或重新生成包装。</p>
             </div>
             <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
-              <p className="font-medium text-amber-50">2. 生成包装</p>
-              <p className="mt-1 leading-6 text-amber-100/74">让系统先给出整份作品集的节奏与固定页建议。</p>
+              <p className="font-medium text-amber-50">2. 再次复核</p>
+              <p className="mt-1 leading-6 text-amber-100/74">确认整份作品集已经通过质量状态后，再继续输出。</p>
             </div>
             <div className="rounded-[18px] border border-amber-400/16 bg-black/12 px-4 py-3">
               <p className="font-medium text-amber-50">3. 再来输出</p>
-              <p className="mt-1 leading-6 text-amber-100/74">包装稳定后，再发布公开链接和正式 PDF。</p>
+              <p className="mt-1 leading-6 text-amber-100/74">通过后再发布公开链接和正式 PDF。</p>
             </div>
           </div>
         </div>

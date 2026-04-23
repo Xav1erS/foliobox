@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getRequiredSession } from "@/lib/required-session";
 import { db } from "@/lib/db";
+import { resolvePortfolioEditorState, resolvePortfolioPackagingContent } from "@/lib/portfolio-editor";
+import { validatePortfolioPackaging } from "@/lib/portfolio-editor-validation";
 import { PageHeader } from "@/components/app/PageHeader";
 import { InlineTip } from "@/components/app/InlineTip";
 import { Button } from "@/components/ui/button";
@@ -20,12 +22,51 @@ export default async function PortfolioPublishPage({
     select: {
       id: true,
       name: true,
+      outlineJson: true,
       contentJson: true,
       projectIds: true,
     },
   });
 
   if (!portfolio) notFound();
+
+  const selectedProjects = await db.project.findMany({
+    where: { id: { in: portfolio.projectIds }, userId: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      packageMode: true,
+      updatedAt: true,
+      layoutJson: true,
+      facts: {
+        select: {
+          background: true,
+          resultSummary: true,
+        },
+      },
+    },
+  });
+  const orderedProjects = portfolio.projectIds
+    .map((projectId) => selectedProjects.find((project) => project.id === projectId) ?? null)
+    .filter(Boolean)
+    .map((project) => ({
+      id: project!.id,
+      name: project!.name,
+      stage: project!.stage,
+      packageMode: project!.packageMode,
+      updatedAt: project!.updatedAt.toISOString(),
+      layoutJson: project!.layoutJson,
+      background: project!.facts?.background ?? null,
+      resultSummary: project!.facts?.resultSummary ?? null,
+    }));
+  const packaging = resolvePortfolioPackagingContent(portfolio.contentJson);
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: resolvePortfolioEditorState(portfolio.outlineJson).fixedPages,
+    projects: orderedProjects,
+    packaging,
+  });
 
   const published = await db.publishedPortfolio.findFirst({
     where: { userId: session.user.id, portfolioId: portfolio.id, isPublished: true },
@@ -66,10 +107,14 @@ export default async function PortfolioPublishPage({
               Packaging
             </p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              {portfolio.contentJson ? "Ready" : "Pending"}
+              {validation.portfolioState === "not_ready"
+                ? "Review"
+                : packaging?.pages?.length
+                  ? "Ready"
+                  : "Pending"}
             </p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {portfolio.contentJson ? "已生成作品集包装结果，可继续发布与导出。" : "还没有作品集包装结果，建议先回编辑器生成。"}
+              {validation.summary}
             </p>
           </div>
           <div className="app-panel-highlight px-4 py-4 text-white">
@@ -84,7 +129,8 @@ export default async function PortfolioPublishPage({
 
         <PortfolioPublishClient
           portfolioId={portfolio.id}
-          hasPackaging={Boolean(portfolio.contentJson)}
+          hasPackaging={Boolean(packaging?.pages?.length)}
+          validation={validation}
           initialSlug={published?.slug ?? null}
         />
       </div>

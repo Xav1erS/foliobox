@@ -24,7 +24,7 @@ type ValidationSource =
   | "export_check";
 
 type ValidationSeverity = "warn" | "block";
-type ValidationKind = "structural" | "material";
+type ValidationKind = "structural" | "material" | "content";
 
 type ValidationIssue = {
   boardId: string;
@@ -273,6 +273,114 @@ function boardHasAnyContent(board: ProjectBoard) {
   return board.nodes.some((node) => node.type === "image" || node.type === "text");
 }
 
+const PROTOTYPE_PLACEHOLDER_COPY_PATTERNS = [
+  /待补充/i,
+  /待补图/i,
+  /待生成/i,
+  /已匹配设计图/i,
+  /缺少合适配图/i,
+  /先用文案与结构卡成立/i,
+  /建议优先使用/i,
+  /建议素材/i,
+  /优先围绕/i,
+  /主视觉未就绪/i,
+] as const;
+
+function normalizeValidationCopy(text: string | null | undefined) {
+  return (text ?? "").trim().replace(/\s+/g, " ");
+}
+
+function isPrototypePlaceholderCopy(text: string | null | undefined) {
+  const normalized = normalizeValidationCopy(text);
+  if (!normalized) return true;
+  return PROTOTYPE_PLACEHOLDER_COPY_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function getPrototypeContentIssues(board: ProjectBoard) {
+  const issues: ValidationIssue[] = [];
+  const contentTextNodes = board.nodes.filter(
+    (node): node is ProjectBoardTextNode =>
+      node.type === "text" && node.role !== "caption"
+  );
+  const meaningfulTextCount = contentTextNodes.filter((node) => {
+    const normalized = normalizeValidationCopy(node.text);
+    if (isPrototypePlaceholderCopy(normalized)) return false;
+    if (node.role === "title") return normalized.length >= 2;
+    return normalized.length >= 4;
+  }).length;
+  const unresolvedInfoCount = contentTextNodes.filter(
+    (node) => node.role === "metric" && isPrototypePlaceholderCopy(node.text)
+  ).length;
+  const unresolvedVisualHint = contentTextNodes.some(
+    (node) =>
+      (node.role === "note" || node.role === "body") &&
+      /(待补图|建议素材|缺少合适配图|已匹配设计图)/i.test(normalizeValidationCopy(node.text))
+  );
+
+  if (meaningfulTextCount < 3) {
+    issues.push({
+      boardId: board.id,
+      severity: "block",
+      kind: "content",
+      message: "当前内容稿还没讲清楚，先补齐标题、说明和页面要点。",
+    });
+    return issues;
+  }
+
+  if (unresolvedInfoCount >= 2) {
+    issues.push({
+      boardId: board.id,
+      severity: "warn",
+      kind: "content",
+      message: "当前内容稿仍有关键要点待补充，建议先补内容再排版。",
+    });
+  }
+
+  if (countImages(board) === 0 && unresolvedVisualHint) {
+    issues.push({
+      boardId: board.id,
+      severity: "warn",
+      kind: "material",
+      message: "这页还缺少可用配图，建议补图后再精修。",
+    });
+  }
+
+  return issues;
+}
+
+function getPrototypeCoverIssues(board: ProjectBoard) {
+  if (
+    board.pageType !== "项目定位 / 背景页" &&
+    board.pageType !== "项目定位 / 背景"
+  ) {
+    return [] as ValidationIssue[];
+  }
+
+  const titleNode = board.nodes.find(
+    (node): node is ProjectBoardTextNode => node.type === "text" && node.role === "title"
+  );
+  const heroNode = board.nodes.find(
+    (node): node is ProjectBoardNode => node.type === "image"
+  );
+  if (!titleNode || !heroNode) {
+    return [] as ValidationIssue[];
+  }
+
+  const titleBottom = titleNode.y + titleNode.height;
+  if (heroNode.y < titleBottom + 40) {
+    return [
+      {
+        boardId: board.id,
+        severity: "block" as const,
+        kind: "structural" as const,
+        message: "封面主视觉压住了标题区，当前开场页还未成立。",
+      },
+    ];
+  }
+
+  return [] as ValidationIssue[];
+}
+
 function getPrototypeBlueprintSignature(board: ProjectBoard) {
   const shapeSignature = board.nodes
     .filter((node) => node.type === "shape")
@@ -394,7 +502,7 @@ function getPrototypeBoardIssues(board: ProjectBoard) {
       boardId: board.id,
       severity: "block",
       kind: "structural",
-      message: "原型画板缺少页型标记。",
+      message: "内容稿画板缺少页型标记。",
     });
   }
   if (!isPrototypeBoard(board)) {
@@ -402,7 +510,7 @@ function getPrototypeBoardIssues(board: ProjectBoard) {
       boardId: board.id,
       severity: "block",
       kind: "structural",
-      message: "原型画板缺少占位节点，无法继续生成排版。",
+      message: "内容稿画板缺少占位节点，无法继续生成排版。",
     });
   }
   if (!board.nodes.some((node) => node.placeholder)) {
@@ -410,7 +518,7 @@ function getPrototypeBoardIssues(board: ProjectBoard) {
       boardId: board.id,
       severity: "block",
       kind: "structural",
-      message: "原型画板缺少占位标记。",
+      message: "内容稿画板缺少占位标记。",
     });
   }
   if (board.nodes.some((node) => node.placeholder && !isNodeInsideFrame(node))) {
@@ -418,11 +526,13 @@ function getPrototypeBoardIssues(board: ProjectBoard) {
       boardId: board.id,
       severity: "block",
       kind: "structural",
-      message: "原型画板存在越界占位节点。",
+      message: "内容稿画板存在越界占位节点。",
     });
   }
 
   pushRuleIssues(board, rule, "structural", issues);
+  issues.push(...getPrototypeCoverIssues(board));
+  issues.push(...getPrototypeContentIssues(board));
 
   return issues;
 }
@@ -487,8 +597,9 @@ function getBoardCause(params: {
   if (issues.length === 0) return null;
   const hasStructuralIssue = issues.some((issue) => issue.kind === "structural");
   const hasMaterialIssue = issues.some((issue) => issue.kind === "material");
+  const hasContentIssue = issues.some((issue) => issue.kind === "content");
 
-  if (!hasStructuralIssue && hasMaterialIssue) {
+  if (!hasStructuralIssue && !hasContentIssue && hasMaterialIssue) {
     return "missing_user_material" as const;
   }
   if (source === "manual_edit") {
@@ -502,7 +613,10 @@ function getBoardCause(params: {
     return null;
   }
   if (source === "prototype_generation" || source === "layout_generation") {
-    return "system_generation_failed" as const;
+    if (hasStructuralIssue) {
+      return "system_generation_failed" as const;
+    }
+    return null;
   }
   if (hasMaterialIssue) {
     return "missing_user_material" as const;
@@ -515,7 +629,9 @@ function buildBoardMessage(
   cause: ProjectValidationCause | null,
   issues: ValidationIssue[]
 ) {
-  if (cause === "system_generation_failed") return "系统生成未完成，已回退";
+  if (cause === "system_generation_failed") {
+    return issues[0]?.message ?? "系统生成未完成，已回退";
+  }
   if (cause === "missing_user_material") return "需要补充信息";
   if (cause === "user_modified_regression") return "你修改后需调整";
   if (status === "block") return issues[0]?.message ?? "当前画板未达标";
@@ -541,7 +657,7 @@ function buildSceneLevelIssues(scene: ProjectEditorScene) {
       boardId: prototypeBoards[0]?.id ?? scene.activeBoardId,
       severity: "block" as const,
       kind: "structural" as const,
-      message: "不同页型的原型骨架过于相似，当前原型缺少区分度。",
+      message: "不同页型的内容稿骨架过于相似，当前低保真区分度不足。",
     },
   ];
 }
@@ -561,18 +677,18 @@ function buildProjectSummary(params: {
     return "本次生成未完成，已保留原内容。";
   }
   if (hasPrototypeBoards) {
-    if (projectState === "pass") return "当前原型已通过自动校验，可继续生成排版。";
+    if (projectState === "pass") return "当前内容稿已讲清主线，可以继续生成排版。";
     if (projectCause === "missing_user_material" || projectState === "pass_with_notes") {
       return warnCount > 0
-        ? `当前原型可继续生成，但仍有 ${warnCount} 张画板建议补充信息。`
-        : "当前原型可继续生成，但建议补充素材或说明。";
+        ? `当前内容稿基本成立，但仍有 ${warnCount} 张画板建议补充图文。`
+        : "当前内容稿基本成立，但仍建议补充图文信息。";
     }
     if (projectCause === "user_modified_regression") {
-      return "当前有画板在你修改后未达标，建议先调整。";
+      return "当前有内容稿在你修改后未达标，建议先调整。";
     }
     return blockCount > 0
-      ? `当前有 ${blockCount} 张画板未达标，建议先调整后再继续。`
-      : "当前原型仍需调整。";
+      ? `当前有 ${blockCount} 张内容稿还没讲清楚，建议先补内容再继续。`
+      : "当前内容稿仍需补内容。";
   }
 
   if (projectState === "pass") {
@@ -734,7 +850,7 @@ export function getProjectExportBlockReason(params: {
 }) {
   const { scene, validation } = params;
   if (scene.boards.some((board) => isPrototypeBoard(board))) {
-    return "当前仍有原型画板，请先完成生成排版后再导出 Figma。";
+    return "当前仍有内容稿画板，请先完成生成排版后再导出 Figma。";
   }
   if (validation?.projectState === "not_ready") {
     return validation.summary || "当前项目仍有未达标画板，暂不建议导出。";

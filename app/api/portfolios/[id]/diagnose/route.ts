@@ -14,8 +14,13 @@ import {
 import {
   mergePortfolioEditorState,
   resolvePortfolioEditorState,
+  resolvePortfolioPackagingContent,
   type PortfolioDiagnosis,
 } from "@/lib/portfolio-editor";
+import {
+  buildPortfolioDiagnosis,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -31,6 +36,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       name: true,
       projectIds: true,
       outlineJson: true,
+      contentJson: true,
     },
   });
 
@@ -52,7 +58,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             name: true,
             stage: true,
             packageMode: true,
+            updatedAt: true,
             layoutJson: true,
+            facts: {
+              select: {
+                background: true,
+                resultSummary: true,
+              },
+            },
           },
         })
       : [];
@@ -60,95 +73,31 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const orderedProjects = portfolio.projectIds
     .map((projectId) => selectedProjects.find((project) => project.id === projectId))
     .filter(Boolean);
-
   const editorState = resolvePortfolioEditorState(portfolio.outlineJson);
-  const enabledFixedPages = editorState.fixedPages.filter((page) => page.enabled);
-  const layoutReadyCount = orderedProjects.filter(
-    (project) => project?.stage === "READY" || project?.layoutJson
-  ).length;
-  const packageReadyCount = orderedProjects.filter(
-    (project) => project?.packageMode || project?.layoutJson
-  ).length;
-
-  const overallVerdict: PortfolioDiagnosis["overallVerdict"] =
-    orderedProjects.length === 0
-      ? "insufficient"
-      : layoutReadyCount === orderedProjects.length && enabledFixedPages.length >= 2
-        ? "ready"
-        : packageReadyCount >= Math.max(1, Math.ceil(orderedProjects.length / 2))
-          ? "almost_ready"
-          : "needs_work";
-
-  const diagnosis: PortfolioDiagnosis = {
-    overallVerdict,
-    summary:
-      overallVerdict === "insufficient"
-        ? "这份作品集还没有选入项目，当前不足以进入整份包装。"
-        : overallVerdict === "ready"
-          ? "当前项目选择、固定页和项目就绪度已经足够，可以进入作品集包装生成。"
-          : overallVerdict === "almost_ready"
-            ? "作品集已经具备初步包装基础，但仍有部分项目缺少稳定的排版结果。"
-            : "当前已选项目还不够稳定，建议先补齐项目排版与固定页设置，再进入作品集包装。",
-    checks: [
-      {
-        key: "selection",
-        label: "项目选择",
-        status:
-          orderedProjects.length >= 3
-            ? "strong"
-            : orderedProjects.length >= 1
-              ? "adequate"
-              : "missing",
-        comment:
-          orderedProjects.length === 0
-            ? "还没有选入项目。"
-            : `当前已选 ${orderedProjects.length} 个项目。`,
-      },
-      {
-        key: "project_readiness",
-        label: "项目就绪度",
-        status:
-          layoutReadyCount === orderedProjects.length && orderedProjects.length > 0
-            ? "strong"
-            : packageReadyCount > 0
-              ? "adequate"
-              : orderedProjects.length > 0
-                ? "weak"
-                : "missing",
-        comment:
-          orderedProjects.length === 0
-            ? "没有可判断的项目。"
-            : `${layoutReadyCount}/${orderedProjects.length} 个项目已有排版结果，${packageReadyCount}/${orderedProjects.length} 个项目已有包装结论。`,
-      },
-      {
-        key: "fixed_pages",
-        label: "固定页组织",
-        status:
-          enabledFixedPages.length >= 3
-            ? "strong"
-            : enabledFixedPages.length >= 2
-              ? "adequate"
-              : enabledFixedPages.length >= 1
-                ? "weak"
-                : "missing",
-        comment:
-          enabledFixedPages.length > 0
-            ? `已启用 ${enabledFixedPages.length} 个固定页。`
-            : "还没有启用固定页。",
-      },
-    ],
-    suggestions: [
-      orderedProjects.length === 0 ? "先从项目池中选入 2-4 个最能代表能力面的项目。" : null,
-      layoutReadyCount < orderedProjects.length
-        ? "优先补齐未生成排版的项目，避免作品集节奏和信息密度失衡。"
-        : null,
-      enabledFixedPages.length < 2 ? "至少保留封面和结尾页，保证整份作品集有开场和收束。" : null,
-    ].filter(Boolean) as string[],
-    updatedAt: new Date().toISOString(),
-  };
+  const orderedProjectInputs = orderedProjects.map((project) => ({
+    id: project!.id,
+    name: project!.name,
+    stage: project!.stage,
+    packageMode: project!.packageMode,
+    updatedAt: project!.updatedAt.toISOString(),
+    layoutJson: project!.layoutJson,
+    background: project!.facts?.background ?? null,
+    resultSummary: project!.facts?.resultSummary ?? null,
+  }));
+  const diagnosis: PortfolioDiagnosis = buildPortfolioDiagnosis({
+    projects: orderedProjectInputs,
+    fixedPages: editorState.fixedPages,
+  });
+  const validation = validatePortfolioPackaging({
+    selectedProjectIds: portfolio.projectIds,
+    fixedPages: editorState.fixedPages,
+    projects: orderedProjectInputs,
+    packaging: resolvePortfolioPackagingContent(portfolio.contentJson),
+  });
 
   const nextEditorState = mergePortfolioEditorState(portfolio.outlineJson, {
     diagnosis,
+    validation,
   });
 
   const requestHash = hashGenerationInput({
@@ -190,6 +139,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       data: {
         outlineJson: mergePortfolioEditorState(portfolio.outlineJson, {
           diagnosis: reusedDiagnosis,
+          validation,
         }) as unknown as Prisma.InputJsonValue,
         status: orderedProjects.length > 0 ? "OUTLINE" : "DRAFT",
       },
@@ -212,7 +162,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       },
     });
 
-    return NextResponse.json({ diagnosis: reusedDiagnosis, reused: true });
+    return NextResponse.json({ diagnosis: reusedDiagnosis, validation, reused: true });
   }
 
   const task = await db.generationTask.create({
@@ -264,7 +214,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       data: { status: "done", wasSuccessful: true, countedToBudget: true },
     });
 
-    return NextResponse.json({ diagnosis });
+    return NextResponse.json({ diagnosis, validation });
   } catch (error) {
     await db.generationTask.update({
       where: { id: task.id },

@@ -93,12 +93,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     data.contentJson = Prisma.JsonNull;
     data.outlineJson = mergePortfolioEditorState(portfolio.outlineJson, {
       diagnosis: null,
+      validation: null,
     }) as unknown as Prisma.InputJsonValue;
   }
   if (parsed.data.fixedPages) {
     const nextEditorState = mergePortfolioEditorState(portfolio.outlineJson, {
       fixedPages: parsed.data.fixedPages as FixedPageConfig[],
       diagnosis: null,
+      validation: null,
     });
     data.outlineJson = nextEditorState as unknown as Prisma.InputJsonValue;
     data.contentJson = Prisma.JsonNull;

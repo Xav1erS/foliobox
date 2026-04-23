@@ -10,7 +10,14 @@ import {
   hashGenerationInput,
   writePrecheckLog,
 } from "@/lib/generation-precheck";
-import { resolvePortfolioEditorState } from "@/lib/portfolio-editor";
+import {
+  resolvePortfolioEditorState,
+  resolvePortfolioPackagingContent,
+} from "@/lib/portfolio-editor";
+import {
+  resolvePortfolioProjectAdmissions,
+  validatePortfolioPackaging,
+} from "@/lib/portfolio-editor-validation";
 import {
   resolveStyleProfile,
   type StyleReferenceSelection,
@@ -52,8 +59,11 @@ export async function POST(
       where: { id: { in: portfolio.projectIds }, userId: session.user.id },
       select: {
         id: true,
+        name: true,
+        stage: true,
         layoutJson: true,
         packageMode: true,
+        updatedAt: true,
       },
     }),
   ]);
@@ -74,7 +84,7 @@ export async function POST(
     selectedProjects,
     styleSelection,
   });
-  const reusable = await findReusableGeneratedDraft({
+  let reusable = await findReusableGeneratedDraft({
     userId: session.user.id,
     objectType: "portfolio",
     objectId: portfolio.id,
@@ -82,7 +92,43 @@ export async function POST(
     draftType: "packaging",
   });
 
-  const suggestedMode = reusable ? "reuse" : actionQuota.remaining <= 0 ? "block" : "continue";
+  const orderedProjects = portfolio.projectIds
+    .map((projectId) => selectedProjects.find((project) => project.id === projectId) ?? null)
+    .filter(Boolean)
+    .map((project) => ({
+      id: project!.id,
+      name: project!.name,
+      stage: project!.stage,
+      packageMode: project!.packageMode,
+      updatedAt: project!.updatedAt.toISOString(),
+      layoutJson: project!.layoutJson,
+      background: null,
+      resultSummary: null,
+    }));
+  const admissions = resolvePortfolioProjectAdmissions(orderedProjects);
+  const eligibleProjectCount = admissions.filter(
+    (project) => project.status === "pass" || project.status === "warn"
+  ).length;
+  const blockedProjectCount = admissions.filter((project) => project.status === "block").length;
+  const warnProjectCount = admissions.filter((project) => project.status === "warn").length;
+  if (reusable) {
+    const reusablePackaging = resolvePortfolioPackagingContent(reusable.draft.contentJson);
+    const reusableValidation = validatePortfolioPackaging({
+      selectedProjectIds: portfolio.projectIds,
+      fixedPages: editorState.fixedPages,
+      projects: orderedProjects,
+      packaging: reusablePackaging,
+    });
+    if (reusableValidation.portfolioState === "not_ready") {
+      reusable = null;
+    }
+  }
+  const suggestedMode =
+    reusable
+      ? "reuse"
+      : eligibleProjectCount === 0 || actionQuota.remaining <= 0
+        ? "block"
+        : "continue";
 
   await writePrecheckLog({
     userId: session.user.id,
@@ -104,5 +150,8 @@ export async function POST(
     actionRemaining: actionQuota.remaining,
     reusableDraftId: reusable?.draft.id ?? null,
     reusableTaskId: reusable?.task.id ?? null,
+    eligibleProjectCount,
+    blockedProjectCount,
+    warnProjectCount,
   });
 }

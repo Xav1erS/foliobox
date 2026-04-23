@@ -195,6 +195,96 @@ describe("project editor validation", () => {
     expect(validation.boards.every((board) => board.status === "pass")).toBe(true);
   });
 
+  it("blocks prototype scenes when most copy is still placeholder text", () => {
+    const scene = createPrototypeScene();
+    const brokenScene = normalizeProjectEditorScene({
+      ...scene,
+      boards: scene.boards.map((board, index) =>
+        index === 0
+          ? {
+              ...board,
+              nodes: board.nodes.map((node) => {
+                if (node.type !== "text" || node.role === "caption") return node;
+                if (node.role === "title") {
+                  return { ...node, text: "项目定位待补充" };
+                }
+                if (node.role === "metric") {
+                  return { ...node, text: "角色待生成" };
+                }
+                return { ...node, text: "待补充" };
+              }),
+            }
+          : board
+      ),
+    });
+    const validation = validateProjectEditorScene({
+      scene: brokenScene,
+      assets: CORE_ASSETS,
+      source: "prototype_generation",
+    });
+
+    expect(validation.projectState).toBe("not_ready");
+    expect(validation.summary).toContain("补内容");
+    expect(validation.boards[0]?.status).toBe("block");
+    expect(validation.boards[0]?.message).toContain("讲清楚");
+  });
+
+  it("marks prototype scenes with unresolved key points as notes instead of pass", () => {
+    const scene = createPrototypeScene();
+    const warnedScene = normalizeProjectEditorScene({
+      ...scene,
+      boards: scene.boards.map((board, index) => {
+        if (index !== 0) return board;
+        let unresolvedMetricCount = 0;
+        return {
+          ...board,
+          nodes: board.nodes.map((node) => {
+            if (node.type !== "text" || node.role !== "metric" || unresolvedMetricCount >= 2) {
+              return node;
+            }
+            unresolvedMetricCount += 1;
+            return { ...node, text: "角色待生成" };
+          }),
+        };
+      }),
+    });
+    const validation = validateProjectEditorScene({
+      scene: warnedScene,
+      assets: CORE_ASSETS,
+      source: "prototype_generation",
+    });
+
+    expect(validation.projectState).toBe("pass_with_notes");
+    expect(validation.boards[0]?.status).toBe("warn");
+    expect(validation.boards[0]?.message).toContain("关键要点待补充");
+  });
+
+  it("blocks cover drafts whose hero visual overlaps the title area", () => {
+    const scene = createPrototypeScene();
+    const brokenScene = normalizeProjectEditorScene({
+      ...scene,
+      boards: scene.boards.map((board, index) =>
+        index === 0
+          ? {
+              ...board,
+              nodes: board.nodes.map((node) =>
+                node.type === "image" ? { ...node, y: 140 } : node
+              ),
+            }
+          : board
+      ),
+    });
+    const validation = validateProjectEditorScene({
+      scene: brokenScene,
+      assets: CORE_ASSETS,
+      source: "prototype_generation",
+    });
+
+    expect(validation.projectState).toBe("not_ready");
+    expect(validation.boards[0]?.status).toBe("block");
+    expect(validation.boards[0]?.message).toContain("标题区");
+  });
+
   it("accepts generated scenes without leaving placeholder nodes", () => {
     const { prototypeScene, generatedScene } = createGeneratedScene();
     const validation = validateProjectEditorScene({
@@ -321,7 +411,7 @@ describe("project editor validation", () => {
         scene: prototypeScene,
         validation: prototypeValidation,
       })
-    ).toContain("原型画板");
+    ).toContain("内容稿画板");
 
     const { prototypeScene: previousScene, generatedScene } = createGeneratedScene();
     const generatedValidation = validateProjectEditorScene({

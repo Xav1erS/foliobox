@@ -9,10 +9,7 @@ import {
 } from "react";
 import {
   AlertTriangle,
-  ArrowDown,
   ArrowRight,
-  ArrowUp,
-  ChevronDown,
   Check,
   Loader2,
   Plus,
@@ -23,12 +20,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  StructureGroupCard,
+  StructureOverview,
+} from "@/components/editor/ProjectStructureEditor";
 import { resolveProjectAssetMeta } from "@/lib/project-editor-scene";
 import { buildPrivateBlobProxyUrl } from "@/lib/storage";
 import type {
   ProjectMaterialRecognition,
-  ProjectStructureGroup,
-  ProjectStructureSection,
   ProjectStructureSuggestion,
 } from "@/lib/project-editor-scene";
 import {
@@ -72,11 +71,14 @@ export interface ProjectSetupWizardProps {
   recognizingMaterials: boolean;
   suggestingStructure: boolean;
   confirmingStructure: boolean;
+  applyingStructure?: boolean;
   uploadingAssets: boolean;
   hasExistingBoards: boolean;
   actionError: string;
   onAiUnderstand: () => void;
   onConfirmAndEnter: () => void;
+  onApplyStructure?: () => void;
+  onOpenStructureWorkbench?: () => void;
   onUploadAssets: () => void;
   onUpdateAssetTitle: (assetId: string, title: string) => void;
   onUpdateAssetNote: (assetId: string, note: string) => void;
@@ -84,6 +86,7 @@ export interface ProjectSetupWizardProps {
   onReturnToCanvas: () => void;
   onStructureChange?: (next: ProjectStructureSuggestion) => void;
   onGenerateStructure?: () => void;
+  focusedSection?: "facts" | "assets" | "ai" | "structure";
 }
 
 type SectionKey = "facts" | "assets" | "ai" | "structure";
@@ -115,11 +118,14 @@ export function ProjectSetupWizard({
   recognizingMaterials,
   suggestingStructure,
   confirmingStructure,
+  applyingStructure = false,
   uploadingAssets,
   hasExistingBoards,
   actionError,
   onAiUnderstand,
   onConfirmAndEnter,
+  onApplyStructure,
+  onOpenStructureWorkbench,
   onUploadAssets,
   onUpdateAssetTitle,
   onUpdateAssetNote,
@@ -127,6 +133,7 @@ export function ProjectSetupWizard({
   onReturnToCanvas,
   onStructureChange,
   onGenerateStructure,
+  focusedSection,
 }: ProjectSetupWizardProps) {
   const [boardsDestroyConfirmOpen, setBoardsDestroyConfirmOpen] = useState(false);
   const [reanalysisConfirmOpen, setReanalysisConfirmOpen] = useState(false);
@@ -205,6 +212,15 @@ export function ProjectSetupWizard({
   const scrollToSection = useCallback((key: SectionKey) => {
     sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+
+  useEffect(() => {
+    if (!focusedSection) return;
+    setActiveSection(focusedSection);
+    const handle = window.requestAnimationFrame(() => {
+      scrollToSection(focusedSection);
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [focusedSection, scrollToSection]);
 
   function handleAiClick() {
     if (aiRunning) return;
@@ -646,34 +662,86 @@ export function ProjectSetupWizard({
                     {actionError}
                   </div>
                 ) : null}
-                {onGenerateStructure && !isStructureConfirmed && !structureNeedsRefresh ? (
-                  <div className="flex justify-end">
+                {isStructureConfirmed ? (
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    {onOpenStructureWorkbench ? (
+                      <button
+                        type="button"
+                        onClick={onOpenStructureWorkbench}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                      >
+                        调整结构
+                      </button>
+                    ) : null}
+                    {onGenerateStructure ? (
+                      <button
+                        type="button"
+                        onClick={() => onGenerateStructure()}
+                        disabled={suggestingStructure || aiRunning}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {suggestingStructure ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        重新生成结构
+                      </button>
+                    ) : null}
+                    {onApplyStructure ? (
+                      <button
+                        type="button"
+                        onClick={onApplyStructure}
+                        disabled={applyingStructure || structureDraft.groups.length === 0}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {applyingStructure ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                        {applyingStructure ? "正在创建内容稿…" : "重新创建内容稿"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => onGenerateStructure()}
-                      disabled={suggestingStructure || aiRunning}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={onReturnToCanvas}
+                      className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all hover:bg-neutral-100 active:scale-[0.99]"
                     >
-                      {suggestingStructure ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3 w-3" />
-                      )}
-                      重新生成结构
+                      返回画布
+                      <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
-                ) : null}
-                {isStructureConfirmed ? (
-                  <button
-                    type="button"
-                    onClick={onReturnToCanvas}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-semibold text-neutral-900 shadow-lg transition-all hover:bg-neutral-100 active:scale-[0.99]"
-                  >
-                    返回画布
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
                 ) : (
                   <>
+                    {onOpenStructureWorkbench ? (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={onOpenStructureWorkbench}
+                          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/75 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                        >
+                          在结构工作台中调整
+                        </button>
+                      </div>
+                    ) : null}
+                    {onGenerateStructure && !structureNeedsRefresh ? (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => onGenerateStructure()}
+                          disabled={suggestingStructure || aiRunning}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {suggestingStructure ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                          重新生成结构
+                        </button>
+                      </div>
+                    ) : null}
                     {hasExistingBoards ? (
                       <p className="text-center text-xs text-amber-400/70">
                         确认后将替换当前所有画板内容
@@ -688,7 +756,7 @@ export function ProjectSetupWizard({
                       {confirmingStructure ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          正在创建画板…
+                          正在创建内容稿…
                         </>
                       ) : (
                         <>
@@ -832,186 +900,6 @@ function AssetsGrid({
           {uploadingAssets ? "上传中" : "添加素材"}
         </span>
       </button>
-    </div>
-  );
-}
-
-function StructureOverview({ draft }: { draft: ProjectStructureSuggestion }) {
-  const totalPages = draft.groups.reduce((sum, g) => sum + g.sections.length, 0);
-  return (
-    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.02] p-5">
-      <div className="flex items-baseline gap-3">
-        <span className="text-xs uppercase tracking-wider text-white/40">
-          建议总页数
-        </span>
-        <span className="text-2xl font-semibold text-white">{totalPages}</span>
-        <span className="text-sm text-white/40">页 · {draft.groups.length} 个章节</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {draft.groups.map((g, i) => (
-          <span
-            key={g.id}
-            className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-xs text-white/55"
-          >
-            第 {i + 1} 章 · {g.sections.length} 页
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StructureGroupCard({
-  group,
-  index,
-  totalGroups,
-  editable,
-  onChange,
-  onMove,
-  onDelete,
-}: {
-  group: ProjectStructureGroup;
-  index: number;
-  totalGroups: number;
-  editable: boolean;
-  onChange: (next: ProjectStructureGroup) => void;
-  onMove: (direction: "up" | "down") => void;
-  onDelete: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [label, setLabel] = useState(group.label);
-  const [editingLabel, setEditingLabel] = useState(false);
-
-  useEffect(() => {
-    setLabel(group.label);
-  }, [group.label]);
-
-  const commitLabel = () => {
-    setEditingLabel(false);
-    const trimmed = label.trim();
-    if (!trimmed || trimmed === group.label) {
-      setLabel(group.label);
-      return;
-    }
-    onChange({ ...group, label: trimmed });
-  };
-
-  const updateSection = (sectionId: string, patch: Partial<ProjectStructureSection>) => {
-    onChange({
-      ...group,
-      sections: group.sections.map((s) => (s.id === sectionId ? { ...s, ...patch } : s)),
-    });
-  };
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]">
-      <div className="flex items-center gap-2 px-4 py-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/5 hover:text-white/90"
-          aria-label={expanded ? "收起" : "展开"}
-        >
-          <ChevronDown
-            className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
-          />
-        </button>
-        <span className="shrink-0 text-xs font-mono text-white/35">
-          第 {index + 1} 章
-        </span>
-        {editingLabel && editable ? (
-          <Input
-            autoFocus
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={commitLabel}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitLabel();
-              if (e.key === "Escape") {
-                setLabel(group.label);
-                setEditingLabel(false);
-              }
-            }}
-            className="h-7 flex-1 rounded-lg border-white/10 bg-white/[0.06] px-2 text-sm text-white"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => editable && setEditingLabel(true)}
-            disabled={!editable}
-            className={cn(
-              "flex-1 truncate text-left text-sm font-medium text-white/85",
-              editable && "rounded px-1 hover:bg-white/5"
-            )}
-          >
-            {group.label}
-          </button>
-        )}
-        <span className="shrink-0 text-xs text-white/40">
-          {group.sections.length} 页
-        </span>
-        {editable ? (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => onMove("up")}
-              disabled={index === 0}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/5 hover:text-white/85 disabled:opacity-25"
-              aria-label="上移"
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onMove("down")}
-              disabled={index === totalGroups - 1}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/5 hover:text-white/85 disabled:opacity-25"
-              aria-label="下移"
-            >
-              <ArrowDown className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={totalGroups <= 1}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-25"
-              aria-label="删除章节"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ) : null}
-      </div>
-      {expanded ? (
-        <div className="border-t border-white/5 bg-black/15 px-4 py-3">
-          <ul className="space-y-1.5">
-            {group.sections.map((section, sIdx) => (
-              <li
-                key={section.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-white/[0.03]"
-              >
-                <span className="shrink-0 text-xs font-mono text-white/30">
-                  P{sIdx + 1}
-                </span>
-                {editable ? (
-                  <Input
-                    value={section.title}
-                    onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                    className="h-7 flex-1 rounded-md border-white/8 bg-white/[0.04] px-2 text-sm text-white"
-                  />
-                ) : (
-                  <span className="flex-1 text-sm text-white/70">{section.title}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {group.rationale ? (
-            <p className="mt-3 border-l-2 border-white/10 pl-3 text-xs leading-relaxed text-white/40">
-              {group.rationale}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }

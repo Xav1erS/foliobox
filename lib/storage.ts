@@ -120,5 +120,8 @@ export function isBlobStorageUrl(value: string) {
 }
 
 export function buildPrivateBlobProxyUrl(source: string) {
+  if (source.startsWith("data:")) {
+    return source;
+  }
   return `/api/blob/file?source=${encodeURIComponent(source)}`;
 }
