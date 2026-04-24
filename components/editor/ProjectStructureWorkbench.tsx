@@ -25,11 +25,14 @@ import type {
   ProjectStructureSection,
   ProjectStructureSuggestion,
 } from "@/lib/project-editor-scene";
+import type { ApplyStructureResponseBase } from "@/lib/project-structure-apply-types";
 
 type StructureWorkbenchMessage = {
   tone: "info" | "error";
   text: string;
 } | null;
+
+type ApplyStructureResponse = ApplyStructureResponseBase;
 
 export function ProjectStructureWorkbench({
   projectId,
@@ -223,7 +226,7 @@ export function ProjectStructureWorkbench({
 
     if (
       hasExistingBoards &&
-      !window.confirm("这会按当前确认结构重建内容稿列表，并替换当前内容稿。确认继续吗？")
+      !window.confirm(`这会删除并重建当前 ${totalPages} 张内容稿，已生成排版和手动修改可能被替换。确认继续吗？`)
     ) {
       return;
     }
@@ -233,22 +236,27 @@ export function ProjectStructureWorkbench({
     setActionMessage(null);
 
     try {
-      const data = await parseJsonResponse<{ rolledBack?: boolean; message?: string }>(
+      const data = await parseJsonResponse<ApplyStructureResponse>(
         await fetch(`/api/projects/${projectId}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })
       );
       setHasExistingBoards(true);
+      const partialMessage =
+        data.status === "partial_success" || (data.warnings?.length ?? 0) > 0
+          ? "内容稿已重建，AI 补图已跳过。"
+          : null;
       setActionMessage({
-        tone: data.rolledBack ? "error" : "info",
+        tone: data.rolledBack || data.status === "rolled_back" ? "error" : "info",
         text:
+          partialMessage ??
           data.message ??
-          (data.rolledBack
+          (data.rolledBack || data.status === "rolled_back"
             ? "创建内容稿未完成，已保留原内容。"
             : "已按当前结构重新创建内容稿。"),
       });
-      if (data.rolledBack) {
+      if (data.rolledBack || data.status === "rolled_back") {
         router.refresh();
       } else {
         router.replace(`/projects/${projectId}/editor`);
@@ -344,6 +352,9 @@ export function ProjectStructureWorkbench({
                     ? "当前已经有基于这份结构创建的内容稿。"
                     : "当前还没有基于结构创建的内容稿。"}
                 </p>
+                {structureDraft?.status === "confirmed" ? (
+                  <p>将重建 {totalPages} 张内容稿。</p>
+                ) : null}
                 {materialRecognition ? (
                   <p>AI 理解：{materialRecognition.summary}</p>
                 ) : null}

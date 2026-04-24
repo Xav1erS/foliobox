@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox } from "fabric";
+import type { ActiveSelection, Canvas as FabricCanvas, FabricObject, Textbox, TMat2D } from "fabric";
 import {
   ALIBABA_PUHUITI_URL,
   EDITOR_FONTS,
@@ -49,6 +49,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  AlertTriangle,
   ArrowLeft,
   ChevronDown,
   Circle,
@@ -173,10 +174,16 @@ import {
 } from "@/lib/style-reference-presets";
 import { cn } from "@/lib/utils";
 import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
+import type {
+  ApplyStructureResponseBase,
+  ApplyStructureWarning,
+} from "@/lib/project-structure-apply-types";
 import type { ProjectEditorInitialData } from "./types";
 
 type FabricModule = typeof import("fabric");
 type ProjectAsset = ProjectEditorInitialData["assets"][number];
+const BOARD_VIEWPORT_TRANSFORM: TMat2D = [1, 0, 0, 1, 0, 0];
+const BOARD_OBJECT_ORIGIN = { originX: "left", originY: "top" } as const;
 
 type ActiveObjectMeta =
   | { kind: "none" }
@@ -276,6 +283,49 @@ type GeneratePrecheck = {
   skippedGeneratedBoardCount?: number;
 };
 
+type ApplyStructureResponse = ApplyStructureResponseBase & {
+  layoutJson: LayoutJson;
+  assets?: ProjectEditorInitialData["assets"];
+};
+
+type StructureApplyNotice = {
+  status: "success" | "partial_success";
+  message: string;
+  warnings: ApplyStructureWarning[];
+} | null;
+
+
+function buildStructureApplyNotice(data: ApplyStructureResponse): StructureApplyNotice {
+  if (data.rolledBack || data.status === "rolled_back") return null;
+  const warnings = data.warnings ?? [];
+  if (data.status === "partial_success" || warnings.length > 0) {
+    return {
+      status: "partial_success",
+      message: "内容稿已重建，AI 补图已跳过。",
+      warnings,
+    };
+  }
+  return {
+    status: "success",
+    message: "内容稿已按当前结构重建，可继续生成排版。",
+    warnings: [],
+  };
+}
+
+function getEditorExportBlockReason(params: {
+  scene: ProjectEditorScene;
+  validation: ProjectLayoutValidation;
+}) {
+  const { scene, validation } = params;
+  if (scene.boards.some((board) => isPrototypeBoard(board))) {
+    return "当前仍有内容稿画板，请先完成生成排版后再导出 Figma。";
+  }
+  if (validation.projectState === "not_ready") {
+    return validation.summary || "当前项目仍有未达标画板，暂不建议导出。";
+  }
+  return null;
+}
+
 function getFallbackProjectValidation(): ProjectLayoutValidation {
   return {
     projectState: "unknown",
@@ -317,8 +367,8 @@ function getProjectValidationMeta(
   }
   if (resolved.cause === "missing_user_material" || resolved.projectState === "pass_with_notes") {
     return {
-      label: hasPrototypeBoards ? "建议先补图文" : "需要补充信息",
-      shortLabel: hasPrototypeBoards ? "需补图文" : "需补充",
+      label: hasPrototypeBoards ? "可生成，建议补图" : "需要补充信息",
+      shortLabel: hasPrototypeBoards ? "建议补图" : "需补充",
       summary:
         resolved.summary ||
         (hasPrototypeBoards ? "当前内容稿基本成立，但仍建议补充图文信息。" : "当前仍建议补充素材或信息。"),
@@ -327,8 +377,8 @@ function getProjectValidationMeta(
   }
   if (resolved.projectState === "pass") {
     return {
-      label: hasPrototypeBoards ? "可生成排版" : "已通过",
-      shortLabel: hasPrototypeBoards ? "可生成" : "已通过",
+      label: hasPrototypeBoards ? "内容稿可生成排版" : "已通过",
+      shortLabel: hasPrototypeBoards ? "可生成排版" : "已通过",
       summary:
         resolved.summary ||
         (hasPrototypeBoards
@@ -366,7 +416,7 @@ function getBoardQualityMeta(
   }
   if (boardValidation.cause === "missing_user_material") {
     return {
-      label: prototypeBoard ? "需补图文" : "需要补充信息",
+      label: prototypeBoard ? "建议补图文" : "需要补充信息",
       className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
     };
   }
@@ -378,13 +428,21 @@ function getBoardQualityMeta(
   }
   if (boardValidation.status === "warn") {
     return {
-      label: prototypeBoard ? "需补图文" : "有提示",
+      label: prototypeBoard ? "建议补图文" : "有提示",
       className: "border-sky-300/18 bg-sky-400/10 text-sky-100/86",
     };
   }
   return {
-    label: prototypeBoard ? "可生成" : "已通过",
+    label: "已通过",
     className: "border-emerald-300/18 bg-emerald-400/10 text-emerald-100/86",
+  };
+}
+
+function getTransientVisualWarningMeta(board: ProjectBoard, enabled: boolean) {
+  if (!enabled || !isPrototypeBoard(board)) return null;
+  return {
+    label: "建议补图文",
+    className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
   };
 }
 
@@ -523,6 +581,9 @@ export function ProjectEditorFabricClient({
     tone: "info" | "error";
     text: string;
   } | null>(null);
+  const [structureApplyNotice, setStructureApplyNotice] =
+    useState<StructureApplyNotice>(null);
+  const structureApplyNoticeStorageKey = `foliobox:${initialData.id}:structure-apply-notice`;
   // 排版阶段左侧栏不再包含 project tab；直接进排版时默认落在画板面板
   const [leftPanel, setLeftPanel] = useState<LeftPanelKey | null>(() => {
     const setupCompleted = Boolean(initialData.layout?.setup?.completedAt);
@@ -589,27 +650,97 @@ export function ProjectEditorFabricClient({
     () => (activeBoard ? boardValidationMap.get(activeBoard.id) ?? null : null),
     [activeBoard, boardValidationMap]
   );
-  const activeBoardQualityMeta = useMemo(
-    () => (activeBoard ? getBoardQualityMeta(activeBoard, activeBoardValidation) : null),
-    [activeBoard, activeBoardValidation]
+  const hasTransientVisualWarning = Boolean(
+    structureApplyNotice?.status === "partial_success" &&
+      scene.boards.some((board) => isPrototypeBoard(board))
   );
-  const projectValidationMeta = useMemo(
+  const activeBoardQualityMeta = useMemo(
+    () =>
+      activeBoard
+        ? getTransientVisualWarningMeta(activeBoard, hasTransientVisualWarning) ??
+          getBoardQualityMeta(activeBoard, activeBoardValidation)
+        : null,
+    [activeBoard, activeBoardValidation, hasTransientVisualWarning]
+  );
+  const activeBoardQualityMessage = useMemo(() => {
+    if (activeBoard && getTransientVisualWarningMeta(activeBoard, hasTransientVisualWarning)) {
+      return "AI 补图已跳过，建议先上传可用配图；也可以继续生成排版。";
+    }
+    return (
+      activeBoardValidation?.message ??
+      (activeBoard && isPrototypeBoard(activeBoard)
+        ? "这页内容稿已讲清主线，可以继续生成排版。"
+        : "这页已达到可继续精修的基础质量线。")
+    );
+  }, [activeBoard, activeBoardValidation, hasTransientVisualWarning]);
+  const firstMaterialWarningBoardId = useMemo(() => {
+    const materialPattern = /补图|图片|素材|配图|主视觉/;
+    const matched = projectValidation.boards.find(
+      (board) =>
+        board.cause === "missing_user_material" ||
+        (board.status === "warn" && materialPattern.test(board.message))
+    );
+    if (matched?.boardId) return matched.boardId;
+    return scene.boards.find((board) => isPrototypeBoard(board))?.id ?? null;
+  }, [projectValidation.boards, scene.boards]);
+  const activeBoardRecommendedAction = useMemo(() => {
+    if (!activeBoard) return "待选择画板";
+    if (isPrototypeBoard(activeBoard)) {
+      if (hasTransientVisualWarning) return "上传图片";
+      if (activeBoardValidation?.status === "block") return "调整内容";
+      if (
+        activeBoardValidation?.cause === "missing_user_material" ||
+        (activeBoardValidation?.status === "warn" &&
+          /补图|图片|素材|配图|主视觉/.test(activeBoardValidation.message))
+      ) {
+        return "上传图片";
+      }
+      return "生成排版";
+    }
+    if (activeBoard.phase === "generated") {
+      return activeBoardValidation?.status === "block" ? "调整内容" : "继续精修";
+    }
+    return "调整内容";
+  }, [activeBoard, activeBoardValidation, hasTransientVisualWarning]);
+  const baseProjectValidationMeta = useMemo(
     () => getProjectValidationMeta(projectValidation, scene),
     [projectValidation, scene]
   );
+  const projectValidationMeta = useMemo(
+    () =>
+      hasTransientVisualWarning
+        ? {
+            label: "可生成，建议补图",
+            shortLabel: "建议补图",
+            summary:
+              "内容稿已重建，AI 补图已跳过。你可以上传图片、稍后补图，或继续生成排版。",
+            className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
+          }
+        : baseProjectValidationMeta,
+    [baseProjectValidationMeta, hasTransientVisualWarning]
+  );
+  const projectExportBlockReason = useMemo(
+    () =>
+      applyingStructure
+        ? "正在重建内容稿，请等待完成后再导出 Figma。"
+        : getEditorExportBlockReason({ scene, validation: projectValidation }),
+    [applyingStructure, projectValidation, scene]
+  );
   const canExportCurrentProject = useMemo(
     () =>
+      !applyingStructure &&
       projectValidation.projectState !== "not_ready" &&
       !scene.boards.some((board) => isPrototypeBoard(board)),
-    [projectValidation.projectState, scene.boards]
+    [applyingStructure, projectValidation.projectState, scene.boards]
   );
   const canGenerateCurrentProject = useMemo(
     () =>
+      !applyingStructure &&
       !(
         scene.boards.some((board) => isPrototypeBoard(board)) &&
         projectValidation.projectState === "not_ready"
       ),
-    [projectValidation.projectState, scene.boards]
+    [applyingStructure, projectValidation.projectState, scene.boards]
   );
   const visibleAssets = useMemo(() => {
     const keyword = assetSearch.trim().toLowerCase();
@@ -709,6 +840,7 @@ export function ProjectEditorFabricClient({
   function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent" | "locked">> & {
     frameBackground?: string;
   }) {
+    if (applyingStructure) return;
     setScene((current) =>
       normalizeProjectEditorScene({
         ...current,
@@ -766,7 +898,9 @@ export function ProjectEditorFabricClient({
           ? "画板待保存"
           : "画板已保存";
   const topStatusLabel =
-    saveState === "saved" && factsSaveState === "saved"
+    applyingStructure
+      ? "正在重建内容稿"
+      : saveState === "saved" && factsSaveState === "saved"
       ? `已保存 · ${projectValidationMeta.shortLabel}`
       : saveState === "error" || factsSaveState === "error"
         ? "保存失败"
@@ -775,10 +909,20 @@ export function ProjectEditorFabricClient({
           : `待保存 · ${projectValidationMeta.shortLabel}`;
 
   function toggleLeftPanel(panel: LeftPanelKey) {
+    if (applyingStructure) return;
     setLeftPanel((current) => (current === panel ? null : panel));
   }
 
   function deleteBoard(boardId: string) {
+    if (applyingStructure) return;
+    const targetBoard = scene.boards.find((board) => board.id === boardId);
+    if (
+      targetBoard &&
+      isPrototypeBoard(targetBoard) &&
+      !window.confirm("删除画板可能导致当前结构与页面列表不一致；建议回结构中调整后重建。确认删除吗？")
+    ) {
+      return;
+    }
     setScene((current) => {
       if (current.boards.length <= 1) return current;
       const nextBoards = current.boards.filter((board) => board.id !== boardId);
@@ -808,6 +952,7 @@ export function ProjectEditorFabricClient({
   }
 
   function handleBoardDragEnd(event: DragEndEvent) {
+    if (applyingStructure) return;
     const activeId = String(event.active.id);
     const overId = event.over ? String(event.over.id) : null;
     if (!overId || activeId === overId) return;
@@ -892,6 +1037,7 @@ export function ProjectEditorFabricClient({
   }
 
   function selectBoard(boardId: string) {
+    if (applyingStructure) return;
     setScene((current) =>
       normalizeProjectEditorScene({ ...current, activeBoardId: boardId })
     );
@@ -965,6 +1111,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function refreshGeneratePrecheck() {
+    if (applyingStructure) return;
     setCheckingPrecheck(true);
     setActionError("");
     try {
@@ -989,6 +1136,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleOpenGenerate() {
+    if (applyingStructure) return;
     if (!canGenerateCurrentProject) {
       setActionError(projectValidationMeta.summary);
       return;
@@ -1068,6 +1216,7 @@ export function ProjectEditorFabricClient({
   }
 
   function updateActiveObject(patch: Partial<FabricObject> & Partial<Textbox>) {
+    if (applyingStructure) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const activeObject = canvas.getActiveObject() as FabricObject | ActiveSelection | null;
@@ -1080,6 +1229,7 @@ export function ProjectEditorFabricClient({
   }
 
   function setActiveObjectFill(colorValue: ColorValue) {
+    if (applyingStructure) return;
     const canvas = canvasRef.current;
     const fabric = fabricRef.current;
     if (!canvas || !fabric) return;
@@ -1131,6 +1281,7 @@ export function ProjectEditorFabricClient({
     const renderWidth = naturalWidth * scale;
     const renderHeight = naturalHeight * scale;
     image.set({
+      ...BOARD_OBJECT_ORIGIN,
       left: options.frameX + (frameWidth - renderWidth) / 2,
       top: options.frameY + (frameHeight - renderHeight) / 2,
       width: naturalWidth,
@@ -1178,6 +1329,7 @@ export function ProjectEditorFabricClient({
   }
 
   function updateActiveDimensions(patch: { x?: number; y?: number; width?: number; height?: number }) {
+    if (applyingStructure) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const activeObject = canvas.getActiveObject() as FabricSceneObject | null;
@@ -1240,6 +1392,7 @@ export function ProjectEditorFabricClient({
   }
 
   function arrangeActiveObject(action: "forward" | "backward" | "front" | "back") {
+    if (applyingStructure) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const activeObject = canvas.getActiveObject() as FabricObject | ActiveSelection | null;
@@ -1490,7 +1643,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleDownloadFigmaPlugin() {
-    if (downloadingFigmaPlugin) return;
+    if (downloadingFigmaPlugin || applyingStructure) return;
 
     setDownloadingFigmaPlugin(true);
     setActionError("");
@@ -1533,7 +1686,12 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleExportToFigma() {
-    if (exportingFigma) return;
+    if (exportingFigma || applyingStructure || !canExportCurrentProject) {
+      if (!canExportCurrentProject) {
+        setActionError(projectExportBlockReason ?? projectValidationMeta.summary);
+      }
+      return;
+    }
 
     setExportingFigma(true);
     setActionError("");
@@ -1691,12 +1849,7 @@ export function ProjectEditorFabricClient({
       await saveStructureDraft(confirmedSuggestion);
 
       // 2. 创建低保真内容稿画板（服务端落板）
-      const data = await parseJsonResponse<{
-        layoutJson: LayoutJson;
-        assets?: ProjectEditorInitialData["assets"];
-        rolledBack?: boolean;
-        message?: string;
-      }>(
+      const data = await parseJsonResponse<ApplyStructureResponse>(
         await fetch(`/api/projects/${initialData.id}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1704,14 +1857,20 @@ export function ProjectEditorFabricClient({
         })
       );
       const nextAssets = data.assets ?? assets;
-      const nextScene = resolveProjectEditorScene(data.layoutJson, {
+      const resolvedScene = resolveProjectEditorScene(data.layoutJson, {
         assets: nextAssets,
         projectName: initialData.name,
+      });
+      const firstBoardId = resolvedScene.boardOrder[0] ?? resolvedScene.activeBoardId;
+      const nextScene = normalizeProjectEditorScene({
+        ...resolvedScene,
+        activeBoardId: firstBoardId,
       });
       setLayout(data.layoutJson);
       setAssets(nextAssets);
       setScene(nextScene);
       requestActiveBoardRebuild();
+      scheduleFitSurface();
       lastSavedSceneRef.current = JSON.stringify(nextScene);
 
       if (data.rolledBack) {
@@ -1722,10 +1881,8 @@ export function ProjectEditorFabricClient({
       // 3. 进入画布编辑模式
       setSetupMode(false);
       setLeftPanel("boards");
-      setActionMessage({
-        tone: "info",
-        text: data.message ?? "已创建低保真内容稿，可继续进入排版。",
-      });
+      setStructureApplyNotice(buildStructureApplyNotice(data));
+      setActionMessage(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "创建内容稿失败，请稍后重试");
     } finally {
@@ -1871,44 +2028,51 @@ export function ProjectEditorFabricClient({
       return;
     }
 
+    const boardCount = scene.boards.length;
     const shouldContinue = window.confirm(
-      "这会按当前确认结构重建内容稿列表，并替换当前内容稿。确认继续吗？"
+      `这会删除并重建当前 ${boardCount} 张内容稿，已生成排版和手动修改可能被替换。确认继续吗？`
     );
     if (!shouldContinue) return;
 
     setApplyingStructure(true);
     setActionError("");
     setActionMessage(null);
+    setStructureApplyNotice(null);
 
     try {
-      const data = await parseJsonResponse<{
-        layoutJson: LayoutJson;
-        assets?: ProjectEditorInitialData["assets"];
-        rolledBack?: boolean;
-        message?: string;
-      }>(
+      const data = await parseJsonResponse<ApplyStructureResponse>(
         await fetch(`/api/projects/${initialData.id}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })
       );
       const nextAssets = data.assets ?? assets;
-      const nextScene = resolveProjectEditorScene(data.layoutJson, {
+      const resolvedScene = resolveProjectEditorScene(data.layoutJson, {
         assets: nextAssets,
         projectName: initialData.name,
+      });
+      const firstBoardId = resolvedScene.boardOrder[0] ?? resolvedScene.activeBoardId;
+      const nextScene = normalizeProjectEditorScene({
+        ...resolvedScene,
+        activeBoardId: firstBoardId,
       });
       setLayout(data.layoutJson);
       setAssets(nextAssets);
       setScene(nextScene);
       requestActiveBoardRebuild();
+      scheduleFitSurface();
       setLeftPanel("boards");
       lastSavedSceneRef.current = JSON.stringify(nextScene);
-      setActionMessage({
-        tone: data.rolledBack ? "error" : "info",
-        text:
-          data.message ??
-          (data.rolledBack ? "创建内容稿未完成，已保留原内容。" : "已按当前结构创建内容稿。"),
-      });
+      if (data.rolledBack || data.status === "rolled_back") {
+        setStructureApplyNotice(null);
+        setActionMessage({
+          tone: "error",
+          text: data.message ?? "创建内容稿未完成，已保留原内容。",
+        });
+      } else {
+        setStructureApplyNotice(buildStructureApplyNotice(data));
+        setActionMessage(null);
+      }
     } catch (error) {
       setActionMessage({
         tone: "error",
@@ -1924,6 +2088,7 @@ export function ProjectEditorFabricClient({
     setGenerating(true);
     setActionError("");
     setActionMessage(null);
+    setStructureApplyNotice(null);
 
     try {
       // 项目准备 阶段完成后由骨架流程写入 packageMode；若尚未写入，默认走 DEEP。
@@ -2018,6 +2183,43 @@ export function ProjectEditorFabricClient({
   }, [shapeMenuOpen]);
 
   useEffect(() => {
+    if (!applyingStructure) return;
+    setShapeMenuOpen(false);
+    setContextMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+  }, [applyingStructure]);
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(structureApplyNoticeStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as StructureApplyNotice;
+      if (!parsed || parsed.status !== "partial_success") {
+        window.sessionStorage.removeItem(structureApplyNoticeStorageKey);
+        return;
+      }
+      setStructureApplyNotice(parsed);
+    } catch {
+      window.sessionStorage.removeItem(structureApplyNoticeStorageKey);
+    }
+  }, [structureApplyNoticeStorageKey]);
+
+  useEffect(() => {
+    const hasPrototypeBoards = scene.boards.some((board) => isPrototypeBoard(board));
+    if (
+      !structureApplyNotice ||
+      structureApplyNotice.status !== "partial_success" ||
+      !hasPrototypeBoards
+    ) {
+      window.sessionStorage.removeItem(structureApplyNoticeStorageKey);
+      return;
+    }
+    window.sessionStorage.setItem(
+      structureApplyNoticeStorageKey,
+      JSON.stringify(structureApplyNotice)
+    );
+  }, [scene.boards, structureApplyNotice, structureApplyNoticeStorageKey]);
+
+  useEffect(() => {
     if (!actionMessage || actionMessage.tone === "error") return;
     const timeout = window.setTimeout(() => setActionMessage(null), 3200);
     return () => window.clearTimeout(timeout);
@@ -2047,6 +2249,15 @@ export function ProjectEditorFabricClient({
         fitSurface(explicitScale);
       });
     });
+  }
+
+  function resetCanvasBoardSpace(canvas: FabricCanvas) {
+    canvas.setDimensions({
+      width: PROJECT_BOARD_WIDTH,
+      height: PROJECT_BOARD_HEIGHT,
+    });
+    canvas.setViewportTransform([...BOARD_VIEWPORT_TRANSFORM] as TMat2D);
+    canvas.setZoom(1);
   }
 
 
@@ -2143,9 +2354,9 @@ export function ProjectEditorFabricClient({
     setActiveMeta({ kind: "none" });
   }
 
-  // Single fit entry point. The DOM owns layout: the surface div has explicit width/height
-  // and is centered by viewport flexbox. Fabric only sizes its drawing buffer to match
-  // and applies a pure-zoom viewport transform with origin (0, 0). No tx/ty math.
+  // Single fit entry point. Fabric stays in canonical board coordinates (1920 x 1080).
+  // Zoom is display-only through the DOM wrapper, so node coordinates never depend on
+  // the current viewport size or browser zoom.
   function fitSurface(explicitScale?: number) {
     const canvas = canvasRef.current;
     const viewport = viewportRef.current;
@@ -2168,18 +2379,15 @@ export function ProjectEditorFabricClient({
       );
     }
 
-    const renderW = Math.round(PROJECT_BOARD_WIDTH * scale);
-    const renderH = Math.round(PROJECT_BOARD_HEIGHT * scale);
-
     setSurfaceScale(scale);
-    canvas.setDimensions({ width: renderW, height: renderH });
-    canvas.setZoom(scale);
+    resetCanvasBoardSpace(canvas);
     canvas.calcOffset();
     canvas.requestRenderAll();
   }
 
   function applyObjectChrome(target: FabricSceneObject) {
     target.set({
+      ...BOARD_OBJECT_ORIGIN,
       borderColor: "rgba(255, 255, 255, 0.92)",
       borderScaleFactor: 1.2,
       borderOpacityWhenMoving: 0.95,
@@ -2191,6 +2399,7 @@ export function ProjectEditorFabricClient({
       padding: 3,
       lockRotation: true,
     });
+    target.setCoords();
     // 隐藏旋转手柄（lockRotation=true 但 mtr 仍会显示，隐藏避免误解）
     target.setControlsVisibility({ mtr: false });
   }
@@ -2545,6 +2754,7 @@ export function ProjectEditorFabricClient({
     canvas: FabricCanvas,
     target?: FabricSceneObject
   ) => {
+    if (applyingStructure) return;
     if (target?.data?.placeholder) {
       target.data.placeholder = false;
     }
@@ -2560,6 +2770,7 @@ export function ProjectEditorFabricClient({
     canvas: FabricCanvas,
     event: { e: globalThis.MouseEvent; target?: FabricObject }
   ) => {
+    if (applyingStructure) return;
     const nativeEvent = event.e;
     if (nativeEvent.button !== 2) return;
     nativeEvent.preventDefault();
@@ -2613,19 +2824,16 @@ export function ProjectEditorFabricClient({
         0.1,
         4,
       );
-      const initRenderW = Math.round(PROJECT_BOARD_WIDTH * initScale);
-      const initRenderH = Math.round(PROJECT_BOARD_HEIGHT * initScale);
-
       const canvas = new fabric.Canvas(hostRef.current, {
-        width: initRenderW,
-        height: initRenderH,
+        width: PROJECT_BOARD_WIDTH,
+        height: PROJECT_BOARD_HEIGHT,
         preserveObjectStacking: true,
         selection: true,
         backgroundColor: "#ffffff",
       });
       canvasRef.current = canvas;
       setSurfaceScale(initScale);
-      canvas.setZoom(initScale);
+      resetCanvasBoardSpace(canvas);
 
       const observer = new ResizeObserver(() => handleCanvasResize());
       observer.observe(vp);
@@ -2654,8 +2862,8 @@ export function ProjectEditorFabricClient({
       });
 
       setCanvasReady(true);
-      // 挂载完立刻 fit 一次，确保首帧 zoom/size 与 DOM 同步。
-      fitSurface();
+      canvas.calcOffset();
+      canvas.requestRenderAll();
 
       cleanup = () => {
         if (fitFrameRef.current !== null) {
@@ -2687,6 +2895,16 @@ export function ProjectEditorFabricClient({
     handleCanvasSelectionChange,
     setupMode,
   ]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const frame = requestAnimationFrame(() => {
+      canvas.calcOffset();
+      canvas.requestRenderAll();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [surfaceScale]);
 
   useEffect(() => {
     // 加载自托管字体（得意黑 + 阿里普惠体）
@@ -2801,6 +3019,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function addTextObject() {
+    if (applyingStructure) return;
     const fabric = fabricRef.current;
     const canvas = canvasRef.current;
     if (!fabric || !canvas) return;
@@ -2829,6 +3048,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function addShapeObject(shape: ProjectShapeType) {
+    if (applyingStructure) return;
     const fabric = fabricRef.current;
     const canvas = canvasRef.current;
     if (!fabric || !canvas) return;
@@ -2888,6 +3108,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function addAssetToCanvas(assetId: string) {
+    if (applyingStructure) return;
     const fabric = fabricRef.current;
     const canvas = canvasRef.current;
     const asset = assetMap.get(assetId);
@@ -2923,6 +3144,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function replaceActiveImageAsset(nextAssetId: string) {
+    if (applyingStructure) return;
     const fabric = fabricRef.current;
     const canvas = canvasRef.current;
     const activeObject = canvas?.getActiveObject() as FabricSceneObject | null;
@@ -2978,10 +3200,12 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleUploadAssets(files: File[]) {
+    if (applyingStructure) return;
     if (files.length === 0) return;
     const existingIds = new Set(assets.map((asset) => asset.id));
     setUploadingAssets(true);
     setActionMessage(null);
+    setStructureApplyNotice(null);
 
     try {
       setLeftPanel("assets");
@@ -3025,10 +3249,12 @@ export function ProjectEditorFabricClient({
   }
 
   function handleOpenAssetUpload() {
+    if (applyingStructure) return;
     assetUploadRef.current?.click();
   }
 
   async function handleAssetFilesPicked(files: FileList | null) {
+    if (applyingStructure) return;
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
     await handleUploadAssets(selectedFiles);
@@ -3038,6 +3264,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function saveSelectedImageDetails() {
+    if (applyingStructure) return;
     if (!selectedImageAsset || assetDetailsSaving) return;
 
     setAssetDetailsSaving(true);
@@ -3096,14 +3323,17 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleRenameAsset(assetId: string, title: string) {
+    if (applyingStructure) return;
     await handleAssetInlineUpdate(assetId, { title: title.trim() || null });
   }
 
   async function handleUpdateAssetNote(assetId: string, note: string) {
+    if (applyingStructure) return;
     await handleAssetInlineUpdate(assetId, { note: note.trim() || null });
   }
 
   async function handleDeleteAsset(assetId: string) {
+    if (applyingStructure) return;
     try {
       const response = await fetch(
         `/api/projects/${initialData.id}/assets/${assetId}`,
@@ -3124,6 +3354,7 @@ export function ProjectEditorFabricClient({
   }
 
   function deleteSelection() {
+    if (applyingStructure) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const activeObjects = canvas.getActiveObjects();
@@ -3137,6 +3368,7 @@ export function ProjectEditorFabricClient({
   }
 
   async function handleContextAction(action: string) {
+    if (applyingStructure) return;
     if (action === "copy") {
       await cloneActiveObject();
       return;
@@ -3175,6 +3407,7 @@ export function ProjectEditorFabricClient({
   }
 
   const handleCanvasKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (applyingStructure) return;
     const target = event.target as HTMLElement | null;
     const tagName = target?.tagName?.toLowerCase();
     const isTyping =
@@ -3262,8 +3495,14 @@ export function ProjectEditorFabricClient({
           <Button
             className="h-10 gap-2 rounded-full border border-white/10 bg-primary px-4 text-primary-foreground shadow-[0_16px_28px_-18px_rgba(0,0,0,0.52)] hover:bg-primary/90 disabled:opacity-40"
             onClick={() => void handleOpenGenerate()}
-            disabled={generating || !canGenerateCurrentProject}
-            title={!canGenerateCurrentProject ? projectValidationMeta.summary : undefined}
+            disabled={generating || applyingStructure || !canGenerateCurrentProject}
+            title={
+              applyingStructure
+                ? "正在重建内容稿，请等待完成后再生成排版。"
+                : !canGenerateCurrentProject
+                  ? projectValidationMeta.summary
+                  : undefined
+            }
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             生成排版
@@ -3291,8 +3530,8 @@ export function ProjectEditorFabricClient({
             <EditorChromeButton
               className="h-10 gap-2 border-white/8 bg-white/4 px-4 text-white/60 hover:bg-white/8 hover:text-white"
               onClick={() => setExportDialogOpen(true)}
-              disabled={exportingFigma || !canExportCurrentProject}
-              title={!canExportCurrentProject ? projectValidationMeta.summary : undefined}
+              disabled={exportingFigma || applyingStructure || !canExportCurrentProject}
+              title={!canExportCurrentProject ? projectExportBlockReason ?? projectValidationMeta.summary : undefined}
             >
               {exportingFigma ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -3313,6 +3552,7 @@ export function ProjectEditorFabricClient({
                   // 进入向导时重置到项目面板，避免结构/图层面板并行暴露
                   setLeftPanel("project");
                 }}
+                disabled={applyingStructure}
               >
               项目准备
             </EditorChromeButton>
@@ -3328,7 +3568,7 @@ export function ProjectEditorFabricClient({
       leftRail={setupMode ? (
         <SetupContextSidebar projectName={initialData.name} facts={projectFactsDraft} />
       ) : (
-        <div className="flex h-full min-h-0">
+        <div className={cn("flex h-full min-h-0", applyingStructure && "pointer-events-none opacity-60")}>
           <div className="flex w-[56px] shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-background px-1.5 py-3.5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.02)]">
             {(setupMode
               ? LEFT_PANEL_ITEMS.filter((i) => i.key === "project" || i.key === "assets")
@@ -3342,12 +3582,14 @@ export function ProjectEditorFabricClient({
                   key={item.key}
                   type="button"
                   onClick={() => toggleLeftPanel(item.key)}
+                  disabled={applyingStructure}
                   title={item.label}
                   className={cn(
                     "group relative flex h-11 w-11 items-center justify-center rounded-[14px] transition-all duration-200",
                     active
                       ? "bg-white/10 text-white"
-                      : "text-white/52 hover:bg-white/5 hover:text-white"
+                      : "text-white/52 hover:bg-white/5 hover:text-white",
+                    applyingStructure && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-white/52"
                   )}
                 >
                   <span
@@ -3816,6 +4058,11 @@ export function ProjectEditorFabricClient({
                           <p className="text-[11px] leading-5 text-white/42">
                             新增页面请先调整结构，再重新创建内容稿。
                           </p>
+                          {structureDraft.status === "confirmed" ? (
+                            <p className="text-[11px] leading-5 text-white/42">
+                              将重建 {structureDraft.groups.reduce((sum, group) => sum + group.sections.length, 0)} 张内容稿。
+                            </p>
+                          ) : null}
                           <div className="flex flex-wrap gap-2">
                             <Button
                               type="button"
@@ -3826,6 +4073,7 @@ export function ProjectEditorFabricClient({
                                 setActionError("");
                                 setLeftPanel("project");
                               }}
+                              disabled={applyingStructure}
                               className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
                             >
                               <Sparkles className="mr-2 h-4 w-4" />
@@ -3836,7 +4084,7 @@ export function ProjectEditorFabricClient({
                                 type="button"
                                 variant="outline"
                                 onClick={() => void confirmStructureDraft()}
-                                disabled={structureSaveState === "saving"}
+                                disabled={applyingStructure || structureSaveState === "saving"}
                                 className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
                               >
                                 <Check className="mr-2 h-4 w-4" />
@@ -3848,6 +4096,7 @@ export function ProjectEditorFabricClient({
                               variant="outline"
                               onClick={() => void applyStructureToBoards()}
                               disabled={
+                                applyingStructure ||
                                 applyingStructure ||
                                 structureDraft.status !== "confirmed" ||
                                 structureDraft.groups.length === 0
@@ -3913,6 +4162,7 @@ export function ProjectEditorFabricClient({
                                       thumbnailUrl={thumbnailUrl}
                                       isLive={isLive}
                                       active={scene.activeBoardId === board.id}
+                                      forceMaterialWarning={hasTransientVisualWarning}
                                       canDelete={scene.boards.length > 1}
                                       onSelect={() => selectBoard(board.id)}
                                       onDelete={() => deleteBoard(board.id)}
@@ -4011,6 +4261,7 @@ export function ProjectEditorFabricClient({
                     setLeftPanel("assets");
                     setShapeMenuOpen(false);
                   }}
+                  disabled={applyingStructure}
                 >
                   <ImageIcon className="h-4 w-4" />
                   插入图片
@@ -4018,6 +4269,7 @@ export function ProjectEditorFabricClient({
                 <EditorChromeButton
                   className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={addTextObject}
+                  disabled={applyingStructure}
                 >
                   <Type className="h-4 w-4" />
                   添加文本
@@ -4026,6 +4278,7 @@ export function ProjectEditorFabricClient({
                   <EditorChromeButton
                     className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                     onClick={() => setShapeMenuOpen((prev) => !prev)}
+                    disabled={applyingStructure}
                   >
                     <Square className="h-4 w-4" />
                     形状
@@ -4067,6 +4320,7 @@ export function ProjectEditorFabricClient({
                 <EditorChromeButton
                   className="h-8 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface()}
+                  disabled={applyingStructure}
                 >
                   适应画板
                 </EditorChromeButton>
@@ -4076,6 +4330,7 @@ export function ProjectEditorFabricClient({
                 <EditorChromeButton
                   className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface(clamp(surfaceScale - 0.1, 0.1, 4))}
+                  disabled={applyingStructure}
                 >
                   <ZoomOut className="h-4 w-4" />
                 </EditorChromeButton>
@@ -4085,6 +4340,7 @@ export function ProjectEditorFabricClient({
                 <EditorChromeButton
                   className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
                   onClick={() => fitSurface(clamp(surfaceScale + 0.1, 0.1, 4))}
+                  disabled={applyingStructure}
                 >
                   <ZoomIn className="h-4 w-4" />
                 </EditorChromeButton>
@@ -4094,14 +4350,23 @@ export function ProjectEditorFabricClient({
 
           <div
             ref={surfaceRef}
-            className="relative overflow-hidden rounded-[12px] shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
+            className="relative overflow-hidden rounded-[12px] bg-white shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
             style={{
               width: `${Math.round(PROJECT_BOARD_WIDTH * surfaceScale)}px`,
               height: `${Math.round(PROJECT_BOARD_HEIGHT * surfaceScale)}px`,
-              backgroundColor: "#ffffff",
             }}
           >
-            <canvas ref={hostRef} className="block h-full w-full" />
+            <div
+              className="absolute left-0 top-0"
+              style={{
+                width: `${PROJECT_BOARD_WIDTH}px`,
+                height: `${PROJECT_BOARD_HEIGHT}px`,
+                transform: `scale(${surfaceScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <canvas ref={hostRef} className="block" />
+            </div>
           </div>
 
           {!canvasReady ? (
@@ -4109,6 +4374,90 @@ export function ProjectEditorFabricClient({
               <div className="rounded-full border border-white/8 bg-white/4 px-4 py-2 text-sm text-white/62">
                 <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
                 正在初始化 Fabric 引擎…
+              </div>
+            </div>
+          ) : null}
+          {applyingStructure ? (
+            <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/18 backdrop-blur-[1px]">
+              <div className="rounded-full border border-white/10 bg-card/92 px-5 py-3 text-sm text-white/82 shadow-[0_24px_64px_-36px_rgba(0,0,0,0.86)]">
+                <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
+                正在按当前结构重建内容稿 · 将替换当前画板列表
+              </div>
+            </div>
+          ) : null}
+          {!applyingStructure && structureApplyNotice ? (
+            <div className="absolute inset-x-6 bottom-6 z-30 flex justify-center">
+              <div
+                className={cn(
+                  "w-[min(760px,100%)] rounded-[16px] border px-4 py-3 text-sm shadow-[0_24px_56px_-38px_rgba(0,0,0,0.9)]",
+                  structureApplyNotice.status === "partial_success"
+                    ? "border-amber-300/24 bg-[#211a0f] text-amber-50"
+                    : "border-emerald-300/20 bg-[#102018] text-emerald-50"
+                )}
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                  {structureApplyNotice.status === "partial_success" ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
+                  ) : (
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{structureApplyNotice.message}</p>
+                    {structureApplyNotice.status === "partial_success" ? (
+                      <p className="mt-1 text-xs leading-5 text-amber-50/76">
+                        {structureApplyNotice.warnings[0]?.message ??
+                          "AI 补图暂不可用，本次已先生成内容稿。你可以上传图片、稍后补图，或继续生成排版。"}
+                      </p>
+                    ) : null}
+                  </div>
+                  </div>
+                    <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+                      {structureApplyNotice.status === "partial_success" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLeftPanel("assets");
+                              handleOpenAssetUpload();
+                            }}
+                            className="rounded-full border border-amber-200/20 bg-amber-200/12 px-3 py-1.5 text-xs font-medium text-amber-50 transition-colors hover:bg-amber-200/18"
+                          >
+                            上传图片
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLeftPanel("boards");
+                              if (firstMaterialWarningBoardId) {
+                                selectBoard(firstMaterialWarningBoardId);
+                              }
+                            }}
+                            className="rounded-full border border-amber-200/20 bg-amber-200/12 px-3 py-1.5 text-xs font-medium text-amber-50 transition-colors hover:bg-amber-200/18"
+                          >
+                            查看需补图页面
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStructureApplyNotice(null);
+                          void handleOpenGenerate();
+                        }}
+                        className="rounded-full border border-white/12 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-950 transition-colors hover:bg-neutral-100"
+                      >
+                        继续生成排版
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStructureApplyNotice(null)}
+                        className="rounded-full border border-white/10 bg-transparent px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/8 hover:text-white"
+                      >
+                        稍后处理
+                      </button>
+                    </div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -4158,7 +4507,7 @@ export function ProjectEditorFabricClient({
         )}
         </>}
       rightRail={setupMode ? undefined : (
-        <div className="flex h-full min-h-0 flex-col">
+        <div className={cn("flex h-full min-h-0 flex-col", applyingStructure && "pointer-events-none opacity-60")}>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="mt-0">
                   {hasActiveInspector ? (
@@ -4834,7 +5183,7 @@ export function ProjectEditorFabricClient({
                               </div>
                             ) : null}
                             <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                              <p className="text-[11px] tracking-[0.14em] text-white/34">下一步</p>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">质量检查</p>
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 {activeBoardQualityMeta ? (
                                   <span
@@ -4852,10 +5201,13 @@ export function ProjectEditorFabricClient({
                                 )}
                               </div>
                               <p className="mt-2 text-xs leading-5 text-white/54">
-                                {activeBoardValidation?.message ??
-                                  (isPrototypeBoard(activeBoard)
-                                    ? "这页内容稿已讲清主线，可以继续生成排版。"
-                                    : "这页已达到可继续精修的基础质量线。")}
+                                {activeBoardQualityMessage}
+                              </p>
+                            </div>
+                            <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
+                              <p className="text-[11px] tracking-[0.14em] text-white/34">推荐动作</p>
+                              <p className="mt-1 text-sm font-medium text-white/78">
+                                {activeBoardRecommendedAction}
                               </p>
                             </div>
                           </div>
@@ -4968,7 +5320,10 @@ export function ProjectEditorFabricClient({
         </div>
       )}
       bottomStrip={setupMode ? undefined : (
-        <div className="mx-auto flex w-[calc(100%-40px)] flex-col overflow-hidden rounded-[22px] border border-white/6 bg-background shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]">
+        <div className={cn(
+          "mx-auto flex w-[calc(100%-40px)] flex-col overflow-hidden rounded-[22px] border border-white/6 bg-background shadow-[0_24px_64px_-42px_rgba(0,0,0,0.82)]",
+          applyingStructure && "pointer-events-none opacity-60"
+        )}>
           <div className="overflow-x-auto px-4 py-4">
             <div className="flex items-stretch gap-2">
               {boardGroupRuns.map((run) => (
@@ -4998,6 +5353,7 @@ export function ProjectEditorFabricClient({
                           thumbnailUrl={thumbnailUrl}
                           isLive={isLive}
                           active={scene.activeBoardId === board.id}
+                          forceMaterialWarning={hasTransientVisualWarning}
                           canDelete={scene.boards.length > 1}
                           onSelect={() =>
                             setScene((current) =>
@@ -5063,7 +5419,7 @@ export function ProjectEditorFabricClient({
               <div className="rounded-[18px] border border-red-300/18 bg-red-400/10 px-4 py-3 text-red-50/88">
                 <p className="font-medium text-red-50">当前暂不可导出</p>
                 <p className="mt-2 text-sm leading-6 text-red-50/72">
-                  {projectValidationMeta.summary}
+                  {projectExportBlockReason ?? projectValidationMeta.summary}
                 </p>
               </div>
             ) : null}
@@ -5074,7 +5430,7 @@ export function ProjectEditorFabricClient({
               type="button"
               variant="outline"
               onClick={() => setExportDialogOpen(false)}
-              disabled={exportingFigma || downloadingFigmaPlugin}
+              disabled={exportingFigma || downloadingFigmaPlugin || applyingStructure}
             >
               取消
             </Button>
@@ -5083,7 +5439,7 @@ export function ProjectEditorFabricClient({
                 type="button"
                 variant="outline"
                 onClick={() => void handleDownloadFigmaPlugin()}
-                disabled={downloadingFigmaPlugin || exportingFigma}
+                disabled={downloadingFigmaPlugin || exportingFigma || applyingStructure}
               >
                 {downloadingFigmaPlugin ? (
                   <>
@@ -5100,7 +5456,8 @@ export function ProjectEditorFabricClient({
               <Button
                 type="button"
                 onClick={() => void handleExportToFigma()}
-                disabled={exportingFigma || downloadingFigmaPlugin || !canExportCurrentProject}
+                disabled={exportingFigma || downloadingFigmaPlugin || applyingStructure || !canExportCurrentProject}
+                title={!canExportCurrentProject ? projectExportBlockReason ?? projectValidationMeta.summary : undefined}
               >
                 {exportingFigma ? (
                   <>
@@ -5562,6 +5919,7 @@ function BoardListRow({
   thumbnailUrl,
   isLive,
   active,
+  forceMaterialWarning,
   canDelete,
   onSelect,
   onDelete,
@@ -5572,6 +5930,7 @@ function BoardListRow({
   thumbnailUrl: string | null;
   isLive: boolean;
   active: boolean;
+  forceMaterialWarning: boolean;
   canDelete: boolean;
   onSelect: () => void;
   onDelete: () => void;
@@ -5588,7 +5947,9 @@ function BoardListRow({
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
   const phaseMeta = getBoardPhaseMeta(board);
-  const qualityMeta = getBoardQualityMeta(board, boardValidation);
+  const qualityMeta =
+    getTransientVisualWarningMeta(board, forceMaterialWarning) ??
+    getBoardQualityMeta(board, boardValidation);
   const secondaryText =
     (board.structureSource?.sectionTitle ??
       board.structureSource?.groupLabel ??
@@ -5708,6 +6069,7 @@ function FilmstripCard({
   thumbnailUrl,
   isLive,
   active,
+  forceMaterialWarning,
   canDelete,
   onSelect,
   onDelete,
@@ -5718,6 +6080,7 @@ function FilmstripCard({
   thumbnailUrl: string | null;
   isLive: boolean;
   active: boolean;
+  forceMaterialWarning: boolean;
   canDelete: boolean;
   onSelect: () => void;
   onDelete: () => void;
@@ -5728,7 +6091,9 @@ function FilmstripCard({
       : buildPrivateBlobProxyUrl(thumbnailUrl)
     : null;
   const phaseMeta = getBoardPhaseMeta(board);
-  const qualityMeta = getBoardQualityMeta(board, boardValidation);
+  const qualityMeta =
+    getTransientVisualWarningMeta(board, forceMaterialWarning) ??
+    getBoardQualityMeta(board, boardValidation);
 
   return (
     <div

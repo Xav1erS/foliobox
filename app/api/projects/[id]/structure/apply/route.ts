@@ -28,6 +28,7 @@ import {
   validateProjectEditorScene,
 } from "@/lib/project-editor-validation";
 import type { ImageInput } from "@/lib/llm/provider";
+import type { ApplyStructureWarning } from "@/lib/project-structure-apply-types";
 
 const MAX_GENERATED_VISUAL_ASSETS_PER_APPLY = 3;
 const SHOULD_SKIP_GENERATED_VISUALS =
@@ -539,7 +540,7 @@ export async function POST(
 
   const packageMode = normalizePackageMode(project.packageMode);
   const sceneAssets: ProjectSceneSeedAsset[] = [...project.assets];
-  const visualGenerationWarnings: string[] = [];
+  const visualGenerationWarnings: ApplyStructureWarning[] = [];
   const visualPlans = SHOULD_SKIP_GENERATED_VISUALS
     ? []
     : planPrototypeVisualAssets({
@@ -624,11 +625,17 @@ export async function POST(
           /verify organization/i.test(errorMessage)
         ) {
           imageModelBlocked = true;
-          visualGenerationWarnings.push(
-            "AI 补图已跳过：当前 OpenAI 组织尚未完成验证，暂时无法使用 gpt-image-2。"
-          );
+          visualGenerationWarnings.push({
+            code: "visual_generation_unavailable",
+            message:
+              "AI 补图暂不可用，本次已先生成内容稿。你可以上传图片、稍后补图，或继续生成排版。",
+          });
         } else if (visualGenerationWarnings.length === 0) {
-          visualGenerationWarnings.push("AI 补图部分失败，已保留文字内容稿继续创建。");
+          visualGenerationWarnings.push({
+            code: "visual_generation_partial_failed",
+            message:
+              "AI 补图部分失败，本次已先生成内容稿。你可以上传图片、稍后补图，或继续生成排版。",
+          });
         }
         console.error("[project_visual_asset_generation] failed", {
           projectId: project.id,
@@ -691,6 +698,7 @@ export async function POST(
     return NextResponse.json({
       layoutJson: fallbackLayout,
       assets: sceneAssets,
+      status: "rolled_back",
       rolledBack: true,
       message: "创建内容稿未完成，已保留原内容。",
     });
@@ -710,8 +718,12 @@ export async function POST(
   return NextResponse.json({
     layoutJson: nextLayout,
     assets: sceneAssets,
+    status: visualGenerationWarnings.length > 0 ? "partial_success" : "success",
     ...(visualGenerationWarnings.length > 0
-      ? { message: visualGenerationWarnings.join(" ") }
+      ? { warnings: visualGenerationWarnings }
+      : {}),
+    ...(visualGenerationWarnings.length > 0
+      ? { message: visualGenerationWarnings.map((w) => w.message).join(" ") }
       : {}),
   });
 }

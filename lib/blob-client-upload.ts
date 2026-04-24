@@ -1,11 +1,10 @@
 import { upload } from "@vercel/blob/client";
 
-type UploadFolder = "project-assets" | "score-inputs" | "resumes" | "style-references";
+type UploadFolder = "project-assets" | "score-inputs" | "style-references";
 type UploadKind =
   | "project-image"
   | "score-image"
   | "score-pdf"
-  | "resume-pdf"
   | "style-reference-image";
 
 export type UploadedBlobFile = {

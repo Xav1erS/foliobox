@@ -1,7 +1,6 @@
 import { put, del, list, get } from "@vercel/blob";
 
 export type StorageFolder =
-  | "resumes"
   | "project-assets"
   | "exports"
   | "score-inputs"

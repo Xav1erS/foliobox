@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, UploadCloud, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { InlineTip } from "@/components/app/InlineTip";
 import { StickyActionBar } from "@/components/app/StickyActionBar";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { uploadFilesFromBrowser } from "@/lib/blob-client-upload";
 
 interface ProfileData {
   currentTitle?: string | null;
@@ -143,10 +142,6 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [resumeUploading, setResumeUploading] = useState(false);
-  const [resumeApplying, setResumeApplying] = useState(false);
-  const [resumeMessage, setResumeMessage] = useState("");
-  const [parsedResumeId, setParsedResumeId] = useState<string | null>(null);
 
   function set<K extends keyof ProfileData>(key: K, value: ProfileData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -178,193 +173,8 @@ export function ProfileForm({ initialData }: { initialData: ProfileData | null }
     }
   }
 
-  async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setResumeUploading(true);
-    setResumeMessage("");
-
-    try {
-      const [uploaded] = await uploadFilesFromBrowser({
-        files: [file],
-        folder: "resumes",
-        kind: "resume-pdf",
-      });
-
-      const response = await fetch("/api/resumes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: [uploaded] }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error((data as { error?: string }).error ?? "简历上传失败");
-      }
-
-      const profileDraft = (data as { profileDraft?: Partial<ProfileData> & { summary?: string } })
-        .profileDraft;
-      setParsedResumeId((data as { resume?: { id?: string } }).resume?.id ?? null);
-      setResumeMessage(
-        profileDraft?.summary ?? "已读取这份简历。你可以先应用到当前档案，再手动微调。"
-      );
-    } catch (uploadError) {
-      setResumeMessage(uploadError instanceof Error ? uploadError.message : "简历上传失败");
-      setParsedResumeId(null);
-    } finally {
-      setResumeUploading(false);
-      event.target.value = "";
-    }
-  }
-
-  async function handleApplyResume() {
-    if (!parsedResumeId) return;
-
-    setResumeApplying(true);
-    setResumeMessage("");
-
-    try {
-      const response = await fetch(`/api/profile/from-resume/${parsedResumeId}`, {
-        method: "POST",
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error((data as { error?: string }).error ?? "应用简历失败");
-      }
-
-      const profile = (data as { profile?: ProfileData }).profile;
-      if (profile) {
-        setForm({
-          currentTitle: profile.currentTitle ?? "",
-          yearsOfExperience: profile.yearsOfExperience ?? "",
-          industry: profile.industry ?? "",
-          specialties: profile.specialties ?? [],
-          targetRole: profile.targetRole ?? "",
-          strengths: profile.strengths ?? [],
-          tonePreference: profile.tonePreference ?? "",
-        });
-      }
-
-      setSaved(false);
-      setResumeMessage("简历里的基础信息已经写入当前档案，你可以继续微调后再保存。");
-    } catch (applyError) {
-      setResumeMessage(applyError instanceof Error ? applyError.message : "应用简历失败");
-    } finally {
-      setResumeApplying(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/70 bg-card/95 shadow-xs">
-          <CardContent className="p-5">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
-              Current Identity
-            </p>
-            <p className="mt-2 text-sm font-medium text-foreground">
-              {form.currentTitle || "还没有写当前职位"}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              这是 AI 判断你是谁、适合强调什么的第一层上下文。
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/95 shadow-xs">
-          <CardContent className="p-5">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-muted-foreground">
-              Target Role
-            </p>
-            <p className="mt-2 text-sm font-medium text-foreground">
-              {form.targetRole || "还没有写目标岗位"}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              目标岗位会直接影响项目里更偏向强调的方法和能力。
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="app-panel-highlight text-white shadow-xs">
-          <CardContent className="p-5">
-            <p className="text-eyebrow font-mono uppercase tracking-[0.18em] text-white/42">
-              Focus Tags
-            </p>
-            <p className="mt-2 text-sm font-medium">
-              {`${form.specialties?.length ?? 0} 个方向标签 · ${form.strengths?.length ?? 0} 个优势标签`}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-white/68">
-              方向和优势的选择会共同决定作品集第一版的叙述重心。
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/70 bg-card/95 shadow-xs">
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-md px-2 py-0.5 font-mono text-xs">
-              简历导入
-            </Badge>
-          </div>
-          <CardTitle className="text-xl">从简历快速带入</CardTitle>
-          <CardDescription className="text-sm leading-6">
-            先上传一份 PDF 简历，我会帮你提取职位、经验年限和部分方向标签，再落到当前档案里。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-          <div className="rounded-xl border border-border/70 bg-muted/35 px-5 py-5">
-            <p className="text-sm leading-6 text-muted-foreground">
-              这一步更适合先把基础信息带进来，不会覆盖你后续手动写的项目事实。当前版本优先支持 PDF 简历。
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {[
-                { title: "1. 上传 PDF", description: "先做文本提取和结构解析。" },
-                { title: "2. 预览摘要", description: "先看系统读到了什么。" },
-                { title: "3. 应用到档案", description: "再手动微调成你想要的表达。" },
-              ].map((step) => (
-                <div key={step.title} className="rounded-xl border border-border/70 bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{step.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.description}</p>
-                </div>
-              ))}
-            </div>
-            {resumeMessage ? (
-              <div className="mt-4 rounded-xl border border-border/70 bg-background px-4 py-3 text-sm text-muted-foreground">
-                {resumeMessage}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/25 px-4 py-4 text-center transition-colors hover:border-foreground/30 hover:bg-background">
-              {resumeUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <UploadCloud className="h-5 w-5 text-muted-foreground" />
-              )}
-              <p className="mt-3 text-sm font-medium text-foreground">上传 PDF 简历</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">上传后会先做一次文本提取</p>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                onChange={handleResumeUpload}
-              />
-            </label>
-            <Button
-              variant="outline"
-              className="h-10 w-full"
-              onClick={handleApplyResume}
-              disabled={!parsedResumeId || resumeApplying}
-            >
-              {resumeApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              应用到当前档案
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card className="border-border/70 bg-card/95 shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">

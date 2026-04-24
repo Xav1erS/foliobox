@@ -70,22 +70,21 @@ model User {
   sessions Session[]
 
   // App relations
-  profile           DesignerProfile?
-  resumes           Resume[]
-  projects          Project[]
-  portfolios        Portfolio[]
-  portfolioScores   PortfolioScore[]
-  portfolioOutlines PortfolioOutline[]
-  portfolioDrafts   PortfolioDraft[]
-  publishedPortfolios PublishedPortfolio[]
-  styleReferenceSets StyleReferenceSet[]
-  orders            Order[]
-  userPlans         UserPlan[]
-  llmUsageEvents    LLMUsageEvent[]
+  profile                 DesignerProfile?
+  projects                Project[]
+  portfolios              Portfolio[]
+  portfolioScores         PortfolioScore[]
+  portfolioOutlines       PortfolioOutline[]
+  portfolioDrafts         PortfolioDraft[]
+  publishedPortfolios     PublishedPortfolio[]
+  styleReferenceSets      StyleReferenceSet[]
+  orders                  Order[]
+  userPlans               UserPlan[]
+  llmUsageEvents          LLMUsageEvent[]
   externalParseUsageEvents ExternalParseUsageEvent[]
-  generationTasks   GenerationTask[]
-  precheckLogs      PrecheckLog[]
-  budgetUsageEvents BudgetUsageEvent[]
+  generationTasks         GenerationTask[]
+  precheckLogs            PrecheckLog[]
+  budgetUsageEvents       BudgetUsageEvent[]
 }
 
 model DesignerProfile {
@@ -98,40 +97,10 @@ model DesignerProfile {
   targetRole        String?
   strengths         String[]
   tonePreference    String?
-  source            ProfileSource @default(MANUAL)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-enum ProfileSource {
-  MANUAL
-  RESUME_PARSE
-}
-
-model Resume {
-  id          String      @id @default(cuid())
-  userId      String
-  fileUrl     String
-  fileType    ResumeFileType
-  parseStatus ParseStatus @default(PENDING)
-  rawText     String?     @db.Text
-  parsedJson  Json?
-  createdAt   DateTime    @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-enum ResumeFileType {
-  PDF
-  DOCX
-}
-
-enum ParseStatus {
-  PENDING
-  DONE
-  FAILED
 }
 
 model Project {

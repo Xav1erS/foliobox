@@ -86,10 +86,7 @@ const DASHBOARD_QUOTA_ORDER = [
   "projectLayouts",
   "portfolioPackagings",
   "publishLinks",
-] as const;
-
-const DASHBOARD_TWO_COLUMN_GRID =
-  "grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]";
+] as const satisfies ReadonlyArray<keyof typeof DASHBOARD_QUOTA_LABELS>;
 
 const DASHBOARD_QUICK_LINKS = [
   { icon: BookOpen, label: "新建作品集", href: "/portfolios/new" },
@@ -98,111 +95,8 @@ const DASHBOARD_QUICK_LINKS = [
   { icon: User, label: "设计师档案", href: "/profile" },
 ] as const;
 
-function getQuotaUsageRatio(
-  key: (typeof DASHBOARD_QUOTA_ORDER)[number],
-  quota: { used: number; remaining: number; limit: number }
-) {
-  if (quota.limit <= 0) return 0;
-  if (key === "activeProjects") return quota.used / quota.limit;
-  return (quota.limit - quota.remaining) / quota.limit;
-}
-
-function DashboardHeroArt() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <svg viewBox="0 0 920 520" className="absolute inset-0 h-full w-full">
-        <defs>
-          <radialGradient id="dashboard-hero-door-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(244,248,251,0.34)" />
-            <stop offset="45%" stopColor="rgba(192,207,219,0.16)" />
-            <stop offset="100%" stopColor="rgba(192,207,219,0)" />
-          </radialGradient>
-          <radialGradient id="dashboard-hero-ground-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(206,219,229,0.18)" />
-            <stop offset="100%" stopColor="rgba(206,219,229,0)" />
-          </radialGradient>
-          <linearGradient id="dashboard-hero-line" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="rgba(225,234,241,0)" />
-            <stop offset="50%" stopColor="rgba(225,234,241,0.34)" />
-            <stop offset="100%" stopColor="rgba(225,234,241,0.05)" />
-          </linearGradient>
-          <linearGradient id="dashboard-hero-top-wash" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.06)" />
-            <stop offset="40%" stopColor="rgba(255,255,255,0.02)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
-        </defs>
-
-        <rect x="0" y="0" width="920" height="520" fill="url(#dashboard-hero-top-wash)" />
-
-        <ellipse cx="815" cy="110" rx="112" ry="112" fill="url(#dashboard-hero-door-glow)" />
-        <rect x="778" y="64" width="108" height="174" fill="none" stroke="rgba(220,229,236,0.5)" strokeWidth="1.3" />
-
-        <ellipse cx="760" cy="432" rx="168" ry="34" fill="url(#dashboard-hero-ground-glow)" />
-        <ellipse cx="758" cy="426" rx="170" ry="30" fill="none" stroke="rgba(213,224,232,0.08)" strokeWidth="1" />
-        <ellipse cx="782" cy="450" rx="182" ry="24" fill="none" stroke="rgba(213,224,232,0.06)" strokeWidth="1" />
-
-        <g fill="none" strokeLinecap="round">
-          <path d="M370 274C482 252 598 250 742 266C794 271 838 278 882 288" stroke="url(#dashboard-hero-line)" strokeWidth="1.2" />
-          <path d="M420 286C546 261 658 263 778 281C820 288 852 294 900 306" stroke="url(#dashboard-hero-line)" strokeWidth="1.05" opacity="0.86" />
-          <path d="M470 302C586 278 690 281 798 300C840 308 875 315 920 324" stroke="url(#dashboard-hero-line)" strokeWidth="0.95" opacity="0.72" />
-          <path d="M512 320C620 296 710 300 810 319C850 326 885 332 920 338" stroke="url(#dashboard-hero-line)" strokeWidth="0.9" opacity="0.54" />
-          <path d="M560 344C658 322 742 326 834 342C868 348 894 354 920 360" stroke="url(#dashboard-hero-line)" strokeWidth="0.85" opacity="0.42" />
-        </g>
-      </svg>
-    </div>
-  );
-}
-
-function DashboardPlanArt() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <svg viewBox="0 0 920 320" className="absolute inset-0 h-full w-full">
-        <defs>
-          <radialGradient id="dashboard-plan-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(239,245,249,0.22)" />
-            <stop offset="100%" stopColor="rgba(239,245,249,0)" />
-          </radialGradient>
-          <linearGradient id="dashboard-plan-beam" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(226,236,242,0)" />
-            <stop offset="56%" stopColor="rgba(226,236,242,0.65)" />
-            <stop offset="100%" stopColor="rgba(226,236,242,0.04)" />
-          </linearGradient>
-          <linearGradient id="dashboard-plan-top-wash" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.04)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
-        </defs>
-
-        <rect x="0" y="0" width="920" height="320" fill="url(#dashboard-plan-top-wash)" />
-        <ellipse cx="822" cy="46" rx="88" ry="88" fill="url(#dashboard-plan-glow)" />
-        <path d="M660 320L920 92" stroke="url(#dashboard-plan-beam)" strokeWidth="1.4" />
-
-        <g transform="translate(702 104)" fill="none" stroke="rgba(219,229,237,0.46)" strokeWidth="1.25">
-          <path d="M0 38L52 8L104 38L52 68L0 38Z" />
-          <path d="M0 38V108L52 140V68" />
-          <path d="M104 38V108L52 140" />
-          <path d="M52 68L104 38" />
-        </g>
-      </svg>
-    </div>
-  );
-}
-
-function DashboardScoreArt() {
-  return (
-    <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(188,204,216,0.14),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent_32%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 right-0 h-36 w-44 bg-[radial-gradient(rgba(217,227,236,0.6)_0.8px,transparent_0.8px)] [background-size:12px_12px] opacity-[0.26] [mask-image:linear-gradient(180deg,transparent,black_30%)]"
-      />
-    </>
-  );
-}
+const DASHBOARD_TWO_COLUMN_GRID =
+  "grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_360px]";
 
 export default async function DashboardPage({
   searchParams,
@@ -395,35 +289,22 @@ export default async function DashboardPage({
     return PROJECT_STATUS_LABEL[project.importStatus]?.label ?? "草稿";
   }
 
-  const secondaryProjectToken = secondaryProject ? "01" : "项目";
-
   return (
     <div className="mx-auto max-w-[1480px] space-y-8 px-6 py-10">
-      <div className="space-y-5">
-        <div className="h-1 w-10 rounded-full bg-[linear-gradient(90deg,rgba(249,252,255,0.98),rgba(170,189,205,0.8))] shadow-[0_0_18px_rgba(168,190,208,0.38)]" />
-        <PageHeader
-          eyebrow="工作台"
-          title="工作台首页"
-          description="从这里继续你最近在做的事。"
-          className="gap-6"
-        />
-      </div>
+      <PageHeader
+        eyebrow="工作台"
+        title="工作台首页"
+        description="从这里继续你最近在做的事。"
+      />
 
-      <Separator className="-mx-6 w-auto bg-white/[0.06]" />
+      <Separator className="-mx-6 w-auto" />
 
       {fromScore ? (
-        <Card className="app-panel relative overflow-hidden border-white/10 bg-[#101318] shadow-none">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(170,189,205,0.14),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_34%)]"
-          />
-          <CardHeader className="relative gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <Card className="app-panel shadow-none">
+          <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant="secondary"
-                  className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                >
+                <Badge variant="secondary" className="rounded-md px-2 py-0.5 text-xs font-medium">
                   来自评分
                 </Badge>
                 {focusedScoreLevel ? (
@@ -467,16 +348,13 @@ export default async function DashboardPage({
               ) : null}
               {scorePrimaryCreatesProject ? (
                 <CreateProjectDialog>
-                  <Button className="h-11 border-white/12 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(224,231,237,0.92))] px-5 text-[#0b0d10] shadow-[0_18px_48px_-30px_rgba(189,207,222,0.42)] hover:bg-white">
+                  <Button className="h-11 px-5">
                     {scorePrimaryLabel}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CreateProjectDialog>
               ) : (
-                <Button
-                  asChild
-                  className="h-11 border-white/12 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(224,231,237,0.92))] px-5 text-[#0b0d10] shadow-[0_18px_48px_-30px_rgba(189,207,222,0.42)] hover:bg-white"
-                >
+                <Button asChild className="h-11 px-5">
                   <Link href={scorePrimaryHref}>
                     {scorePrimaryLabel}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -627,58 +505,36 @@ export default async function DashboardPage({
       ) : (
         <div className="space-y-6">
           <div className={DASHBOARD_TWO_COLUMN_GRID}>
-            <Card className="app-panel-elevated relative flex h-full flex-col overflow-hidden border-white/10 bg-[#0f1115] shadow-[0_40px_110px_-82px_rgba(0,0,0,0.96)]">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(166,186,201,0.16),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)_18%,transparent_44%)]"
-              />
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(217,228,237,0.54),transparent)]"
-              />
-              <DashboardHeroArt />
-              <CardHeader className="relative z-10 min-h-[220px] max-w-3xl space-y-4 pb-2 lg:max-w-[54%]">
+            <Card className="app-panel-elevated flex h-full flex-col shadow-none">
+              <CardHeader className="min-h-[180px] space-y-3 pb-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/80"
-                  >
+                  <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                     继续工作
                   </Badge>
                   {primaryIsPortfolio && activePortfolio ? (
-                    <Badge
-                      variant="outline"
-                      className="border-[#d4e1ec]/10 bg-[#12161c]/80 px-2.5 py-1 text-[11px] font-medium text-[#d9e4ed]"
-                    >
+                    <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
                       {primaryPriorityLabel}
                     </Badge>
                   ) : null}
                 </div>
-                {primaryTitle ? (
-                  <CardTitle className="text-[2.6rem] leading-[1.02] tracking-[-0.055em] text-[#f4f7fa]">
-                    {primaryTitle}
-                  </CardTitle>
-                ) : null}
+                {primaryTitle ? <CardTitle className="text-3xl">{primaryTitle}</CardTitle> : null}
                 {primaryDescription ? (
-                  <CardDescription className="max-w-3xl text-[15px] leading-7 text-white/62">
+                  <CardDescription className="max-w-3xl text-sm leading-6">
                     {primaryDescription}
                   </CardDescription>
                 ) : null}
               </CardHeader>
 
-              <CardContent className="relative z-10 space-y-5 pt-0">
-                <div className="flex flex-col gap-4 border-b border-white/8 pb-5 sm:flex-row sm:items-end sm:justify-between">
+              <CardContent className="space-y-4 pt-0">
+                <div className="flex flex-col gap-4 border-b border-border/70 pb-4 sm:flex-row sm:items-end sm:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
                     {primaryStatus ? (
-                      <Badge
-                        variant="outline"
-                        className="border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                      >
+                      <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
                         {primaryStatus}
                       </Badge>
                     ) : null}
                     {primaryUpdatedAt ? (
-                      <span className="flex items-center gap-1.5 text-xs tabular-nums text-[#9ca9b5]">
+                      <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
                         <Clock3 className="h-3 w-3" />
                         最近更新于 {primaryUpdatedAt}
                       </span>
@@ -687,20 +543,13 @@ export default async function DashboardPage({
 
                   {primaryContinuePath ? (
                     <div className="flex flex-wrap gap-3 sm:justify-end">
-                      <Button
-                        asChild
-                        className="h-11 border-white/12 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(224,231,237,0.92))] px-5 text-[#0b0d10] shadow-[0_18px_48px_-30px_rgba(189,207,222,0.45)] hover:bg-white"
-                      >
+                      <Button asChild className="h-11 px-5">
                         <Link href={primaryContinuePath.href}>
                           {primaryCtaLabel}
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="h-11 border-[#d4e0ea]/12 bg-white/[0.03] px-5 text-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:border-[#dbe6ef]/18 hover:bg-[#181d24]"
-                      >
+                      <Button asChild variant="outline" className="h-11 px-5">
                         <Link href={primaryIsPortfolio ? "/portfolios" : "/projects"}>
                           {primaryIsPortfolio ? "查看全部作品集" : "查看全部项目"}
                         </Link>
@@ -710,130 +559,90 @@ export default async function DashboardPage({
                 </div>
 
                 {secondaryProject ? (
-                  <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  <div className="rounded-[24px] border border-border bg-secondary p-3.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[11px] font-medium text-[#9ca9b5]">
+                      <p className="text-[11px] font-medium text-muted-foreground">
                         同时进行
                       </p>
-                      <Badge
-                        variant="outline"
-                        className="border-white/10 bg-[#11151b]/88 px-2 py-0.5 text-xs font-medium text-white/70"
-                      >
+                      <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
                         项目
                       </Badge>
                     </div>
                     <Link
                       href={getProjectContinuePath(secondaryProject).href}
-                      className="mt-4 flex items-center justify-between gap-4 rounded-[22px] border border-white/8 bg-[#11151b]/90 px-4 py-4 transition-all hover:border-[#d9e4ed]/16 hover:bg-[#171c23]"
+                      className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
                     >
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-[#d6e3ed]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] text-lg font-semibold tracking-[-0.04em] text-[#eef4f8] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          {secondaryProjectToken}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">{secondaryProject.name}</span>
+                          <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
+                            {projectStageLabel(secondaryProject)}
+                          </Badge>
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-base font-medium text-[#f2f6f9]">
-                              {secondaryProject.name}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="border-white/10 bg-white/[0.03] px-2 py-0.5 text-xs font-medium text-white/68"
-                            >
-                              {projectStageLabel(secondaryProject)}
-                            </Badge>
-                          </span>
-                          <span className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-[#8e9ba7]">
-                            <Clock3 className="h-3 w-3" />
-                            {formatProjectDate(secondaryProject.updatedAt)}
-                          </span>
+                        <span className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+                          <Clock3 className="h-3 w-3" />
+                          {formatProjectDate(secondaryProject.updatedAt)}
                         </span>
                       </span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-[#93a7b7]" />
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </Link>
                   </div>
                 ) : null}
               </CardContent>
             </Card>
 
-            <Card className="app-panel relative flex h-full flex-col overflow-hidden border-white/10 bg-[#101317] shadow-none">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,181,198,0.12),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_28%)]"
-              />
-              <CardHeader className="relative min-h-[180px] space-y-3 pb-4">
+            <Card className="app-panel flex h-full flex-col shadow-none">
+              <CardHeader className="min-h-[180px] space-y-3 pb-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className="border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                  >
+                  <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                     快速入口
                   </Badge>
                 </div>
-                <CardTitle className="text-[1.9rem] tracking-[-0.05em] text-[#f4f7fa]">
-                  常用入口
-                </CardTitle>
-                <CardDescription className="text-sm leading-6 text-white/58">
+                <CardTitle className="text-xl">常用入口</CardTitle>
+                <CardDescription className="text-sm leading-6">
                   常用入口都在这里，不需要再回旧的流程页。
                 </CardDescription>
               </CardHeader>
-              <CardContent className="relative grid flex-1 gap-3 pt-0">
+              <CardContent className="grid flex-1 gap-3 pt-0">
                 <CreateProjectDialog>
                   <button
                     type="button"
-                    className="group flex min-h-[62px] items-center gap-3 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] px-4 py-3.5 text-left transition-all hover:border-[#dbe6ef]/18 hover:bg-[#171c23]"
+                    className="flex min-h-[54px] items-center gap-3 rounded-2xl border border-border bg-secondary px-4 py-3.5 text-left transition-colors hover:bg-accent"
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d8e4ed]/10 bg-white/[0.03] text-[#dbe6ee] transition-colors group-hover:border-[#dbe6ef]/18">
-                      <PlusCircle className="h-4 w-4" />
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-[#f1f5f8]">新建项目</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-[#8fa3b2]" />
+                    <PlusCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 text-sm font-medium text-foreground">新建项目</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
                 </CreateProjectDialog>
                 {DASHBOARD_QUICK_LINKS.map(({ icon: Icon, label, href }) => (
                   <Link
                     key={href}
                     href={href}
-                    className="group flex min-h-[62px] items-center gap-3 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] px-4 py-3.5 transition-all hover:border-[#dbe6ef]/18 hover:bg-[#171c23]"
+                    className="flex min-h-[54px] items-center gap-3 rounded-2xl border border-border bg-secondary px-4 py-3.5 transition-colors hover:bg-accent"
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d8e4ed]/10 bg-white/[0.03] text-[#dbe6ee] transition-colors group-hover:border-[#dbe6ef]/18">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-[#f1f5f8]">{label}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-[#8fa3b2]" />
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </Link>
                 ))}
               </CardContent>
             </Card>
 
-            <Card className="app-panel-muted relative flex h-full flex-col overflow-hidden border-white/10 bg-[#0f1216] shadow-none">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,181,198,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent_30%)]"
-              />
-              <DashboardPlanArt />
-              <CardContent className="relative flex h-full flex-col space-y-5 p-5">
+            <Card className="app-panel-muted flex h-full flex-col shadow-none">
+              <CardContent className="flex h-full flex-col space-y-4 p-5">
                 <div className="flex min-h-[140px] flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                      >
+                      <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                         套餐与额度
                       </Badge>
                     </div>
-                    <p className="text-[2.1rem] font-semibold tracking-[-0.05em] text-[#f5f8fa]">
-                      {planCopy.title}
-                    </p>
-                    <p className="max-w-[34rem] text-sm leading-6 text-white/58">
+                    <p className="text-base font-semibold text-foreground">{planCopy.title}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">
                       {planCopy.description}
                     </p>
                   </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="h-10 border-[#d4e0ea]/12 bg-white/[0.03] px-4 text-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:border-[#dbe6ef]/18 hover:bg-[#171c23]"
-                  >
+                  <Button asChild variant="outline" className="h-9 px-3.5">
                     <Link href={currentPlan === "FREE" ? "/pricing" : "/profile?panel=account"}>
                       <CreditCard className="mr-2 h-3.5 w-3.5" />
                       查看权益
@@ -841,47 +650,26 @@ export default async function DashboardPage({
                   </Button>
                 </div>
                 {entitlementSummary.expiresAt ? (
-                  <p className="text-xs tabular-nums text-[#94a2af]">
+                  <p className="text-xs tabular-nums text-muted-foreground">
                     有效期至 {formatProjectDate(entitlementSummary.expiresAt)}
                   </p>
                 ) : null}
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   {DASHBOARD_QUOTA_ORDER.map((quotaKey) => {
                     const quota = entitlementSummary.quotas[quotaKey];
-                    const usageRatio = getQuotaUsageRatio(quotaKey, quota);
-                    const usageLabel =
-                      quota.limit <= 0
-                        ? "未解锁"
-                        : quotaKey === "activeProjects"
-                          ? `${quota.used}/${quota.limit}`
-                          : `${quota.remaining} / ${quota.limit} 次`;
                     return (
                       <div
                         key={quotaKey}
-                        className="min-h-[112px] rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.018))] px-4 py-3.5"
+                        className="min-h-[74px] rounded-lg border border-border bg-secondary px-3 py-2.5"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-medium text-[#94a2af]">
-                            {DASHBOARD_QUOTA_LABELS[quotaKey]}
-                          </p>
-                          <span className="text-[11px] font-medium text-white/34">
-                            {quota.limit <= 0 ? "锁定" : `${Math.round(usageRatio * 100)}%`}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-base font-semibold text-[#f2f6f9]">
-                          {usageLabel}
+                        <p className="text-[11px] font-medium text-muted-foreground">
+                          {DASHBOARD_QUOTA_LABELS[quotaKey]}
                         </p>
-                        <div className="mt-4 h-[5px] rounded-full bg-white/8">
-                          <div
-                            className="h-full rounded-full bg-[linear-gradient(90deg,rgba(246,249,252,0.95),rgba(164,185,201,0.86))]"
-                            style={{
-                              width:
-                                usageRatio > 0
-                                  ? `${Math.max(usageRatio * 100, 12)}%`
-                                  : "0%",
-                            }}
-                          />
-                        </div>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {quotaKey === "activeProjects"
+                            ? `${quota.used}/${quota.limit}`
+                            : `${quota.remaining} / ${quota.limit} 次`}
+                        </p>
                       </div>
                     );
                   })}
@@ -890,15 +678,11 @@ export default async function DashboardPage({
             </Card>
 
             {latestScore && latestScoreTotal !== null ? (
-              <Card className="app-panel-muted relative flex h-full flex-col overflow-hidden border-white/10 bg-[#0f1115] shadow-none">
-                <DashboardScoreArt />
-                <CardContent className="relative flex h-full flex-col space-y-5 p-5">
+              <Card className="app-panel-muted flex h-full flex-col shadow-none">
+                <CardContent className="flex h-full flex-col space-y-4 p-5">
                   <div className="flex min-h-[140px] flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                      >
+                      <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                         最近一次评分
                       </Badge>
                       {latestScoreLevel ? (
@@ -911,23 +695,14 @@ export default async function DashboardPage({
                     </div>
                     <div className="flex items-end justify-between gap-3">
                       <div>
-                        <div className="flex items-end gap-2">
-                          <p className="text-[3.25rem] font-semibold leading-none tracking-[-0.06em] text-[#f4f8fb]">
-                            {latestScoreTotal}
-                          </p>
-                          <span className="pb-1 text-sm text-[#93a4b2]">/100</span>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-white/58">
+                        <p className="text-2xl font-semibold text-foreground">{latestScoreTotal}</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
                           {formatProjectDate(latestScore.createdAt)} 的结果，可作为接下来整理和发布前的参考。
                         </p>
                       </div>
                     </div>
                   </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="mt-auto h-10 self-start border-[#d4e0ea]/12 bg-white/[0.03] px-4 text-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:border-[#dbe6ef]/18 hover:bg-[#171c23]"
-                  >
+                  <Button asChild variant="outline" className="mt-auto h-9 self-start px-3.5">
                     <Link href={`/score/${latestScore.id}`}>
                       查看完整评分结果
                       <ArrowRight className="ml-2 h-3.5 w-3.5" />
@@ -936,32 +711,22 @@ export default async function DashboardPage({
                 </CardContent>
               </Card>
             ) : (
-              <Card className="app-panel-muted relative flex h-full flex-col overflow-hidden border-white/10 bg-[#0f1115] shadow-none">
-                <DashboardScoreArt />
-                <CardContent className="relative flex h-full flex-col space-y-5 p-5">
+              <Card className="app-panel-muted flex h-full flex-col shadow-none">
+                <CardContent className="flex h-full flex-col space-y-4 p-5">
                   <div className="flex min-h-[140px] flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/76"
-                      >
+                      <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                         接下来建议
                       </Badge>
                     </div>
                     <div>
-                      <p className="text-base font-semibold text-[#f2f6f9]">
-                        {nextPreparationCard.title}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-white/58">
+                      <p className="text-base font-semibold text-foreground">{nextPreparationCard.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         {nextPreparationCard.description}
                       </p>
                     </div>
                   </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="mt-auto h-10 self-start border-[#d4e0ea]/12 bg-white/[0.03] px-4 text-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:border-[#dbe6ef]/18 hover:bg-[#171c23]"
-                  >
+                  <Button asChild variant="outline" className="mt-auto h-9 self-start px-3.5">
                     <Link href={nextPreparationCard.href}>
                       {nextPreparationCard.cta}
                       <ArrowRight className="ml-2 h-3.5 w-3.5" />
@@ -975,18 +740,13 @@ export default async function DashboardPage({
           {projects.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="h-px w-8 bg-[linear-gradient(90deg,rgba(247,250,252,0.92),rgba(163,181,198,0.56))]" />
-                  <div>
-                    <p className="text-[11px] font-medium text-muted-foreground">
-                      最近项目
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      项目会持续沉淀在这里，需要时可以直接回到编辑器。
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    最近项目
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">项目会持续沉淀在这里，需要时可以直接回到编辑器。</p>
                 </div>
-                <Button asChild variant="ghost" className="h-9 px-0 text-white/74 hover:text-white">
+                <Button asChild variant="ghost" className="h-9 px-0">
                   <Link href="/projects">
                     查看全部项目
                     <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
