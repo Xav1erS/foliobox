@@ -75,6 +75,7 @@ function makeDrafts(): ProjectPrototypeBoardDraft[] {
       visualBrief: "优先使用封面图。",
       preferredAssetIds: [],
       missingAssetNote: "待补主视觉",
+      layoutIntent: "hero",
     },
     {
       sectionId: "section-journey",
@@ -86,6 +87,7 @@ function makeDrafts(): ProjectPrototypeBoardDraft[] {
       visualBrief: "需要一张体验地图 / journey map 作为说明图。",
       preferredAssetIds: [],
       missingAssetNote: "待补体验地图",
+      layoutIntent: "timeline",
     },
     {
       sectionId: "section-result",
@@ -97,6 +99,7 @@ function makeDrafts(): ProjectPrototypeBoardDraft[] {
       visualBrief: "需要一张结果证据板。",
       preferredAssetIds: [],
       missingAssetNote: "待补结果证据图",
+      layoutIntent: "grid_3",
     },
   ];
 }

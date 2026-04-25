@@ -210,6 +210,18 @@ export type ProjectBoardStructureSource = z.infer<
   typeof ProjectBoardStructureSourceSchema
 >;
 
+export const PROJECT_LAYOUT_INTENTS = [
+  "hero",
+  "split_2_1",
+  "grid_3",
+  "grid_2x2",
+  "timeline",
+  "narrative",
+  "showcase",
+] as const;
+export type ProjectLayoutIntent = (typeof PROJECT_LAYOUT_INTENTS)[number];
+export const ProjectLayoutIntentSchema = z.enum(PROJECT_LAYOUT_INTENTS);
+
 export const ProjectBoardSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -228,6 +240,7 @@ export const ProjectBoardSchema = z.object({
   locked: z.boolean().optional().default(false),
   pageType: ProjectPageTypeSchema.nullable().optional().default(null),
   phase: ProjectBoardPhaseSchema.nullable().optional().default(null),
+  layoutIntent: ProjectLayoutIntentSchema.nullable().optional().default(null),
 });
 
 export type ProjectBoard = z.infer<typeof ProjectBoardSchema>;
@@ -361,6 +374,7 @@ export const ProjectPrototypeBoardDraftSchema = z.object({
   visualBrief: z.string().optional().default(""),
   preferredAssetIds: z.array(z.string()).optional().default([]),
   missingAssetNote: z.string().optional().default(""),
+  layoutIntent: ProjectLayoutIntentSchema.optional(),
 });
 
 export type ProjectPrototypeBoardDraft = z.infer<typeof ProjectPrototypeBoardDraftSchema>;
@@ -395,6 +409,11 @@ export type ProjectLayoutDocument = Record<string, unknown> & {
   editorScene?: ProjectEditorScene;
   materialRecognition?: ProjectMaterialRecognition;
   structureSuggestion?: ProjectStructureSuggestion;
+  /**
+   * 单图视觉理由 sidecar，仅在 NEXT_PUBLIC_ASSET_REASONING_VISION 开启时写入。
+   * Key: `${boardId}::${assetId}` → 一句话理由（≤ 30 字）。
+   */
+  assetReasoningVision?: Record<string, string>;
   /**
    * Setup 向导完成信号。只在用户手动点击"进入排版"时写入 completedAt。
    * 用于控制 setupMode 的初始值（决定退出重进是走向导还是画板）。
@@ -572,6 +591,7 @@ export function createProjectBoard(
     locked: patch?.locked ?? false,
     pageType: patch?.pageType ?? null,
     phase: patch?.phase ?? null,
+    layoutIntent: patch?.layoutIntent ?? null,
   };
 }
 
@@ -969,6 +989,7 @@ function resolvePrototypeDraft(params: {
     preferredAssetIds: draft.preferredAssetIds ?? fallback.preferredAssetIds,
     missingAssetNote:
       trimPrototypeCopy(draft.missingAssetNote, 44) || fallback.missingAssetNote,
+    layoutIntent: draft.layoutIntent ?? fallback.layoutIntent,
   } satisfies ProjectPrototypeBoardDraft;
 }
 
@@ -1176,6 +1197,7 @@ export function buildProjectSceneFromStructureSuggestion(params: {
           contentSuggestions,
           pageType,
           phase: "prototype",
+          layoutIntent: draft?.layoutIntent ?? null,
           frame: {
             width: PROJECT_BOARD_WIDTH,
             height: PROJECT_BOARD_HEIGHT,

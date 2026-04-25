@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -26,6 +26,10 @@ import type {
   ProjectStructureSuggestion,
 } from "@/lib/project-editor-scene";
 import type { ApplyStructureResponseBase } from "@/lib/project-structure-apply-types";
+import {
+  diffProjectStructure,
+  summarizeStructureDiff,
+} from "@/lib/project-structure-diff";
 
 type StructureWorkbenchMessage = {
   tone: "info" | "error";
@@ -63,6 +67,13 @@ export function ProjectStructureWorkbench({
     () => structureDraft?.groups.reduce((sum, group) => sum + group.sections.length, 0) ?? 0,
     [structureDraft]
   );
+  // 落板基准：以本次进入页面时的结构为"已应用"快照，与当前 draft 对比即可看到改动。
+  const appliedSnapshotRef = useRef(initialStructureDraft);
+  const structureDiff = useMemo(
+    () => diffProjectStructure(appliedSnapshotRef.current, structureDraft),
+    [structureDraft]
+  );
+  const diffSummary = summarizeStructureDiff(structureDiff);
 
   function mutateStructureDraft(
     updater: (current: ProjectStructureSuggestion) => ProjectStructureSuggestion
@@ -393,6 +404,32 @@ export function ProjectStructureWorkbench({
                   <Check className="mr-2 h-4 w-4" />
                   确认当前结构
                 </Button>
+                {hasExistingBoards && structureDiff.hasChanges ? (
+                  <div className="rounded-xl border border-amber-300/24 bg-amber-400/8 px-3 py-2.5 text-xs leading-5 text-amber-50">
+                    <div className="flex items-center gap-1.5 text-amber-100">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-300" aria-hidden />
+                      <span className="text-sm font-medium">本次重建会改动当前结构</span>
+                    </div>
+                    <p className="mt-1 text-amber-50/82">{diffSummary}</p>
+                    {structureDiff.added.length > 0 ? (
+                      <p className="mt-1 truncate text-amber-50/64">
+                        新增：{structureDiff.added.map((item) => item.title).join("、")}
+                      </p>
+                    ) : null}
+                    {structureDiff.removed.length > 0 ? (
+                      <p className="mt-1 truncate text-amber-50/64">
+                        删除：{structureDiff.removed.map((item) => item.title).join("、")}
+                      </p>
+                    ) : null}
+                    {structureDiff.renamed.length > 0 ? (
+                      <p className="mt-1 truncate text-amber-50/64">
+                        改名：{structureDiff.renamed
+                          .map((item) => `${item.previousTitle}→${item.nextTitle}`)
+                          .join("、")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"

@@ -448,12 +448,15 @@ function pushRuleIssues(
   rule: SlotRule,
   kind: ValidationKind,
   issues: ValidationIssue[],
-  options: { allowMissingImageWarning?: boolean } = {}
+  options: { allowMissingImageWarning?: boolean; softRuleSeverity?: boolean } = {}
 ) {
+  // 内容稿（prototype）阶段允许这些"块数 / 角色数 / 形状数不达标"作 warn，
+  // 让用户在画布上继续修。生成稿（generated）保持 block 严格。
+  const softSeverity: ValidationSeverity = options.softRuleSeverity ? "warn" : "block";
   if (typeof rule.minNodes === "number" && board.nodes.length < rule.minNodes) {
     issues.push({
       boardId: board.id,
-      severity: "block",
+      severity: softSeverity,
       kind,
       message: "画板内容块过少，当前结构不完整。",
     });
@@ -461,7 +464,7 @@ function pushRuleIssues(
   if (typeof rule.minShapes === "number" && countShapes(board) < rule.minShapes) {
     issues.push({
       boardId: board.id,
-      severity: "block",
+      severity: softSeverity,
       kind,
       message: "画板骨架缺少必要区块，当前结构不完整。",
     });
@@ -484,7 +487,7 @@ function pushRuleIssues(
     const isMetric = role === "metric";
     issues.push({
       boardId: board.id,
-      severity: "block",
+      severity: softSeverity,
       kind,
       message: isMetric
         ? "这页缺少必要的结果证据区块。"
@@ -530,7 +533,7 @@ function getPrototypeBoardIssues(board: ProjectBoard) {
     });
   }
 
-  pushRuleIssues(board, rule, "structural", issues);
+  pushRuleIssues(board, rule, "structural", issues, { softRuleSeverity: true });
   issues.push(...getPrototypeCoverIssues(board));
   issues.push(...getPrototypeContentIssues(board));
 

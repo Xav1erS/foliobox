@@ -76,6 +76,8 @@ export type LayoutJson = z.infer<typeof LayoutJsonSchema> & {
   structureSuggestion?: ProjectStructureSuggestion;
   /** Setup 向导完成标记，只在用户点击"进入排版"时写入。 */
   setup?: { completedAt?: string | null };
+  /** 单图视觉理由 sidecar，env-flagged 才有；key=`${sectionId}::${assetId}`。 */
+  assetReasoningVision?: Record<string, string>;
 };
 export type LayoutPage = z.infer<typeof LayoutPageSchema>;
 

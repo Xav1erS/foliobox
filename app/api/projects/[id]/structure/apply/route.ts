@@ -23,12 +23,14 @@ import {
   planPrototypeVisualAssets,
   type GeneratedVisualKind,
 } from "@/lib/project-visual-asset-generation";
+import { buildLayoutIntentRubric } from "@/lib/project-editor-prompt-rubric";
 import {
   stampProjectValidationFailure,
   validateProjectEditorScene,
 } from "@/lib/project-editor-validation";
 import type { ImageInput } from "@/lib/llm/provider";
 import type { ApplyStructureWarning } from "@/lib/project-structure-apply-types";
+import { generateAssetVisionReasonings } from "@/lib/project-asset-vision-reasoning";
 
 const MAX_GENERATED_VISUAL_ASSETS_PER_APPLY = 3;
 const SHOULD_SKIP_GENERATED_VISUALS =
@@ -221,6 +223,9 @@ ${input.recognitionSummary}
 ## 旧内容稿上下文（仅供避免遗漏，不可复用文案）
 ${input.currentSceneSummary}
 
+## 版式意图指南
+${buildLayoutIntentRubric()}
+
 ## 输出 JSON
 {
   "generatedAt": "<ISO 时间字符串>",
@@ -237,18 +242,20 @@ ${input.currentSceneSummary}
       ],
       "visualBrief": "<如果有图，这张图在本页承担什么作用；如果缺图，应该补什么图>",
       "preferredAssetIds": ["<优先使用的素材 id>"],
-      "missingAssetNote": "<如果缺图，明确写待补什么图；如果已有图，也可写空字符串>"
+      "missingAssetNote": "<如果缺图，明确写待补什么图；如果已有图，也可写空字符串>",
+      "layoutIntent": "<必须从 hero / split_2_1 / grid_3 / grid_2x2 / timeline / narrative / showcase 中选一个，遵守版式意图指南>"
     }
   ]
 }
 
-## 字段长度建议
+## 字段长度硬约束
 - title：中文不超过 12 字
-- summary：尽量控制在 80 字内
-- narrative：尽量控制在 120 字内
-- keyPoints：每条尽量控制在 28 字内，2 到 4 条
-- infoCards：0 到 3 条；label 尽量不超过 6 字，value 尽量不超过 18 字
+- summary：60-90 中文字之间，过短或过长都不合格
+- narrative：60-120 中文字之间。少于 60 字时补充背景或反思，多于 120 字时拆出 keyPoints
+- keyPoints：每条 12-28 字，2 到 4 条
+- infoCards：0 到 3 条；label ≤ 6 字，value ≤ 24 字（硬上限），优先用数字 / 短结论
 - preferredAssetIds：只能从输入素材 id 中选择；如果没有合适素材，可为空数组
+- layoutIntent：每页必填；相邻两页的 layoutIntent 不允许完全相同
 
 只输出 JSON，不输出 markdown。`;
 }
@@ -531,6 +538,7 @@ export async function POST(
         visualBrief: draft.visualBrief ?? "",
         preferredAssetIds: draft.preferredAssetIds ?? [],
         missingAssetNote: draft.missingAssetNote ?? "",
+        layoutIntent: draft.layoutIntent,
       }));
   } catch (error) {
     const message =
@@ -660,6 +668,27 @@ export async function POST(
     }
   }
 
+  // 视觉理由 sidecar：env-flagged，每次最多 4 张图，失败不阻塞主流程。
+  const assetByIdMap = new Map<string, ProjectSceneSeedAsset>(
+    sceneAssets.map((asset) => [asset.id, asset as ProjectSceneSeedAsset])
+  );
+  const assetReasoningVision = await generateAssetVisionReasonings({
+    userId: session.user.id,
+    projectId: project.id,
+    suggestion,
+    contentDrafts,
+    assetById: assetByIdMap,
+    resolveImage: async (assetId) => {
+      const asset = assetByIdMap.get(assetId);
+      if (!asset || !asset.imageUrl) return null;
+      try {
+        return await resolveAssetToImageInput(asset.imageUrl);
+      } catch {
+        return null;
+      }
+    },
+  });
+
   const editorScene = buildProjectSceneFromStructureSuggestion({
     suggestion,
     assets: sceneAssets,
@@ -707,6 +736,8 @@ export async function POST(
   const nextLayout = mergeProjectLayoutDocument(project.layoutJson, {
     editorScene,
     validation,
+    assetReasoningVision:
+      Object.keys(assetReasoningVision).length > 0 ? assetReasoningVision : undefined,
     ...(body.markSetupCompleted ? { setup: { completedAt: new Date().toISOString() } } : {}),
   });
 

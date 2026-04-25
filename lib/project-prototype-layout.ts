@@ -3,6 +3,7 @@ import type {
   ProjectBoardNode,
   ProjectBoardShapeNode,
   ProjectBoardTextNode,
+  ProjectLayoutIntent,
   ProjectPageType,
   ProjectPrototypeBoardDraft,
 } from "./project-editor-scene";
@@ -274,16 +275,16 @@ function addVisualSlot(
     const fittedVisualBrief = fitTextToHeight(
       visualBrief || "已匹配设计图",
       Math.max(120, rect.width - 72),
-      16,
-      1.2,
-      28
+      18,
+      1.25,
+      32
     );
     nodes.push(
       factory.createImage(matchedAssetId, {
         x: rect.x + 28,
-        y: rect.y + 36,
+        y: rect.y + 40,
         width: Math.max(120, rect.width - 56),
-        height: Math.max(120, rect.height - 128),
+        height: Math.max(120, rect.height - 132),
         zIndex: 4,
       }),
       factory.createText({
@@ -292,20 +293,20 @@ function addVisualSlot(
         x: rect.x + 28,
         y: rect.y + 18,
         width: Math.max(120, rect.width - 56),
-        height: 24,
-        fontSize: 16,
-        lineHeight: 1.2,
+        height: 26,
+        fontSize: 18,
+        lineHeight: 1.25,
         zIndex: 5,
       }),
       factory.createText({
         role: "note",
         text: fittedVisualBrief,
         x: rect.x + 36,
-        y: rect.y + rect.height - 58,
+        y: rect.y + rect.height - 60,
         width: Math.max(120, rect.width - 72),
-        height: 28,
-        fontSize: 16,
-        lineHeight: 1.2,
+        height: 32,
+        fontSize: 18,
+        lineHeight: 1.25,
         align: "center",
         zIndex: 5,
       })
@@ -995,11 +996,480 @@ function layoutReflection(
   );
 }
 
+// ---------- Intent composers (Sprint 1) ----------
+// Each composer owns a distinct silhouette so that 11 pages stop looking identical.
+
+function addAccentBar(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  rect: PrototypeRect
+) {
+  nodes.push(factory.createShape({ ...rect, zIndex: 4 }));
+}
+
+function intentHero(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText, assetLabel, matchedAssetId } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1200,
+    titleFontSize: 80,
+  });
+  const contentTop = header.contentTop;
+  const visualHeight = 520;
+  const visualWidth = matchedAssetId ? 1180 : SAFE_WIDTH;
+  const visualX = matchedAssetId ? SAFE_X + (SAFE_WIDTH - visualWidth) / 2 : SAFE_X;
+  addVisualSlot(nodes, factory, {
+    rect: { x: visualX, y: contentTop, width: visualWidth, height: visualHeight },
+    matchedAssetId,
+    visualBrief: draft.visualBrief,
+    fallbackText: assetLabel,
+  });
+  const footerY = Math.min(SAFE_BOTTOM - 112, contentTop + visualHeight + 56);
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: footerY, width: SAFE_WIDTH, height: 96 },
+    helperText || draft.summary || "这一页用主视觉建立开场。",
+    {
+      role: "body",
+      fontSize: 26,
+      lineHeight: 1.4,
+      align: "center",
+      paddingTop: 28,
+      zIndex: 3,
+    }
+  );
+}
+
+function intentSplit21(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText, assetLabel, matchedAssetId } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1000,
+    titleFontSize: 60,
+  });
+  const contentTop = header.contentTop;
+  const leftWidth = Math.floor((SAFE_WIDTH - GRID_GUTTER) * 0.62);
+  const rightWidth = SAFE_WIDTH - leftWidth - GRID_GUTTER;
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop, width: leftWidth, height: 360 },
+    draft.summary || helperText || "左侧主论述区待补充",
+    {
+      role: "body",
+      fontSize: 26,
+      lineHeight: 1.5,
+      zIndex: 3,
+    }
+  );
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop + 392, width: leftWidth, height: 180 },
+    draft.narrative || draft.keyPoints.slice(0, 3).join("\n") || "展开说明待补充",
+    {
+      role: "note",
+      fontSize: 22,
+      lineHeight: 1.45,
+      zIndex: 3,
+    }
+  );
+  addVisualSlot(nodes, factory, {
+    rect: {
+      x: SAFE_X + leftWidth + GRID_GUTTER,
+      y: contentTop,
+      width: rightWidth,
+      height: 572,
+    },
+    matchedAssetId,
+    visualBrief: draft.visualBrief,
+    fallbackText: assetLabel,
+  });
+}
+
+function intentGrid3(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1100,
+    titleFontSize: 62,
+  });
+  const contentTop = header.contentTop;
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop, width: SAFE_WIDTH, height: 132 },
+    helperText || draft.summary || "三个并列要点的整体说明",
+    {
+      role: "body",
+      fontSize: 24,
+      lineHeight: 1.45,
+      zIndex: 3,
+    }
+  );
+  const cardsY = contentTop + 164;
+  const cardHeight = 404;
+  const gap = 32;
+  const cardWidth = Math.floor((SAFE_WIDTH - gap * 2) / 3);
+  const labels = ["要点一", "要点二", "要点三"];
+  for (let i = 0; i < 3; i += 1) {
+    const x = SAFE_X + i * (cardWidth + gap);
+    // accent bar on top of each card
+    addAccentBar(nodes, factory, { x, y: cardsY, width: cardWidth, height: 8 });
+    addPanel(
+      nodes,
+      factory,
+      { x, y: cardsY + 16, width: cardWidth, height: cardHeight - 16 },
+      [
+        draft.infoCards[i]?.label || labels[i],
+        "",
+        draft.infoCards[i]?.value || draft.keyPoints[i] || "要点内容待补充",
+      ].join("\n"),
+      {
+        role: "body",
+        fontSize: 22,
+        lineHeight: 1.5,
+        paddingX: 32,
+        paddingTop: 36,
+        zIndex: 3,
+      }
+    );
+  }
+}
+
+function intentGrid2x2(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1100,
+    titleFontSize: 62,
+  });
+  const contentTop = header.contentTop;
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop, width: SAFE_WIDTH, height: 108 },
+    helperText || draft.summary || "四个维度的整体说明",
+    {
+      role: "note",
+      fontSize: 22,
+      lineHeight: 1.4,
+      zIndex: 3,
+    }
+  );
+  const gridY = contentTop + 140;
+  const gap = 28;
+  const cellWidth = Math.floor((SAFE_WIDTH - gap) / 2);
+  const cellHeight = 220;
+  const labels = ["维度 A", "维度 B", "维度 C", "维度 D"];
+  for (let i = 0; i < 4; i += 1) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = SAFE_X + col * (cellWidth + gap);
+    const y = gridY + row * (cellHeight + gap);
+    const label = draft.infoCards[i]?.label || labels[i];
+    const value = draft.infoCards[i]?.value || draft.keyPoints[i] || "待补充";
+    addPanel(
+      nodes,
+      factory,
+      { x, y, width: cellWidth, height: cellHeight },
+      `${label}\n\n${value}`,
+      {
+        role: "body",
+        fontSize: 22,
+        lineHeight: 1.45,
+        paddingX: 36,
+        paddingTop: 32,
+        zIndex: 3,
+      }
+    );
+  }
+}
+
+function intentTimeline(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1100,
+    titleFontSize: 60,
+  });
+  const contentTop = header.contentTop;
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop, width: SAFE_WIDTH, height: 108 },
+    helperText || draft.summary || "以下是这一段流程的顺序主线。",
+    {
+      role: "body",
+      fontSize: 24,
+      lineHeight: 1.45,
+      zIndex: 3,
+    }
+  );
+  const trackY = contentTop + 200;
+  const nodeCount = Math.max(3, Math.min(4, draft.keyPoints.length || 4));
+  const nodeWidth = 220;
+  const totalWidth = SAFE_WIDTH;
+  const nodeSpacing = Math.floor((totalWidth - nodeWidth * nodeCount) / (nodeCount - 1));
+  // connector line along the centers
+  addAccentBar(nodes, factory, {
+    x: SAFE_X + 60,
+    y: trackY + 58,
+    width: totalWidth - 120,
+    height: 4,
+  });
+  for (let i = 0; i < nodeCount; i += 1) {
+    const x = SAFE_X + i * (nodeWidth + nodeSpacing);
+    // node marker
+    addAccentBar(nodes, factory, { x: x + nodeWidth / 2 - 18, y: trackY + 42, width: 36, height: 36 });
+    // step label + description
+    const label = draft.infoCards[i]?.label || `步骤 ${i + 1}`;
+    const description =
+      draft.keyPoints[i] || draft.infoCards[i]?.value || "该阶段说明待补充";
+    nodes.push(
+      factory.createText({
+        role: "caption",
+        text: label,
+        x,
+        y: trackY,
+        width: nodeWidth,
+        height: 34,
+        fontSize: 20,
+        fontWeight: 600,
+        lineHeight: 1.2,
+        align: "center",
+        zIndex: 5,
+      })
+    );
+    addPanel(
+      nodes,
+      factory,
+      { x, y: trackY + 104, width: nodeWidth, height: 200 },
+      description,
+      {
+        role: "note",
+        fontSize: 20,
+        lineHeight: 1.4,
+        align: "center",
+        paddingX: 18,
+        paddingTop: 24,
+        zIndex: 3,
+      }
+    );
+  }
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: trackY + 344, width: SAFE_WIDTH, height: 108 },
+    draft.narrative || draft.visualBrief || "流程整体产出 / 异常恢复说明待补充",
+    {
+      role: "body",
+      fontSize: 22,
+      lineHeight: 1.45,
+      zIndex: 3,
+    }
+  );
+}
+
+function intentNarrative(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, helperText } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 980,
+    titleFontSize: 64,
+  });
+  const contentTop = header.contentTop;
+  const bodyWidth = 1060;
+  const sidebarX = SAFE_X + bodyWidth + GRID_GUTTER;
+  const sidebarWidth = SAFE_WIDTH - bodyWidth - GRID_GUTTER;
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop, width: bodyWidth, height: 620 },
+    [
+      draft.summary || helperText || "先讲清楚故事主线。",
+      "",
+      draft.narrative || "补充段落待完善。",
+    ].join("\n"),
+    {
+      role: "body",
+      fontSize: 26,
+      lineHeight: 1.55,
+      paddingTop: 48,
+      paddingX: 56,
+      zIndex: 3,
+    }
+  );
+  const sideNotes = (draft.keyPoints.length > 0
+    ? draft.keyPoints.slice(0, 3)
+    : ["要点一待补充", "要点二待补充", "要点三待补充"]
+  );
+  const noteHeight = Math.floor((620 - 40) / sideNotes.length);
+  sideNotes.forEach((note, index) => {
+    addPanel(
+      nodes,
+      factory,
+      {
+        x: sidebarX,
+        y: contentTop + index * (noteHeight + 20),
+        width: sidebarWidth,
+        height: noteHeight,
+      },
+      note,
+      {
+        role: "note",
+        fontSize: 20,
+        lineHeight: 1.45,
+        paddingX: 28,
+        paddingTop: 28,
+        zIndex: 3,
+      }
+    );
+  });
+}
+
+function intentShowcase(
+  nodes: ProjectBoardNode[],
+  factory: PrototypeNodeFactory,
+  params: BuildPrototypeLayoutParams
+) {
+  const { draft, assetLabel, matchedAssetId } = params;
+  const header = buildHeader(nodes, factory, {
+    groupLabel: params.groupLabel,
+    title: draft.title,
+    titleWidth: 1100,
+    titleFontSize: 60,
+  });
+  const contentTop = header.contentTop;
+  const visualWidth = 1040;
+  const rightX = SAFE_X + visualWidth + GRID_GUTTER;
+  const rightWidth = SAFE_WIDTH - visualWidth - GRID_GUTTER;
+  addVisualSlot(nodes, factory, {
+    rect: { x: SAFE_X, y: contentTop, width: visualWidth, height: 560 },
+    matchedAssetId,
+    visualBrief: draft.visualBrief,
+    fallbackText: assetLabel,
+  });
+  addPanel(
+    nodes,
+    factory,
+    { x: rightX, y: contentTop, width: rightWidth, height: 180 },
+    draft.summary || "模块 / 方案目标说明",
+    {
+      role: "body",
+      fontSize: 24,
+      lineHeight: 1.45,
+      zIndex: 3,
+    }
+  );
+  const noteCount = Math.max(2, Math.min(3, draft.keyPoints.length || 3));
+  const noteStartY = contentTop + 200;
+  const noteHeight = Math.floor((360 - 20 * (noteCount - 1)) / noteCount);
+  for (let i = 0; i < noteCount; i += 1) {
+    const y = noteStartY + i * (noteHeight + 20);
+    const label = draft.infoCards[i]?.label || `关键点 ${i + 1}`;
+    const value =
+      draft.infoCards[i]?.value || draft.keyPoints[i] || "要点说明待补充";
+    addPanel(
+      nodes,
+      factory,
+      { x: rightX, y, width: rightWidth, height: noteHeight },
+      `${label}\n${value}`,
+      {
+        role: "note",
+        fontSize: 20,
+        lineHeight: 1.4,
+        paddingX: 28,
+        paddingTop: 24,
+        zIndex: 3,
+      }
+    );
+  }
+  addPanel(
+    nodes,
+    factory,
+    { x: SAFE_X, y: contentTop + 592, width: SAFE_WIDTH, height: 96 },
+    draft.narrative || "方案交互 / 设计说明待补充",
+    {
+      role: "body",
+      fontSize: 22,
+      lineHeight: 1.45,
+      paddingTop: 28,
+      zIndex: 3,
+    }
+  );
+}
+
+const INTENT_DISPATCH: Record<
+  ProjectLayoutIntent,
+  (
+    nodes: ProjectBoardNode[],
+    factory: PrototypeNodeFactory,
+    params: BuildPrototypeLayoutParams
+  ) => void
+> = {
+  hero: intentHero,
+  split_2_1: intentSplit21,
+  grid_3: intentGrid3,
+  grid_2x2: intentGrid2x2,
+  timeline: intentTimeline,
+  narrative: intentNarrative,
+  showcase: intentShowcase,
+};
+
 export function buildPrototypeLayoutNodes(
   params: BuildPrototypeLayoutParams,
   factory: PrototypeNodeFactory
 ) {
   const nodes: ProjectBoardNode[] = [];
+  const intent = params.draft.layoutIntent;
+  if (intent && INTENT_DISPATCH[intent]) {
+    // Intent with no matched asset but wants one: degrade to a non-visual intent.
+    const needsVisual = intent === "hero" || intent === "showcase" || intent === "split_2_1";
+    if (needsVisual && !params.matchedAssetId) {
+      const degraded: ProjectLayoutIntent =
+        intent === "hero"
+          ? "narrative"
+          : intent === "showcase"
+            ? "grid_2x2"
+            : "grid_3";
+      INTENT_DISPATCH[degraded](nodes, factory, params);
+      return nodes;
+    }
+    INTENT_DISPATCH[intent](nodes, factory, params);
+    return nodes;
+  }
   if (params.pageType === "项目定位 / 背景页" || params.pageType === "项目定位 / 背景") {
     layoutCover(nodes, factory, params);
     return nodes;

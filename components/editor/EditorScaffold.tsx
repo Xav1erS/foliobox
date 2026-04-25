@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Loader2,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -426,27 +427,55 @@ export function EditorEdgeToggle({
   );
 }
 
+type EditorChromeButtonExtras = {
+  tone?: "default" | "active";
+  loading?: boolean;
+  tooltipLabel?: string;
+};
+
 export function EditorChromeButton({
   className,
   variant = "outline",
+  tone = "default",
+  loading = false,
+  tooltipLabel,
+  disabled,
+  children,
+  title,
   ...props
-}: ComponentProps<typeof Button>) {
+}: ComponentProps<typeof Button> & EditorChromeButtonExtras) {
+  const resolvedTitle = title ?? tooltipLabel;
   return (
     <Button
       variant={variant}
+      title={resolvedTitle}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         "rounded-full border-white/8 bg-white/2.5 text-white transition-all duration-150 hover:bg-white/8 hover:text-white active:scale-[0.985]",
+        tone === "active" &&
+          "border-white/20 bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)] hover:bg-white/14",
+        loading && "pointer-events-none opacity-80",
         className
       )}
       {...props}
-    />
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          {children}
+        </>
+      ) : (
+        children
+      )}
+    </Button>
   );
 }
 
 export function EditorChromeIconButton({
   className,
   ...props
-}: ComponentProps<typeof Button>) {
+}: ComponentProps<typeof Button> & EditorChromeButtonExtras) {
   return (
     <EditorChromeButton
       size="icon"

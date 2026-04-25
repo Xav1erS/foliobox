@@ -25,6 +25,8 @@ export type FabricSceneObject = FabricObject & {
     shapeType?: ProjectShapeType;
     role?: ProjectBoardTextNode["role"];
     placeholder?: boolean;
+    /** Snap 辅助线标记，命中后跳过状态同步 / 缩略图重抓。 */
+    snapGuide?: boolean;
   };
 };
 
