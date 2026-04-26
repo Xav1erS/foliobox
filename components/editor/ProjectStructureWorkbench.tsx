@@ -224,20 +224,30 @@ export function ProjectStructureWorkbench({
       confirmedAt: new Date().toISOString(),
     };
     await saveStructureDraft(confirmedSuggestion);
-    setActionMessage({ tone: "info", text: "当前结构已确认，可继续重建内容稿。" });
+    setActionMessage({ tone: "info", text: "当前结构已确认，可继续生成低保真画板。" });
   }
 
   async function applyStructureToBoards() {
     if (!structureDraft || structureDraft.groups.length === 0 || applyingStructure) return;
 
     if (structureDraft.status !== "confirmed") {
-      setActionMessage({ tone: "error", text: "请先确认当前结构，再重新创建内容稿。" });
+      setActionMessage({ tone: "error", text: "请先确认当前结构，再重新生成低保真画板。" });
       return;
     }
 
     if (
       hasExistingBoards &&
-      !window.confirm(`这会删除并重建当前 ${totalPages} 张内容稿，已生成排版和手动修改可能被替换。确认继续吗？`)
+      !window.confirm(
+        [
+          `将按当前结构重新生成 ${totalPages} 张低保真画板。`,
+          "",
+          "会替换：画板列表、低保真节点、内容稿文案、素材匹配。",
+          "会保留：已确认结构、项目事实、素材库。",
+          "不会自动生成新配图；缺图页面会保留补图提示。",
+          "",
+          "已生成排版和手动修改可能被覆盖。确认继续吗？",
+        ].join("\n")
+      )
     ) {
       return;
     }
@@ -251,12 +261,16 @@ export function ProjectStructureWorkbench({
         await fetch(`/api/projects/${projectId}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            applyMode: "replace_boards",
+            generateVisuals: false,
+          }),
         })
       );
       setHasExistingBoards(true);
       const partialMessage =
         data.status === "partial_success" || (data.warnings?.length ?? 0) > 0
-          ? "内容稿已重建，AI 补图已跳过。"
+          ? "低保真画板已生成，AI 补图已跳过。"
           : null;
       setActionMessage({
         tone: data.rolledBack || data.status === "rolled_back" ? "error" : "info",
@@ -264,8 +278,8 @@ export function ProjectStructureWorkbench({
           partialMessage ??
           data.message ??
           (data.rolledBack || data.status === "rolled_back"
-            ? "创建内容稿未完成，已保留原内容。"
-            : "已按当前结构重新创建内容稿。"),
+            ? "创建低保真画板未完成，已保留原内容。"
+            : "已按当前结构重新生成低保真画板。"),
       });
       if (data.rolledBack || data.status === "rolled_back") {
         router.refresh();
@@ -273,7 +287,7 @@ export function ProjectStructureWorkbench({
         router.replace(`/projects/${projectId}/editor`);
       }
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "重新创建内容稿失败，请稍后重试");
+      setActionError(error instanceof Error ? error.message : "重新生成低保真画板失败，请稍后重试");
     } finally {
       setApplyingStructure(false);
     }
@@ -311,7 +325,7 @@ export function ProjectStructureWorkbench({
             <p className="text-sm text-white/40">Project Structure Workbench</p>
             <h1 className="mt-1 text-3xl font-semibold text-white">{projectName}</h1>
             <p className="mt-2 text-sm text-white/55">
-              这里维护当前生效结构。保存结构不会自动改画板；只有点击“重新创建内容稿”才会重建页面。
+              这里维护当前生效结构。保存结构不会自动改画板；只有点击“重新生成低保真画板”才会替换页面。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -360,11 +374,11 @@ export function ProjectStructureWorkbench({
                 <p>{structureDraft ? `${structureDraft.groups.length} 个章节 · ${totalPages} 页` : "暂无结构"}</p>
                 <p>
                   {hasExistingBoards
-                    ? "当前已经有基于这份结构创建的内容稿。"
-                    : "当前还没有基于结构创建的内容稿。"}
+                    ? "当前已经有基于这份结构创建的低保真画板。"
+                    : "当前还没有基于结构创建的低保真画板。"}
                 </p>
                 {structureDraft?.status === "confirmed" ? (
-                  <p>将重建 {totalPages} 张内容稿。</p>
+                  <p>将重新生成 {totalPages} 张低保真画板。</p>
                 ) : null}
                 {materialRecognition ? (
                   <p>AI 理解：{materialRecognition.summary}</p>
@@ -448,7 +462,7 @@ export function ProjectStructureWorkbench({
                       重建中
                     </>
                   ) : (
-                    "重新创建内容稿"
+                    "重新生成低保真画板"
                   )}
                 </Button>
               </div>

@@ -3,7 +3,11 @@ export type ApplyStructureWarning = {
   message: string;
 };
 
-export type ApplyStructureStatus = "success" | "partial_success" | "rolled_back";
+export type ApplyStructureStatus =
+  | "success"
+  | "partial_success"
+  | "content_updated"
+  | "rolled_back";
 
 export type ApplyStructureResponseBase = {
   status?: ApplyStructureStatus;

@@ -7,13 +7,16 @@ import { llm } from "@/lib/llm";
 import { getPrivateBlob, isBlobStorageUrl, uploadFile } from "@/lib/storage";
 import {
   buildProjectSceneFromStructureSuggestion,
+  inferProjectPageType,
   mergeProjectLayoutDocument,
+  normalizeProjectEditorScene,
   ProjectPrototypeBoardDraftSchema,
   resolveProjectAssetMeta,
   resolveProjectEditorScene,
   resolveProjectLayoutDocument,
   summarizeMaterialRecognitionForAI,
   type ProjectEditorScene,
+  type ProjectLayoutIntent,
   type ProjectPackageMode,
   type ProjectPrototypeBoardDraft,
   type ProjectSceneSeedAsset,
@@ -23,7 +26,11 @@ import {
   planPrototypeVisualAssets,
   type GeneratedVisualKind,
 } from "@/lib/project-visual-asset-generation";
-import { buildLayoutIntentRubric } from "@/lib/project-editor-prompt-rubric";
+import {
+  buildLayoutIntentRubric,
+  getFallbackLayoutIntent,
+  getPreferredLayoutIntents,
+} from "@/lib/project-editor-prompt-rubric";
 import {
   stampProjectValidationFailure,
   validateProjectEditorScene,
@@ -42,11 +49,73 @@ const PrototypeDraftResponseSchema = z.object({
   boardDrafts: z.array(ProjectPrototypeBoardDraftSchema),
 });
 
+/**
+ * 服务端兜底版式意图：
+ * - LLM 漏填或返回 null → 用 pageType 的 fallback 意图填上
+ * - 相邻两页意图相同 → 在 pageType 的 preferred 列表里换一个
+ * 没有这步，buildPrototypeLayoutNodes 会回落到 8 个 legacy 模板（视觉接近），
+ * 11 张缩略稿就会显著同质化。
+ */
+function normalizeLayoutIntents(params: {
+  contentDrafts: ProjectPrototypeBoardDraft[];
+  suggestion: ProjectStructureSuggestion;
+  packageMode: ProjectPackageMode | undefined;
+}): ProjectPrototypeBoardDraft[] {
+  const { contentDrafts, suggestion, packageMode } = params;
+  const draftBySectionId = new Map(contentDrafts.map((d) => [d.sectionId, d]));
+  const totalBoards = suggestion.groups.reduce(
+    (sum, group) => sum + group.sections.length,
+    0
+  );
+  const ordered: ProjectPrototypeBoardDraft[] = [];
+  let prevIntent: ProjectLayoutIntent | null = null;
+  let boardIndex = 0;
+  for (const group of suggestion.groups) {
+    for (const section of group.sections) {
+      const draft = draftBySectionId.get(section.id);
+      if (!draft) continue;
+      const pageType = inferProjectPageType({
+        group,
+        section,
+        boardIndex,
+        totalBoards,
+        packageMode,
+      });
+      const fallback = getFallbackLayoutIntent(pageType);
+      const preferred = getPreferredLayoutIntents(pageType);
+      let intent: ProjectLayoutIntent =
+        (draft.layoutIntent as ProjectLayoutIntent | null | undefined) ?? fallback;
+      if (intent === prevIntent) {
+        const alt = preferred.find((candidate) => candidate !== prevIntent);
+        if (alt) intent = alt;
+      }
+      ordered.push({ ...draft, layoutIntent: intent });
+      prevIntent = intent;
+      boardIndex += 1;
+    }
+  }
+  // 保留 LLM 给但 section 已不存在的 draft（理论上前面 filter 已挡掉，这里兜底）
+  const handled = new Set(ordered.map((d) => d.sectionId));
+  for (const draft of contentDrafts) {
+    if (!handled.has(draft.sectionId)) ordered.push(draft);
+  }
+  return ordered;
+}
+
 function normalizePackageMode(value: string | null | undefined): ProjectPackageMode | undefined {
   if (value === "DEEP" || value === "LIGHT" || value === "SUPPORTIVE") {
     return value;
   }
   return undefined;
+}
+
+function buildContentSuggestionsFromDraft(draft: ProjectPrototypeBoardDraft) {
+  return [
+    draft.summary,
+    draft.narrative,
+    ...(draft.keyPoints ?? []),
+    draft.missingAssetNote,
+  ].filter((item): item is string => Boolean(item?.trim()));
 }
 
 function summarizeFacts(
@@ -415,6 +484,8 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as {
     markSetupCompleted?: boolean;
+    applyMode?: "replace_boards" | "content_only";
+    generateVisuals?: boolean;
   };
   const layoutDocument = resolveProjectLayoutDocument(project.layoutJson);
   const currentScene = resolveProjectEditorScene(project.layoutJson, {
@@ -424,11 +495,11 @@ export async function POST(
   const suggestion = layoutDocument.structureSuggestion;
 
   if (!suggestion) {
-    return NextResponse.json({ error: "请先生成并确认结构，再创建内容稿。" }, { status: 400 });
+    return NextResponse.json({ error: "请先生成并确认结构，再生成低保真画板。" }, { status: 400 });
   }
 
   if (suggestion.status !== "confirmed") {
-    return NextResponse.json({ error: "请先确认当前结构，再创建内容稿。" }, { status: 400 });
+    return NextResponse.json({ error: "请先确认当前结构，再生成低保真画板。" }, { status: 400 });
   }
 
   const recognizedHeroIds = layoutDocument.materialRecognition?.heroAssetIds ?? [];
@@ -547,9 +618,54 @@ export async function POST(
   }
 
   const packageMode = normalizePackageMode(project.packageMode);
+
+  // 版式意图归一化：LLM 经常漏填或回退到同一个 narrative，导致 11 张稿
+  // silhouette 一模一样。这里按 pageType rubric 兜底，并强制相邻页不重复
+  // —— 没有这步，缩略条里看不出版式差异。
+  contentDrafts = normalizeLayoutIntents({
+    contentDrafts,
+    suggestion,
+    packageMode,
+  });
+
+  if (body.applyMode === "content_only") {
+    const draftBySectionId = new Map(contentDrafts.map((draft) => [draft.sectionId, draft]));
+    const nextEditorScene = normalizeProjectEditorScene({
+      ...currentScene,
+      boards: currentScene.boards.map((board) => {
+        const sectionId = board.structureSource?.sectionId;
+        const draft = sectionId ? draftBySectionId.get(sectionId) : null;
+        if (!draft) return board;
+
+        return {
+          ...board,
+          intent: [draft.summary, draft.narrative].filter(Boolean).join(" ") || board.intent,
+          contentSuggestions: buildContentSuggestionsFromDraft(draft),
+          layoutIntent: draft.layoutIntent ?? board.layoutIntent,
+        };
+      }),
+    });
+    const nextLayout = mergeProjectLayoutDocument(project.layoutJson, {
+      editorScene: nextEditorScene,
+    });
+
+    await db.project.update({
+      where: { id },
+      data: { layoutJson: nextLayout as unknown as Prisma.InputJsonValue },
+    });
+
+    return NextResponse.json({
+      layoutJson: nextLayout,
+      assets: project.assets,
+      status: "content_updated",
+      message: "讲述建议已按当前结构刷新，画布内容未被替换。",
+    });
+  }
+
   const sceneAssets: ProjectSceneSeedAsset[] = [...project.assets];
   const visualGenerationWarnings: ApplyStructureWarning[] = [];
-  const visualPlans = SHOULD_SKIP_GENERATED_VISUALS
+  const shouldGenerateVisuals = body.generateVisuals === true;
+  const visualPlans = SHOULD_SKIP_GENERATED_VISUALS || !shouldGenerateVisuals
     ? []
     : planPrototypeVisualAssets({
         projectName: project.name,
@@ -713,7 +829,7 @@ export async function POST(
         source: "export_check",
         previousValidation: layoutDocument.validation ?? null,
       }),
-      summary: "创建内容稿未完成，已保留原内容。",
+      summary: "生成低保真画板未完成，已保留原内容。",
     });
     const fallbackLayout = mergeProjectLayoutDocument(project.layoutJson, {
       validation: fallbackValidation,
@@ -729,7 +845,7 @@ export async function POST(
       assets: sceneAssets,
       status: "rolled_back",
       rolledBack: true,
-      message: "创建内容稿未完成，已保留原内容。",
+      message: "生成低保真画板未完成，已保留原内容。",
     });
   }
 

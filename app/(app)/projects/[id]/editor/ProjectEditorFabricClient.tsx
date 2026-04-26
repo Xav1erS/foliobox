@@ -89,6 +89,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -289,7 +290,7 @@ type ApplyStructureResponse = ApplyStructureResponseBase & {
 };
 
 type StructureApplyNotice = {
-  status: "success" | "partial_success";
+  status: "success" | "partial_success" | "content_updated";
   message: string;
   warnings: ApplyStructureWarning[];
 } | null;
@@ -298,16 +299,23 @@ type StructureApplyNotice = {
 function buildStructureApplyNotice(data: ApplyStructureResponse): StructureApplyNotice {
   if (data.rolledBack || data.status === "rolled_back") return null;
   const warnings = data.warnings ?? [];
+  if (data.status === "content_updated") {
+    return {
+      status: "content_updated",
+      message: data.message ?? "讲述建议已按当前结构刷新，画布内容未被替换。",
+      warnings: [],
+    };
+  }
   if (data.status === "partial_success" || warnings.length > 0) {
     return {
       status: "partial_success",
-      message: "内容稿已重建，AI 补图已跳过。",
+      message: "低保真画板已生成，AI 补图已跳过。",
       warnings,
     };
   }
   return {
     status: "success",
-    message: "内容稿已按当前结构重建，可继续生成排版。",
+    message: data.message ?? "低保真画板已按当前结构重新生成，可继续生成排版。",
     warnings: [],
   };
 }
@@ -583,6 +591,9 @@ export function ProjectEditorFabricClient({
   } | null>(null);
   const [structureApplyNotice, setStructureApplyNotice] =
     useState<StructureApplyNotice>(null);
+  const [structureApplyBusyText, setStructureApplyBusyText] = useState(
+    "正在处理当前结构"
+  );
   const structureApplyNoticeStorageKey = `foliobox:${initialData.id}:structure-apply-notice`;
   // 排版阶段左侧栏不再包含 project tab；直接进排版时默认落在画板面板
   const [leftPanel, setLeftPanel] = useState<LeftPanelKey | null>(() => {
@@ -637,6 +648,10 @@ export function ProjectEditorFabricClient({
   const activeBoard = useMemo(
     () => getSceneBoardById(scene, scene.activeBoardId) ?? scene.boards[0] ?? null,
     [scene]
+  );
+  const hasStructureSourcedBoards = useMemo(
+    () => scene.boards.some((board) => Boolean(board.structureSource?.sectionId)),
+    [scene.boards]
   );
   const projectValidation = useMemo(
     () => layout?.validation ?? getFallbackProjectValidation(),
@@ -713,7 +728,7 @@ export function ProjectEditorFabricClient({
             label: "可生成，建议补图",
             shortLabel: "建议补图",
             summary:
-              "内容稿已重建，AI 补图已跳过。你可以上传图片、稍后补图，或继续生成排版。",
+              "低保真画板已生成，AI 补图已跳过。你可以上传图片、稍后补图，或继续生成排版。",
             className: "border-amber-300/20 bg-amber-300/10 text-amber-100/88",
           }
         : baseProjectValidationMeta,
@@ -722,7 +737,7 @@ export function ProjectEditorFabricClient({
   const projectExportBlockReason = useMemo(
     () =>
       applyingStructure
-        ? "正在重建内容稿，请等待完成后再导出 Figma。"
+        ? "正在处理当前结构，请等待完成后再导出 Figma。"
         : getEditorExportBlockReason({ scene, validation: projectValidation }),
     [applyingStructure, projectValidation, scene]
   );
@@ -899,7 +914,7 @@ export function ProjectEditorFabricClient({
           : "画板已保存";
   const topStatusLabel =
     applyingStructure
-      ? "正在重建内容稿"
+      ? "正在处理结构"
       : saveState === "saved" && factsSaveState === "saved"
       ? `已保存 · ${projectValidationMeta.shortLabel}`
       : saveState === "error" || factsSaveState === "error"
@@ -1853,7 +1868,11 @@ export function ProjectEditorFabricClient({
         await fetch(`/api/projects/${initialData.id}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ markSetupCompleted: true }),
+          body: JSON.stringify({
+            markSetupCompleted: true,
+            applyMode: "replace_boards",
+            generateVisuals: false,
+          }),
         })
       );
       const nextAssets = data.assets ?? assets;
@@ -1874,7 +1893,7 @@ export function ProjectEditorFabricClient({
       lastSavedSceneRef.current = JSON.stringify(nextScene);
 
       if (data.rolledBack) {
-        setActionError(data.message ?? "创建内容稿未完成，已保留原内容。");
+        setActionError(data.message ?? "生成低保真画板未完成，已保留原内容。");
         return;
       }
 
@@ -1884,7 +1903,7 @@ export function ProjectEditorFabricClient({
       setStructureApplyNotice(buildStructureApplyNotice(data));
       setActionMessage(null);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "创建内容稿失败，请稍后重试");
+      setActionError(error instanceof Error ? error.message : "生成低保真画板失败，请稍后重试");
     } finally {
       setConfirmingStructure(false);
     }
@@ -2017,33 +2036,66 @@ export function ProjectEditorFabricClient({
     setActionMessage({ tone: "info", text: "当前结构已确认，可继续按结构落板。" });
   }
 
-  async function applyStructureToBoards() {
+  async function applyStructureToBoards(
+    options: {
+      applyMode?: "replace_boards" | "content_only";
+      generateVisuals?: boolean;
+    } = {}
+  ) {
     if (!structureDraft || structureDraft.groups.length === 0 || applyingStructure) return;
 
     if (structureDraft.status !== "confirmed") {
       setActionMessage({
         tone: "error",
-        text: "请先确认当前结构，再按结构创建内容稿。",
+        text: "请先确认当前结构，再按结构生成低保真画板。",
       });
       return;
     }
 
-    const boardCount = scene.boards.length;
-    const shouldContinue = window.confirm(
-      `这会删除并重建当前 ${boardCount} 张内容稿，已生成排版和手动修改可能被替换。确认继续吗？`
-    );
-    if (!shouldContinue) return;
+    const applyMode = options.applyMode ?? "replace_boards";
+    const generateVisuals = options.generateVisuals === true;
+
+    if (applyMode === "replace_boards") {
+      const boardCount = scene.boards.length;
+      const pageCount = structureDraft.groups.reduce(
+        (sum, group) => sum + group.sections.length,
+        0
+      );
+      const shouldContinue = window.confirm(
+        [
+          `将重新生成 ${pageCount} 张低保真画板，并替换当前 ${boardCount} 张画板。`,
+          "",
+          "会替换：画板列表、低保真节点、内容稿文案、素材匹配。",
+          "会保留：已确认结构、项目事实、素材库。",
+          generateVisuals
+            ? "同时会尝试生成最多 3 张缺失配图。"
+            : "不会自动生成新配图；缺图页面会保留补图提示。",
+          "",
+          "已生成排版和手动修改可能被覆盖。确认继续吗？",
+        ].join("\n")
+      );
+      if (!shouldContinue) return;
+    }
 
     setApplyingStructure(true);
     setActionError("");
     setActionMessage(null);
     setStructureApplyNotice(null);
+    setStructureApplyBusyText(
+      applyMode === "content_only"
+        ? "正在按当前结构刷新讲述建议 · 不替换画布内容"
+        : "正在重新生成低保真画板 · 将替换当前画板列表"
+    );
 
     try {
       const data = await parseJsonResponse<ApplyStructureResponse>(
         await fetch(`/api/projects/${initialData.id}/structure/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            applyMode,
+            generateVisuals,
+          }),
         })
       );
       const nextAssets = data.assets ?? assets;
@@ -2067,7 +2119,7 @@ export function ProjectEditorFabricClient({
         setStructureApplyNotice(null);
         setActionMessage({
           tone: "error",
-          text: data.message ?? "创建内容稿未完成，已保留原内容。",
+          text: data.message ?? "生成低保真画板未完成，已保留原内容。",
         });
       } else {
         setStructureApplyNotice(buildStructureApplyNotice(data));
@@ -2076,7 +2128,7 @@ export function ProjectEditorFabricClient({
     } catch (error) {
       setActionMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "重新创建内容稿失败，请稍后重试",
+        text: error instanceof Error ? error.message : "处理当前结构失败，请稍后重试",
       });
     } finally {
       setApplyingStructure(false);
@@ -3498,7 +3550,7 @@ export function ProjectEditorFabricClient({
             disabled={generating || applyingStructure || !canGenerateCurrentProject}
             title={
               applyingStructure
-                ? "正在重建内容稿，请等待完成后再生成排版。"
+                ? "正在处理当前结构，请等待完成后再生成排版。"
                 : !canGenerateCurrentProject
                   ? projectValidationMeta.summary
                   : undefined
@@ -4017,7 +4069,7 @@ export function ProjectEditorFabricClient({
                         <div className={cn(editorPanelCardClass, "px-4 py-4")}>
                           <p className="text-sm font-medium text-white">还没有结构建议</p>
                           <p className="mt-1.5 text-xs leading-6 text-white/42">
-                            先回到项目准备生成结构，再按结构创建内容稿。
+                            先回到项目准备生成结构，再按结构生成低保真画板。
                           </p>
                           <Button
                             type="button"
@@ -4034,84 +4086,154 @@ export function ProjectEditorFabricClient({
                           </Button>
                         </div>
                       ) : (
-                        <div className={cn(editorPanelCardClass, "space-y-2.5 p-3.5")}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-white">当前结构</p>
-                              <p className="mt-1 text-xs text-white/48">
-                                {structureDraft.groups.length} 个章节 ·{" "}
-                                {structureDraft.groups.reduce((sum, group) => sum + group.sections.length, 0)} 页
+                        <div className={cn(editorPanelCardClass, "space-y-2 p-3")}>
+                          {/* 标题行：把"5 章 · 11 页"塞进副标题、状态做小色点，
+                              释放下方两段冗余说明，整体高度降一档。 */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className="truncate text-sm font-medium text-white">
+                                当前结构
                               </p>
+                              <span className="text-[11px] text-white/46">
+                                {structureDraft.groups.length}章 ·{" "}
+                                {structureDraft.groups.reduce(
+                                  (sum, group) => sum + group.sections.length,
+                                  0
+                                )}页
+                              </span>
                             </div>
-                            <Badge
-                              variant="outline"
-                              className="shrink-0 rounded-full border-white/8 bg-white/3 text-white/66"
+                            <span
+                              className={cn(
+                                "inline-flex h-5 items-center gap-1 rounded-full border px-2 text-[10px]",
+                                structureDraft.status === "confirmed"
+                                  ? "border-emerald-300/30 bg-emerald-400/8 text-emerald-200"
+                                  : "border-amber-300/30 bg-amber-400/8 text-amber-200"
+                              )}
+                              title={materialRecognition ? "AI 理解已完成" : "待 AI 理解"}
                             >
+                              <span
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  structureDraft.status === "confirmed"
+                                    ? "bg-emerald-300"
+                                    : "bg-amber-300"
+                                )}
+                              />
                               {structureDraft.status === "confirmed" ? "已确认" : "草稿"}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/58">
-                              {materialRecognition ? "AI 理解已完成" : "待 AI 理解"}
                             </span>
                           </div>
-                          <p className="text-[11px] leading-5 text-white/42">
-                            新增页面请先调整结构，再重新创建内容稿。
-                          </p>
-                          {structureDraft.status === "confirmed" ? (
-                            <p className="text-[11px] leading-5 text-white/42">
-                              将重建 {structureDraft.groups.reduce((sum, group) => sum + group.sections.length, 0)} 张内容稿。
-                            </p>
-                          ) : null}
-                          <div className="flex flex-wrap gap-2">
+                          {/* 主按钮 + ⋯ overflow：主操作默认只刷新讲述建议；
+                              次操作（调整结构 / 确认结构）收进 Popover。 */}
+                          <div className="flex items-center gap-2">
                             <Button
                               type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setSetupMode(true);
-                                setSetupFocusSection("structure");
-                                setActionError("");
-                                setLeftPanel("project");
-                              }}
-                              disabled={applyingStructure}
-                              className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
-                            >
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              调整结构
-                            </Button>
-                            {structureDraft.status !== "confirmed" ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => void confirmStructureDraft()}
-                                disabled={applyingStructure || structureSaveState === "saving"}
-                                className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6"
-                              >
-                                <Check className="mr-2 h-4 w-4" />
-                                确认结构
-                              </Button>
-                            ) : null}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => void applyStructureToBoards()}
+                              onClick={() =>
+                                void applyStructureToBoards(
+                                  hasStructureSourcedBoards
+                                    ? { applyMode: "content_only" }
+                                    : {
+                                        applyMode: "replace_boards",
+                                        generateVisuals: false,
+                                      }
+                                )
+                              }
                               disabled={
-                                applyingStructure ||
                                 applyingStructure ||
                                 structureDraft.status !== "confirmed" ||
                                 structureDraft.groups.length === 0
                               }
-                              className="h-8 rounded-xl border-white/8 bg-white/3 px-3 text-white hover:bg-white/6 disabled:bg-white/2 disabled:text-white/34"
+                              className="h-9 flex-1 rounded-xl bg-white text-neutral-950 hover:bg-neutral-100 disabled:bg-white/8 disabled:text-white/34"
                             >
                               {applyingStructure ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  重建中
+                                  处理中
                                 </>
                               ) : (
-                                "重新创建内容稿"
+                                <>
+                                  {structureDraft.status !== "confirmed"
+                                    ? "生成低保真画板"
+                                    : hasStructureSourcedBoards
+                                      ? "刷新讲述建议"
+                                      : `生成 ${structureDraft.groups.reduce(
+                                          (sum, group) =>
+                                            sum + group.sections.length,
+                                          0
+                                        )} 张低保真画板`}
+                                </>
                               )}
                             </Button>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={applyingStructure}
+                                  className="h-9 w-9 shrink-0 rounded-xl border-white/8 bg-white/3 p-0 text-white hover:bg-white/6"
+                                  aria-label="结构操作"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                align="end"
+                                className="dark w-64 rounded-2xl border-white/10 bg-card p-1.5 text-white"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSetupMode(true);
+                                    setSetupFocusSection("structure");
+                                    setActionError("");
+                                    setLeftPanel("project");
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                                >
+                                  <Sparkles className="h-4 w-4 text-white/60" />
+                                  调整结构
+                                </button>
+                                {structureDraft.status !== "confirmed" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void confirmStructureDraft()}
+                                    disabled={structureSaveState === "saving"}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                                  >
+                                    <Check className="h-4 w-4 text-white/60" />
+                                    确认结构
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void applyStructureToBoards({
+                                          applyMode: "replace_boards",
+                                          generateVisuals: false,
+                                        })
+                                      }
+                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                                    >
+                                      <Layers className="h-4 w-4 text-white/60" />
+                                      重新生成低保真画板
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void applyStructureToBoards({
+                                          applyMode: "replace_boards",
+                                          generateVisuals: true,
+                                        })
+                                      }
+                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                                    >
+                                      <ImageIcon className="h-4 w-4 text-white/60" />
+                                      重建并尝试补图
+                                    </button>
+                                  </>
+                                )}
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       )}
@@ -4225,7 +4347,12 @@ export function ProjectEditorFabricClient({
                 onAiUnderstand={() => void handleWizardAiUnderstand()}
                 onGenerateStructure={() => void handleSuggestStructure()}
                 onConfirmAndEnter={() => void handleWizardConfirmAndEnter()}
-                onApplyStructure={() => void applyStructureToBoards()}
+                onApplyStructure={() =>
+                  void applyStructureToBoards({
+                    applyMode: "replace_boards",
+                    generateVisuals: false,
+                  })
+                }
                 onUploadAssets={handleOpenAssetUpload}
                 onUpdateAssetTitle={handleRenameAsset}
                 onUpdateAssetNote={handleUpdateAssetNote}
@@ -4381,7 +4508,7 @@ export function ProjectEditorFabricClient({
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/18 backdrop-blur-[1px]">
               <div className="rounded-full border border-white/10 bg-card/92 px-5 py-3 text-sm text-white/82 shadow-[0_24px_64px_-36px_rgba(0,0,0,0.86)]">
                 <Loader2 className="mr-2 inline-flex h-4 w-4 animate-spin" />
-                正在按当前结构重建内容稿 · 将替换当前画板列表
+                {structureApplyBusyText}
               </div>
             </div>
           ) : null}
@@ -4439,22 +4566,24 @@ export function ProjectEditorFabricClient({
                           </button>
                         </>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStructureApplyNotice(null);
-                          void handleOpenGenerate();
-                        }}
-                        className="rounded-full border border-white/12 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-950 transition-colors hover:bg-neutral-100"
-                      >
-                        继续生成排版
-                      </button>
+                      {structureApplyNotice.status !== "content_updated" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStructureApplyNotice(null);
+                            void handleOpenGenerate();
+                          }}
+                          className="rounded-full border border-white/12 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-950 transition-colors hover:bg-neutral-100"
+                        >
+                          继续生成排版
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => setStructureApplyNotice(null)}
                         className="rounded-full border border-white/10 bg-transparent px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/8 hover:text-white"
                       >
-                        稍后处理
+                        {structureApplyNotice.status === "content_updated" ? "知道了" : "稍后处理"}
                       </button>
                     </div>
                 </div>
@@ -4557,7 +4686,7 @@ export function ProjectEditorFabricClient({
                                   <SelectTrigger className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="border-white/8 bg-card text-white">
+                                  <SelectContent className="dark border-white/8 bg-card text-white">
                                     <div className="px-2 pb-1 pt-2 text-xs font-medium tracking-[0.14em] text-white/36">
                                       正文字体
                                     </div>
@@ -4802,7 +4931,7 @@ export function ProjectEditorFabricClient({
                                     <SelectTrigger className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
                                       <SelectValue placeholder="选择这张图在项目讲述中的角色" />
                                     </SelectTrigger>
-                                  <SelectContent className="border-white/8 bg-card text-white">
+                                  <SelectContent className="dark border-white/8 bg-card text-white">
                                       <SelectItem
                                         value="none"
                                         className="focus:bg-white/[0.07] focus:text-white"
@@ -4832,7 +4961,7 @@ export function ProjectEditorFabricClient({
                                     <SelectTrigger className="mt-2 h-10 rounded-xl border-white/8 bg-secondary text-sm text-white focus:ring-white/20">
                                       <SelectValue placeholder="从当前项目素材库替换" />
                                     </SelectTrigger>
-                                    <SelectContent className="border-white/8 bg-card text-white">
+                                    <SelectContent className="dark border-white/8 bg-card text-white">
                                       {assets.map((asset) => (
                                         <SelectItem
                                           key={asset.id}
@@ -6045,6 +6174,7 @@ function BoardListRow({
         </div>
       </button>
 
+      {/* 绝对定位：不占 flex 位置，避免标题被挤掉 32px+8px 宽（约 2-3 个汉字）。 */}
       {canDelete ? (
         <button
           type="button"
@@ -6052,10 +6182,10 @@ function BoardListRow({
             event.stopPropagation();
             onDelete();
           }}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 opacity-0 transition-all duration-150 hover:bg-white/8 hover:text-red-300 group-hover:opacity-100"
+          className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md border border-white/12 bg-background/90 text-white/50 opacity-0 transition-all duration-150 hover:border-red-300/40 hover:text-red-300 group-hover:opacity-100"
           aria-label="删除画板"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3 w-3" />
         </button>
       ) : null}
     </div>

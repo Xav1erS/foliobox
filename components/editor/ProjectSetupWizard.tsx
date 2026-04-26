@@ -289,7 +289,7 @@ export function ProjectSetupWizard({
               <span className="font-medium">当前画板内容将被替换</span>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-white/50">
-              确认结构后，系统会按新结构重建所有画板，你在画布上的现有编辑内容将被清空。
+              确认结构后，系统会按新结构重新生成低保真画板，你在画布上的现有编辑内容将被清空。
               此操作不可撤销。
             </p>
             <div className="mt-5 flex gap-2">
@@ -308,7 +308,7 @@ export function ProjectSetupWizard({
                 }}
                 className="flex-1 rounded-xl bg-red-500/20 py-2 text-sm font-medium text-red-400 hover:bg-red-500/30"
               >
-                确认覆盖，重建画板
+                确认覆盖，重新生成画板
               </button>
             </div>
           </div>
@@ -700,7 +700,7 @@ export function ProjectSetupWizard({
                         ) : (
                           <Plus className="h-4 w-4" />
                         )}
-                        {applyingStructure ? "正在创建内容稿…" : "重新创建内容稿"}
+                        {applyingStructure ? "正在生成低保真画板…" : "重新生成低保真画板"}
                       </button>
                     ) : null}
                     <button
@@ -756,7 +756,7 @@ export function ProjectSetupWizard({
                       {confirmingStructure ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          正在创建内容稿…
+                          正在生成低保真画板…
                         </>
                       ) : (
                         <>
