@@ -15,6 +15,8 @@ export type LLMTask =
   | "project_prototype_generation" // 项目低保真内容稿（结构层）
   | "project_visual_asset_generation" // 项目叙事视觉资产补全（结构层）
   | "project_prototype_visual_single" // 单页手动补图（结构层）
+  | "project_prototype_text_rewrite"  // 单页 AI 优化文案（结构层，旧接口）
+  | "project_prototype_text_instruct" // 单页 AI 上下文助手（chat-style 候选版本）
   | "project_asset_reasoning_vision" // 单图素材使用说明（结构层，可选）
   | "project_layout_generation";  // 项目排版生成（包装层）
 
@@ -114,5 +116,7 @@ export const TASK_MODEL_TIER: Record<LLMTask, "primary" | "lite"> = {
   project_prototype_generation: "primary",
   project_visual_asset_generation: "primary",
   project_prototype_visual_single: "primary",
+  project_prototype_text_rewrite: "primary",
+  project_prototype_text_instruct: "primary",
   project_asset_reasoning_vision: "lite",
 };

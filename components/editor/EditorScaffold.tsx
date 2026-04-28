@@ -244,7 +244,10 @@ function CollapsedRailButton({
       ) : (
         <PanelRightOpen className="h-4 w-4" />
       )}
-      <span className="rotate-180 text-xs tracking-[0.14em] [writing-mode:vertical-rl]">
+      {/* writing-mode:vertical-rl 让文字流向自上而下；text-orientation:upright
+          让中文保持正立，避免被默认旋转 90° 反过来读。原先用 rotate-180 强行
+          翻面会导致从下往上读，是反的。 */}
+      <span className="text-xs tracking-[0.14em] [writing-mode:vertical-rl] [text-orientation:upright]">
         {label}
       </span>
     </button>

@@ -98,7 +98,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   EditorChromeButton,
@@ -107,8 +106,6 @@ import {
   EditorRailSection,
   EditorScaffold,
   EditorStripButton,
-  EditorTabsList,
-  EditorTabsTrigger,
 } from "@/components/editor/EditorScaffold";
 import {
   ColorPickerPopover,
@@ -562,6 +559,17 @@ export function ProjectEditorFabricClient({
     "saved" | "saving" | "dirty" | "error"
   >("saved");
   const [applyingStructure, setApplyingStructure] = useState(false);
+  // 单页 AI 操作（板级，不影响其他画板）：text=优化文案, visual=补一张图。
+  const [boardAiBusy, setBoardAiBusy] = useState<"text" | "visual" | null>(null);
+  // Chat-style 上下文助手：用户在输入框写的指令。
+  const [boardInstructInput, setBoardInstructInput] = useState("");
+  // AI 生成的候选版本（只在内存里，不持久化）：apply 才落库，cancel 还原 snapshot。
+  const [boardCandidate, setBoardCandidate] = useState<{
+    boardId: string;
+    snapshot: ProjectBoard; // 应用前的整页快照，cancel 时还原
+    summary: string;        // AI 一句话说明，给 banner 用
+  } | null>(null);
+  const [instructBusy, setInstructBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exportingFigma, setExportingFigma] = useState(false);
   const [downloadingFigmaPlugin, setDownloadingFigmaPlugin] = useState(false);
@@ -617,6 +625,26 @@ export function ProjectEditorFabricClient({
   const canvasRef = useRef<FabricCanvas | null>(null);
   const fabricRef = useRef<FabricModule | null>(null);
   const clipboardRef = useRef<FabricObject | ActiveSelection | null>(null);
+  // Hover 高亮：单个 transient Rect 在悬浮对象周围画轻描边，
+  // 跟选中态 / 拖动 / 离开 反馈即时清掉。不写进 Fabric scene、不进 layoutJson。
+  const hoverOutlineRef = useRef<FabricObject | null>(null);
+  // "上一次 click 后的 active object" 快照。在 mouse:up 时刷新，
+  // 这样下一次 mouse:down 比对它就能判断"是否第二下点击同一对象"，
+  // 不依赖 mouse:down 当下的 getActiveObject（Fabric 在 mouse:down 处理中已同步更新）。
+  const prevActiveAfterClickRef = useRef<FabricObject | null>(null);
+  // 选中态浮动工具条：当且仅当单选了文本/图片且没在拖动 / 没在文字编辑时出现。
+  // bbox 用 board 坐标（getBoundingRect 单位），渲染时按 surfaceScale 换算屏幕 px。
+  const [selectionToolbar, setSelectionToolbar] = useState<{
+    kind: "text" | "image";
+    bbox: { left: number; top: number; width: number; height: number };
+  } | null>(null);
+  // Undo toast：危险操作（删除等）后弹一条带"撤销"的轻提示，5s 自动消失。
+  // 给用户安全感：错点了能立刻回退，不必依赖 ⌘Z。
+  const [undoToast, setUndoToast] = useState<{
+    message: string;
+    undo: () => void;
+    expiresAt: number;
+  } | null>(null);
   const hydratingRef = useRef(false);
   const boardLoadTokenRef = useRef(0);
   const imageElementCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -852,6 +880,18 @@ export function ProjectEditorFabricClient({
       null
     );
   }, [activeBoard]);
+  // Page brief：当前画板对应 structure section 的 purpose 文案，
+  // 渲染在画布上方让用户立刻知道"这一页要完成什么"。
+  // 没有 structure 来源（手动新增的画板）时返回 null，外层不渲染 brief。
+  const activeBoardPurpose = useMemo(() => {
+    const sectionId = activeBoard?.structureSource?.sectionId;
+    if (!sectionId || !structureDraft) return null;
+    for (const group of structureDraft.groups) {
+      const section = group.sections.find((item) => item.id === sectionId);
+      if (section) return section.purpose?.trim() || null;
+    }
+    return null;
+  }, [activeBoard, structureDraft]);
   function updateActiveBoard(patch: Partial<Pick<ProjectBoard, "name" | "intent" | "locked">> & {
     frameBackground?: string;
   }) {
@@ -2135,6 +2175,257 @@ export function ProjectEditorFabricClient({
     }
   }
 
+  /**
+   * Chat-style 上下文助手：把用户指令送给 AI，得到一个候选版本（不落库）。
+   * 候选版本立刻 apply 到 scene 显示，同时缓存 snapshot；用户决定保留 / 撤销。
+   */
+  async function instructActiveBoard(args: {
+    instruction?: string;
+    intent?: "rewrite" | "shorten" | "credibility" | "expand";
+  }) {
+    if (!activeBoard || instructBusy || boardAiBusy) return;
+    if (boardCandidate) {
+      // 已有未决候选 → 先让用户处理完再来
+      setActionMessage({
+        tone: "info",
+        text: "请先处理当前候选版本（保留或撤销），再发起新指令。",
+      });
+      return;
+    }
+    if (!activeBoard.structureSource?.sectionId) {
+      setActionMessage({
+        tone: "error",
+        text: "本页未挂接结构章节，无法 AI 改写。",
+      });
+      return;
+    }
+    if (activeBoard.locked) {
+      setActionMessage({
+        tone: "error",
+        text: "本页已锁定，无法 AI 改写。",
+      });
+      return;
+    }
+    const instruction = args.instruction?.trim() ?? "";
+    if (!instruction && !args.intent) {
+      setActionMessage({
+        tone: "error",
+        text: "请告诉 AI 你想怎么改这一页。",
+      });
+      return;
+    }
+
+    setInstructBusy(true);
+    setActionError("");
+    setActionMessage(null);
+    const snapshot = activeBoard;
+    try {
+      const data = await parseJsonResponse<{
+        summary: string;
+        candidate: {
+          boardId: string;
+          name: string;
+          intent: string;
+          nodes: ProjectBoardNode[];
+          contentSuggestions: string[];
+        };
+      }>(
+        await fetch(
+          `/api/projects/${initialData.id}/boards/${activeBoard.id}/instruct`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              instruction,
+              intent: args.intent,
+            }),
+          }
+        )
+      );
+      // 立刻把候选版本应用到 scene（让画布渲染候选效果），同时记住 snapshot
+      setScene((current) =>
+        normalizeProjectEditorScene({
+          ...current,
+          activeBoardId: snapshot.id,
+          boards: current.boards.map((board) =>
+            board.id === snapshot.id
+              ? {
+                  ...board,
+                  name: data.candidate.name,
+                  intent: data.candidate.intent,
+                  nodes: data.candidate.nodes,
+                  contentSuggestions: data.candidate.contentSuggestions,
+                }
+              : board
+          ),
+        })
+      );
+      requestActiveBoardRebuild();
+      setBoardCandidate({
+        boardId: snapshot.id,
+        snapshot,
+        summary: data.summary,
+      });
+      setBoardInstructInput("");
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "AI 生成候选版本失败，请稍后重试。",
+      });
+    } finally {
+      setInstructBusy(false);
+    }
+  }
+
+  /** 保留候选版本 = 让 autosave 把它持久化，清掉 snapshot。 */
+  function keepBoardCandidate() {
+    if (!boardCandidate) return;
+    setBoardCandidate(null);
+    setActionMessage({ tone: "info", text: "已保留 AI 候选版本。" });
+  }
+
+  /** 撤销候选版本 = 用 snapshot 还原 scene。 */
+  function discardBoardCandidate() {
+    if (!boardCandidate) return;
+    const { boardId: candidateBoardId, snapshot } = boardCandidate;
+    setScene((current) =>
+      normalizeProjectEditorScene({
+        ...current,
+        boards: current.boards.map((board) =>
+          board.id === candidateBoardId ? snapshot : board
+        ),
+      })
+    );
+    requestActiveBoardRebuild();
+    setBoardCandidate(null);
+    setActionMessage({ tone: "info", text: "已撤销候选版本。" });
+  }
+
+  /**
+   * 单页 AI 优化文案：只重写当前 board 的标题/正文/要点/信息卡，
+   * 保留版式意图 / 配图 / 其他画板。
+   */
+  async function rewriteActiveBoardText() {
+    if (!activeBoard || boardAiBusy) return;
+    if (!activeBoard.structureSource?.sectionId) {
+      setActionMessage({
+        tone: "error",
+        text: "该画板未挂接到结构章节，无法 AI 优化文案。",
+      });
+      return;
+    }
+    setBoardAiBusy("text");
+    setActionError("");
+    setActionMessage(null);
+    try {
+      const data = await parseJsonResponse<{
+        layoutJson: LayoutJson;
+        boardId: string;
+        message?: string;
+      }>(
+        await fetch(
+          `/api/projects/${initialData.id}/boards/${activeBoard.id}/text/rewrite`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          }
+        )
+      );
+      const resolvedScene = resolveProjectEditorScene(data.layoutJson, {
+        assets,
+        projectName: initialData.name,
+      });
+      const nextScene = normalizeProjectEditorScene({
+        ...resolvedScene,
+        activeBoardId: activeBoard.id,
+      });
+      setLayout(data.layoutJson);
+      setScene(nextScene);
+      requestActiveBoardRebuild();
+      lastSavedSceneRef.current = JSON.stringify(nextScene);
+      setActionMessage({
+        tone: "info",
+        text: data.message ?? "本页文案已重写。",
+      });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "AI 优化文案失败，请稍后重试。",
+      });
+    } finally {
+      setBoardAiBusy(null);
+    }
+  }
+
+  /**
+   * 单页 AI 补图：只为当前 board 生成一张配图，挂到本页 thumbnailAssetId / 节点列表，
+   * 不影响其他画板。
+   */
+  async function generateActiveBoardVisual() {
+    if (!activeBoard || boardAiBusy) return;
+    if (!activeBoard.structureSource?.sectionId) {
+      setActionMessage({
+        tone: "error",
+        text: "该画板未挂接到结构章节，无法 AI 补图。",
+      });
+      return;
+    }
+    setBoardAiBusy("visual");
+    setActionError("");
+    setActionMessage(null);
+    try {
+      const data = await parseJsonResponse<{
+        layoutJson: LayoutJson;
+        assets?: ProjectEditorInitialData["assets"];
+        message?: string;
+      }>(
+        await fetch(
+          `/api/projects/${initialData.id}/boards/${activeBoard.id}/visual/generate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          }
+        )
+      );
+      const nextAssets = data.assets ?? assets;
+      const resolvedScene = resolveProjectEditorScene(data.layoutJson, {
+        assets: nextAssets,
+        projectName: initialData.name,
+      });
+      const nextScene = normalizeProjectEditorScene({
+        ...resolvedScene,
+        activeBoardId: activeBoard.id,
+      });
+      setLayout(data.layoutJson);
+      setAssets(nextAssets);
+      setScene(nextScene);
+      requestActiveBoardRebuild();
+      lastSavedSceneRef.current = JSON.stringify(nextScene);
+      setActionMessage({
+        tone: "info",
+        text: data.message ?? "已为本页补一张 AI 图。",
+      });
+    } catch (error) {
+      setActionMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "AI 补图失败，请稍后重试。",
+      });
+    } finally {
+      setBoardAiBusy(null);
+    }
+  }
+
   async function handleGenerateLayout() {
     if (!activeBoard || generating) return;
     setGenerating(true);
@@ -2227,6 +2518,18 @@ export function ProjectEditorFabricClient({
     return () => window.removeEventListener("mousedown", handler);
   }, [contextMenu.open]);
 
+  // Undo toast 自动消失（5s）
+  useEffect(() => {
+    if (!undoToast) return;
+    const remaining = undoToast.expiresAt - Date.now();
+    if (remaining <= 0) {
+      setUndoToast(null);
+      return;
+    }
+    const t = window.setTimeout(() => setUndoToast(null), remaining);
+    return () => window.clearTimeout(t);
+  }, [undoToast]);
+
   useEffect(() => {
     if (!shapeMenuOpen) return;
     const handler = () => setShapeMenuOpen(false);
@@ -2316,6 +2619,7 @@ export function ProjectEditorFabricClient({
   function updateSelectionSummary(canvas: FabricCanvas | null) {
     if (!canvas) {
       setActiveMeta({ kind: "none" });
+      setSelectionToolbar(null);
       return;
     }
 
@@ -2323,11 +2627,13 @@ export function ProjectEditorFabricClient({
     refreshLayerState(canvas);
     if (activeObjects.length === 0) {
       setActiveMeta({ kind: "none" });
+      setSelectionToolbar(null);
       return;
     }
 
     if (activeObjects.length > 1) {
       setActiveMeta({ kind: "multi", count: activeObjects.length });
+      setSelectionToolbar(null);
       return;
     }
 
@@ -2349,6 +2655,16 @@ export function ProjectEditorFabricClient({
         y: Math.round(frame.frameY),
         width: Math.round(frame.frameWidth),
         height: Math.round(frame.frameHeight),
+      });
+      const bbox = current.getBoundingRect();
+      setSelectionToolbar({
+        kind: "image",
+        bbox: {
+          left: bbox.left,
+          top: bbox.top,
+          width: bbox.width,
+          height: bbox.height,
+        },
       });
       return;
     }
@@ -2372,9 +2688,28 @@ export function ProjectEditorFabricClient({
         width: Math.round(scaledW),
         height: Math.round(scaledH),
       });
+      // 文字编辑模式下不显示工具条（避免遮挡输入光标）
+      const isEditing =
+        (textbox as unknown as { isEditing?: boolean }).isEditing === true;
+      if (isEditing) {
+        setSelectionToolbar(null);
+      } else {
+        const bbox = current.getBoundingRect();
+        setSelectionToolbar({
+          kind: "text",
+          bbox: {
+            left: bbox.left,
+            top: bbox.top,
+            width: bbox.width,
+            height: bbox.height,
+          },
+        });
+      }
       return;
     }
 
+    // shape 单选不显示浮动工具条（v1 不暴露 shape 级 AI 操作）
+    setSelectionToolbar(null);
     if (data?.nodeType === "shape") {
       const shapeObj = current as unknown as Record<string, unknown>;
       const shapeRx = data.shapeType === "rect" || data.shapeType === "square"
@@ -2807,6 +3142,8 @@ export function ProjectEditorFabricClient({
     target?: FabricSceneObject
   ) => {
     if (applyingStructure) return;
+    // Transient overlays（hover 高亮 / snap 辅助线）不参与 scene 同步 / 缩略图 / 层级。
+    if (target?.data?.hoverOutline || target?.data?.snapGuide) return;
     if (target?.data?.placeholder) {
       target.data.placeholder = false;
     }
@@ -2816,6 +3153,81 @@ export function ProjectEditorFabricClient({
     syncActiveBoardFromCanvas();
     refreshLayerState(canvas);
     scheduleThumbnailCapture();
+    // 拖动 / 缩放 / 改文字结束后，重新算选中工具条 bbox（让它跟着对象走）
+    updateSelectionSummary(canvas);
+  });
+
+  /** 清掉 hover 描边（如果有）。canvas.remove 会触发 object:removed，
+      但 handleCanvasMutation 已经过滤 hoverOutline，不会误触发同步。 */
+  const clearHoverOutline = useEffectEvent((canvas: FabricCanvas) => {
+    const outline = hoverOutlineRef.current;
+    if (!outline) return;
+    canvas.remove(outline);
+    hoverOutlineRef.current = null;
+    canvas.requestRenderAll();
+  });
+
+  /** 在悬浮对象外 3px 画轻描边，标志"这一块可编辑"。
+      已选中的对象不再画 hover 框（避免和选中态描边重叠）。
+      非可编辑目标（snap / hoverOutline / 占位）一律忽略。 */
+  const handleCanvasHoverOver = useEffectEvent((
+    canvas: FabricCanvas,
+    target?: FabricObject
+  ) => {
+    if (applyingStructure) return;
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+    const typed = target as FabricSceneObject | undefined;
+    if (!target || !isEditableCanvasTarget(target)) {
+      clearHoverOutline(canvas);
+      return;
+    }
+    if (typed?.data?.hoverOutline || typed?.data?.snapGuide) return;
+    const active = canvas.getActiveObject();
+    if (active === target) {
+      clearHoverOutline(canvas);
+      return;
+    }
+    // 已经画过同一个对象的描边？不重画。
+    const existing = hoverOutlineRef.current as
+      | (FabricObject & { data?: { sourceId?: string } })
+      | null;
+    const targetId = (typed?.data?.nodeId ?? `${target.left}-${target.top}`) as string;
+    if (existing && existing.data?.sourceId === targetId) return;
+
+    clearHoverOutline(canvas);
+    const bbox = target.getBoundingRect();
+    const PAD = 3;
+    const outline = new fabric.Rect({
+      // Fabric v6 默认 originX/originY = "center"，必须显式设左上角原点，
+      // 否则 left/top 会被当成中心点 → 描边整体偏移到对象左上方。
+      originX: "left",
+      originY: "top",
+      left: bbox.left - PAD,
+      top: bbox.top - PAD,
+      width: bbox.width + PAD * 2,
+      height: bbox.height + PAD * 2,
+      fill: "transparent",
+      stroke: "#5eead4",
+      strokeWidth: 1.5,
+      strokeUniform: true,
+      selectable: false,
+      evented: false,
+      hoverCursor: "default",
+      excludeFromExport: true,
+      objectCaching: false,
+    });
+    (outline as FabricSceneObject).data = {
+      hoverOutline: true,
+      // sourceId 用来去重，同一对象多次 mouse:over 不重复画
+      ...({ sourceId: targetId } as Record<string, unknown>),
+    };
+    canvas.add(outline);
+    if (typeof (canvas as unknown as { bringObjectToFront?: (o: FabricObject) => void }).bringObjectToFront === "function") {
+      (canvas as unknown as { bringObjectToFront: (o: FabricObject) => void }).bringObjectToFront(outline);
+    }
+    hoverOutlineRef.current = outline;
+    canvas.requestRenderAll();
   });
 
   const handleCanvasContextMenu = useEffectEvent((
@@ -2890,28 +3302,86 @@ export function ProjectEditorFabricClient({
       const observer = new ResizeObserver(() => handleCanvasResize());
       observer.observe(vp);
 
-      canvas.on("selection:created", () => handleCanvasSelectionChange(canvas));
-      canvas.on("selection:updated", () => handleCanvasSelectionChange(canvas));
+      canvas.on("selection:created", () => {
+        clearHoverOutline(canvas);
+        handleCanvasSelectionChange(canvas);
+      });
+      canvas.on("selection:updated", () => {
+        clearHoverOutline(canvas);
+        handleCanvasSelectionChange(canvas);
+      });
       canvas.on("selection:cleared", () => handleCanvasSelectionChange(canvas));
       canvas.on("object:modified", (event) => {
         const target = event.target as FabricSceneObject | undefined;
         handleCanvasMutation(canvas, target);
       });
-      canvas.on("object:added", () => {
-        handleCanvasMutation(canvas);
+      canvas.on("object:added", (event) => {
+        const target = event.target as FabricSceneObject | undefined;
+        handleCanvasMutation(canvas, target);
       });
-      canvas.on("object:removed", () => {
-        handleCanvasMutation(canvas);
+      canvas.on("object:removed", (event) => {
+        const target = event.target as FabricSceneObject | undefined;
+        handleCanvasMutation(canvas, target);
       });
       canvas.on("text:changed", (event) => {
         handleCanvasMutation(canvas, event.target as FabricSceneObject | undefined);
       });
       canvas.on("mouse:down", (event) => {
+        clearHoverOutline(canvas);
+        const native = event.e as globalThis.MouseEvent;
+        // 右键交给 context menu（内部按 button===2 二次过滤）
         handleCanvasContextMenu(canvas, {
-          e: event.e as globalThis.MouseEvent,
+          e: native,
           target: event.target as FabricObject | undefined,
         });
+        if (native.button !== 0) return;
+        // Figma 风格：第一次点击选中，第二次点击已选中的文本 → 直接进编辑。
+        // 不强制单击立刻 edit（避免破坏"先选中再删除/移动"操作链）。
+        const target = event.target as FabricSceneObject | undefined;
+        if (!target || target.type !== "textbox") return;
+        if (target.data?.hoverOutline || target.data?.snapGuide) return;
+        const textbox = target as unknown as {
+          isEditing?: boolean;
+          enterEditing?: () => void;
+        };
+        if (textbox.isEditing) return;
+        // 用 mouse:up 时缓存的"上次点击后 active object"作为对照。
+        // Fabric 在 mouse:down 处理中已同步更新 getActiveObject，
+        // 不能用它做"是否之前已选中"判断，否则首次点击就会误进编辑模式
+        // （表现：toolbar 闪一下就被 text:editing:entered 清掉）。
+        const wasAlreadyActive = prevActiveAfterClickRef.current === target;
+        if (wasAlreadyActive) {
+          requestAnimationFrame(() => {
+            try {
+              textbox.enterEditing?.();
+            } catch {
+              // Fabric 偶发：编辑模式切换失败时静默兜底。
+            }
+          });
+        }
       });
+      // mouse:up 在 selection 完成后触发，用它快照"本轮点击后的 active object"，
+      // 供下一次 mouse:down 比对（实现"第二下点击同一对象 → 进编辑"）。
+      canvas.on("mouse:up", () => {
+        prevActiveAfterClickRef.current = canvas.getActiveObject() ?? null;
+      });
+      // Hover 高亮：只在没有选中 / 没在拖动时给可编辑对象画轻描边
+      canvas.on("mouse:over", (event) => {
+        handleCanvasHoverOver(canvas, event.target as FabricObject | undefined);
+      });
+      canvas.on("mouse:out", () => {
+        clearHoverOutline(canvas);
+      });
+      canvas.on("object:moving", () => {
+        clearHoverOutline(canvas);
+        // 拖动期间隐藏浮动工具条，结束（mouse:up → object:modified → mutation）后再显示
+        setSelectionToolbar(null);
+      });
+      canvas.on("object:scaling", () => setSelectionToolbar(null));
+      canvas.on("object:rotating", () => setSelectionToolbar(null));
+      // 进入文字编辑 → 隐藏工具条；退出编辑 → 重算
+      canvas.on("text:editing:entered", () => setSelectionToolbar(null));
+      canvas.on("text:editing:exited", () => updateSelectionSummary(canvas));
 
       setCanvasReady(true);
       canvas.calcOffset();
@@ -2940,8 +3410,14 @@ export function ProjectEditorFabricClient({
       disposed = true;
       cleanup?.();
     };
+    // updateSelectionSummary 是同 scope 普通函数，加进 deps 会让 effect 每次
+    // 渲染都重挂 canvas（破坏选中态 / 缩略图 / hover ref）。它的依赖（state setters
+    // 等）都是稳定引用，所以这里有意省略。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    clearHoverOutline,
     handleCanvasContextMenu,
+    handleCanvasHoverOver,
     handleCanvasMutation,
     handleCanvasResize,
     handleCanvasSelectionChange,
@@ -3412,11 +3888,35 @@ export function ProjectEditorFabricClient({
     const activeObjects = canvas.getActiveObjects();
     if (activeObjects.length === 0) return;
 
+    // 抓 board.nodes 整体快照：删除后通过整页回填还原（最简单可靠的方案，
+    // 不必单独序列化被删对象）。
+    const boardId = activeBoard?.id ?? null;
+    const snapshot = activeBoard ? activeBoard.nodes : null;
+    const count = activeObjects.length;
+
     activeObjects.forEach((object) => canvas.remove(object));
     canvas.discardActiveObject();
     canvas.requestRenderAll();
     syncActiveBoardFromCanvas();
     updateSelectionSummary(canvas);
+
+    if (snapshot && boardId) {
+      showUndoToast(count > 1 ? `已删除 ${count} 个对象` : "已删除", () => {
+        setScene((current) =>
+          normalizeProjectEditorScene({
+            ...current,
+            boards: current.boards.map((board) =>
+              board.id === boardId ? { ...board, nodes: snapshot } : board
+            ),
+          })
+        );
+        requestActiveBoardRebuild();
+      });
+    }
+  }
+
+  function showUndoToast(message: string, undo: () => void) {
+    setUndoToast({ message, undo, expiresAt: Date.now() + 5000 });
   }
 
   async function handleContextAction(action: string) {
@@ -4374,125 +4874,273 @@ export function ProjectEditorFabricClient({
           }}
           onContextMenu={(event) => event.preventDefault()}
         >
-          <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
-            <div
-              className={cn(
-                "pointer-events-auto flex items-center gap-1 px-1.5 py-1.5",
-                editorFloatingSurfaceClass
-              )}
-            >
-              <div className="flex items-center gap-1 px-0.5">
-                <EditorChromeButton
-                  className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={() => {
-                    setLeftPanel("assets");
-                    setShapeMenuOpen(false);
-                  }}
-                  disabled={applyingStructure}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  插入图片
-                </EditorChromeButton>
-                <EditorChromeButton
-                  className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={addTextObject}
-                  disabled={applyingStructure}
-                >
-                  <Type className="h-4 w-4" />
-                  添加文本
-                </EditorChromeButton>
-                <div className="relative">
-                  <EditorChromeButton
-                    className="h-8 gap-1.5 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                    onClick={() => setShapeMenuOpen((prev) => !prev)}
-                    disabled={applyingStructure}
-                  >
-                    <Square className="h-4 w-4" />
-                    形状
-                    <ChevronDown className="h-4 w-4" />
-                  </EditorChromeButton>
-                  {shapeMenuOpen ? (
-                    <div
-                      className={cn("absolute left-0 top-11 z-30 w-48 p-2", editorPopupSurfaceClass)}
-                      onMouseDown={(event) => event.stopPropagation()}
-                    >
-                      {PROJECT_SHAPE_TYPES.map((shape) => (
-                        <button
-                          key={shape}
-                          type="button"
-                          onClick={() => {
-                            void addShapeObject(shape);
-                            setShapeMenuOpen(false);
-                          }}
-                          className={cn(editorPopupItemClass, "items-center gap-2 text-sm")}
-                        >
-                          {shape === "circle" ? (
-                            <Circle className="h-4 w-4" />
-                          ) : shape === "triangle" ? (
-                            <Triangle className="h-4 w-4" />
-                          ) : shape === "line" ? (
-                            <Minus className="h-4 w-4" />
-                          ) : (
-                            <Square className="h-4 w-4" />
-                          )}
-                          {SHAPE_LABELS[shape]}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="h-5 w-px bg-white/8" />
-              <div className="flex items-center gap-1 px-0.5">
-                <EditorChromeButton
-                  className="h-8 border-white/6 bg-white/6 px-3 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={() => fitSurface()}
-                  disabled={applyingStructure}
-                >
-                  适应画板
-                </EditorChromeButton>
-              </div>
-              <div className="h-5 w-px bg-white/8" />
-              <div className="flex items-center gap-1 px-0.5">
-                <EditorChromeButton
-                  className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={() => fitSurface(clamp(surfaceScale - 0.1, 0.1, 4))}
-                  disabled={applyingStructure}
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </EditorChromeButton>
-                <span className="inline-flex h-8 items-center rounded-full border border-white/6 px-3 text-sm font-medium text-white/60">
-                  {Math.round(surfaceScale * 100)}%
-                </span>
-                <EditorChromeButton
-                  className="h-8 w-8 border-white/6 bg-white/6 text-white/78 shadow-none hover:bg-white/10 hover:text-white"
-                  onClick={() => fitSurface(clamp(surfaceScale + 0.1, 0.1, 4))}
-                  disabled={applyingStructure}
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </EditorChromeButton>
-              </div>
-            </div>
-          </div>
+          {/* 居中浮动工具条已删除（spec：悬浮工具条拆解.md）。
+              理由：插入图片 / 添加文本 / 形状 都是 Canva 自由编辑思维，
+              不属于"项目页校改台"的主任务，且常驻顶部抢了 brief / candidate banner 的语义层。
+              · 视图控制（适应 / 缩放）→ 移到右下角小件，下方那块。
+              · 内容添加（图 / 文本 / 形状）→ 下个 sprint 改成 hover-context 浮窗：
+                  没选中时 = 画板内"+ 添加内容" 入口
+                  选中文字时 = 文字浮动工具条（编辑/AI 优化/缩短/删除）
+                  选中图片时 = 图片浮动工具条（替换/添加说明/设为主图）
+              当前 addTextObject / addShapeObject / setLeftPanel 等 handler 全部保留，
+              等下一 sprint 接入新的 contextual 入口。 */}
 
+          {/* 画板组合：
+              · 上方 banner 区只在有 AI 候选时出现，独占顶部语义层
+              · header row 总是占位（左：brief / 右："+ 添加内容"）放在 dark 背景里，
+                不再贴进 surface 内部 → 不会盖到画板正文，缩放时也不会跟版面挤
+              · brief / 添加内容 / banner 都不写进 Fabric scene（不导出、不被选中） */}
           <div
-            ref={surfaceRef}
-            className="relative overflow-hidden rounded-[12px] bg-white shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
+            className="flex flex-col items-stretch gap-2.5"
             style={{
               width: `${Math.round(PROJECT_BOARD_WIDTH * surfaceScale)}px`,
-              height: `${Math.round(PROJECT_BOARD_HEIGHT * surfaceScale)}px`,
             }}
           >
+            {/* Header row：brief 左 / "+ 添加内容" 右。dark 配色（在画板上方暗区）。
+                没选中时才显示"+ 添加内容"，避免和选中态浮动工具条抢视觉。 */}
+            {activeBoardPurpose || !selectionToolbar ? (
+              <div className="flex items-start justify-between gap-3">
+                {activeBoardPurpose ? (
+                  <div className="min-w-0 flex-1 rounded-[12px] border border-white/8 bg-card/80 px-3.5 py-2 backdrop-blur-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/48">
+                        这一页要完成什么
+                      </p>
+                      {activeBoardValidation ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-white/56">
+                          <span
+                            className={cn(
+                              "h-1.5 w-1.5 rounded-full",
+                              activeBoardValidation.status === "block"
+                                ? "bg-amber-400"
+                                : activeBoardValidation.status === "warn"
+                                  ? "bg-sky-400"
+                                  : "bg-emerald-400",
+                            )}
+                          />
+                          {activeBoardQualityMeta?.label ?? "已通过"}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-white/82">
+                      {activeBoardPurpose}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="min-w-0 flex-1" />
+                )}
+                {!selectionToolbar ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={applyingStructure}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-card/80 px-3 text-xs font-medium text-white/82 backdrop-blur-sm transition-colors hover:bg-white/8 hover:text-white disabled:opacity-50"
+                        aria-label="添加内容"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        添加内容
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      side="bottom"
+                      className="dark w-44 rounded-2xl border-white/10 bg-card p-1.5 text-white"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeftPanel("assets");
+                          handleOpenAssetUpload();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      >
+                        <ImageIcon className="h-4 w-4 text-white/60" />
+                        插入图片
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addTextObject()}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      >
+                        <Type className="h-4 w-4 text-white/60" />
+                        添加文本
+                      </button>
+                    </PopoverContent>
+                  </Popover>
+                ) : null}
+              </div>
+            ) : null}
+            {boardCandidate && activeBoard?.id === boardCandidate.boardId ? (
+              <div className="rounded-[14px] border border-violet-300/24 bg-violet-400/8 px-4 py-3 shadow-[0_18px_36px_-28px_rgba(0,0,0,0.7)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] tracking-[0.16em] text-violet-200/72">
+                      AI 候选版本预览中
+                    </p>
+                    <p
+                      className="mt-1 truncate text-sm leading-6 text-white/88"
+                      title={boardCandidate.summary}
+                    >
+                      {boardCandidate.summary}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => discardBoardCandidate()}
+                      className="inline-flex h-7 items-center rounded-lg border border-white/10 bg-white/4 px-2.5 text-xs text-white/72 transition-colors hover:bg-white/8 hover:text-white"
+                    >
+                      撤销
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => keepBoardCandidate()}
+                      className="inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-xs text-neutral-950 transition-colors hover:bg-neutral-100"
+                    >
+                      保留这个版本
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div
-              className="absolute left-0 top-0"
+              ref={surfaceRef}
+              className="relative overflow-hidden rounded-[12px] bg-white shadow-[0_28px_80px_-32px_rgba(0,0,0,0.75)]"
               style={{
-                width: `${PROJECT_BOARD_WIDTH}px`,
-                height: `${PROJECT_BOARD_HEIGHT}px`,
-                transform: `scale(${surfaceScale})`,
-                transformOrigin: "top left",
+                width: `${Math.round(PROJECT_BOARD_WIDTH * surfaceScale)}px`,
+                height: `${Math.round(PROJECT_BOARD_HEIGHT * surfaceScale)}px`,
               }}
             >
-              <canvas ref={hostRef} className="block" />
+              <div
+                className="absolute left-0 top-0"
+                style={{
+                  width: `${PROJECT_BOARD_WIDTH}px`,
+                  height: `${PROJECT_BOARD_HEIGHT}px`,
+                  transform: `scale(${surfaceScale})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                <canvas ref={hostRef} className="block" />
+              </div>
+              {/* 选中态浮动工具条：单选了文本 / 图片才出现。
+                  位置在选中对象上方 8px；如果上方不够（顶到 surface 边）就放到下方。
+                  按钮尺寸固定（不随 zoom 变），位置随 zoom 缩放（bbox * scale）。 */}
+              {selectionToolbar ? (
+                (() => {
+                  const TOOLBAR_HEIGHT = 32;
+                  const GAP = 8;
+                  const leftPx = selectionToolbar.bbox.left * surfaceScale;
+                  const aboveTop =
+                    selectionToolbar.bbox.top * surfaceScale -
+                    TOOLBAR_HEIGHT -
+                    GAP;
+                  const belowTop =
+                    (selectionToolbar.bbox.top + selectionToolbar.bbox.height) *
+                      surfaceScale +
+                    GAP;
+                  const topPx = aboveTop >= 4 ? aboveTop : belowTop;
+                  return (
+                    <div
+                      className="pointer-events-none absolute z-20"
+                      style={{ left: `${leftPx}px`, top: `${topPx}px` }}
+                    >
+                      <div className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-card/95 p-1 text-white shadow-[0_10px_24px_-12px_rgba(0,0,0,0.7)] backdrop-blur-sm">
+                        {selectionToolbar.kind === "text" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const c = canvasRef.current;
+                                const obj = c?.getActiveObject() as
+                                  | (FabricObject & { isEditing?: boolean; enterEditing?: () => void })
+                                  | null;
+                                if (obj?.enterEditing) {
+                                  try {
+                                    obj.enterEditing();
+                                  } catch {
+                                    // 静默
+                                  }
+                                }
+                              }}
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-white/82 transition-colors hover:bg-white/8 hover:text-white"
+                            >
+                              <PencilLine className="h-3 w-3" />
+                              编辑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void instructActiveBoard({ intent: "rewrite" })
+                              }
+                              disabled={instructBusy || Boolean(boardCandidate)}
+                              title="按当前页指令优化所有文案，结果会以候选版本预览"
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-white/82 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              AI 优化
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void instructActiveBoard({ intent: "shorten" })
+                              }
+                              disabled={instructBusy || Boolean(boardCandidate)}
+                              title="精简整页文案，结果会以候选版本预览"
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-white/82 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                            >
+                              缩短
+                            </button>
+                            <div className="mx-0.5 h-4 w-px bg-white/10" />
+                            <button
+                              type="button"
+                              onClick={() => deleteSelection()}
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-red-200/80 transition-colors hover:bg-red-400/12 hover:text-red-100"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              删除
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLeftPanel("assets");
+                              }}
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-white/82 transition-colors hover:bg-white/8 hover:text-white"
+                            >
+                              <ImageIcon className="h-3 w-3" />
+                              替换
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void generateActiveBoardVisual()
+                              }
+                              disabled={Boolean(boardAiBusy) || Boolean(boardCandidate)}
+                              title="按本页讲述意图重新生成一张 AI 配图"
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-white/82 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              AI 重生
+                            </button>
+                            <div className="mx-0.5 h-4 w-px bg-white/10" />
+                            <button
+                              type="button"
+                              onClick={() => deleteSelection()}
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-red-200/80 transition-colors hover:bg-red-400/12 hover:text-red-100"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              删除
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : null}
             </div>
           </div>
 
@@ -4618,8 +5266,96 @@ export function ProjectEditorFabricClient({
               )}
             </div>
           ) : null}
+          {/* 右下角 zoom 小件：低权重视图控制，不参与编辑主任务。
+              仿 Figma 的右下角缩放栏，常驻可见但不抢顶部叙事层。 */}
+          <div className="pointer-events-none absolute bottom-4 right-4 z-30">
+            <div className="pointer-events-auto inline-flex items-center gap-0.5 rounded-full border border-white/8 bg-card/92 p-1 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)] backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => fitSurface(clamp(surfaceScale - 0.1, 0.1, 4))}
+                disabled={applyingStructure}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/72 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                aria-label="缩小"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+              </button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={applyingStructure}
+                    className="inline-flex h-7 min-w-[52px] items-center justify-center rounded-full px-2 text-xs font-medium tabular-nums text-white/76 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                    aria-label="缩放档位"
+                  >
+                    {Math.round(surfaceScale * 100)}%
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  side="top"
+                  className="dark w-40 rounded-2xl border-white/10 bg-card p-1.5 text-white"
+                >
+                  {[0.5, 0.75, 1, 1.5, 2].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => fitSurface(preset)}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <span>{preset * 100}%</span>
+                      {Math.abs(surfaceScale - preset) < 0.01 ? (
+                        <Check className="h-3 w-3 text-white/60" />
+                      ) : null}
+                    </button>
+                  ))}
+                  <div className="my-1 h-px bg-white/6" />
+                  <button
+                    type="button"
+                    onClick={() => fitSurface()}
+                    className="flex w-full items-center rounded-lg px-2.5 py-1.5 text-left text-xs text-white/82 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  >
+                    适应画板
+                  </button>
+                </PopoverContent>
+              </Popover>
+              <button
+                type="button"
+                onClick={() => fitSurface(clamp(surfaceScale + 0.1, 0.1, 4))}
+                disabled={applyingStructure}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/72 transition-colors hover:bg-white/8 hover:text-white disabled:opacity-40"
+                aria-label="放大"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Undo toast：低权重 + interactive，5s 自动隐。
+              带"撤销"按钮，承载危险操作（删除等）的撤回。 */}
+          {undoToast ? (
+            <div className="pointer-events-none absolute bottom-6 left-1/2 z-40 -translate-x-1/2">
+              <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/10 bg-card/95 py-1.5 pl-4 pr-1.5 text-sm shadow-[0_20px_40px_-24px_rgba(0,0,0,0.7)] backdrop-blur-sm">
+                <span className="text-white/82">{undoToast.message}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    undoToast.undo();
+                    setUndoToast(null);
+                  }}
+                  className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/16"
+                >
+                  撤销
+                </button>
+              </div>
+            </div>
+          ) : null}
           {actionMessage ? (
-            <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2">
+            <div
+              className={cn(
+                "pointer-events-none absolute left-1/2 z-30 -translate-x-1/2",
+                undoToast ? "bottom-20" : "bottom-6"
+              )}
+            >
               <div
                 className={cn(
                   "rounded-full border px-4 py-2 text-sm shadow-[0_20px_40px_-28px_rgba(0,0,0,0.65)] backdrop-blur-sm",
@@ -5253,62 +5989,144 @@ export function ProjectEditorFabricClient({
                       </EditorRailSection>
                     </div>
                   ) : activeBoard ? (
-                    <Tabs defaultValue="properties" className="flex h-full flex-col">
-                      <div className="shrink-0 border-b border-white/6 px-4 pt-3 pb-2">
-                        <EditorTabsList className="grid w-full grid-cols-2">
-                          <EditorTabsTrigger value="properties">属性</EditorTabsTrigger>
-                          <EditorTabsTrigger value="ai">讲述</EditorTabsTrigger>
-                        </EditorTabsList>
-                      </div>
-                      <TabsContent
-                        value="properties"
-                        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-4"
-                      >
-                        <div className={cn(editorPanelCardClass, "space-y-3 p-3.5")}>
-                          <div className="space-y-1.5">
-                            <p className="text-xs text-white/40">画板名称</p>
-                            <Input
-                              value={activeBoard.name}
-                              onChange={(event) =>
-                                updateActiveBoard({ name: event.target.value })
-                              }
-                              className="h-10 rounded-xl border-white/8 bg-secondary text-sm text-white"
-                              placeholder="画板名称"
-                            />
+                    // 单一滚动面板：原本是「属性 / 讲述」两个 tab，但内容大量重复
+                    // （讲述目标、推荐补充内容、画板节点都说一样的事），切 tab 也不
+                    // 自然。改成竖向分 section：AI 操作 → 画板基础 → 讲述目标 → 删除。
+                    <div className="flex h-full min-h-0 flex-col">
+                      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                        {/* Chat-style 上下文助手：核心入口是输入框，按钮收成 chip。
+                            自由 chat → instruction；点 chip → intent。两条都送到
+                            POST boards/[id]/instruct 拿到候选版本（不直接落库）。
+                            "补一张图" 是另一种动作（持久化 + 生成图），保持独立按钮。 */}
+                        <div className={cn(editorPanelMutedCardClass, "space-y-2.5 p-3")}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs tracking-[0.16em] text-white/30">
+                              本页 AI 助手
+                            </p>
+                            <span className="text-[10px] text-white/30">仅本页</span>
                           </div>
-
                           <div className="space-y-2">
-                            <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                              <p className="text-[11px] tracking-[0.14em] text-white/34">尺寸</p>
-                              <p className="mt-1 text-sm text-white/78">
-                                {activeBoard.frame.width} × {activeBoard.frame.height}
-                              </p>
+                            <Textarea
+                              value={boardInstructInput}
+                              onChange={(event) =>
+                                setBoardInstructInput(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === "Enter" &&
+                                  (event.metaKey || event.ctrlKey)
+                                ) {
+                                  event.preventDefault();
+                                  void instructActiveBoard({
+                                    instruction: boardInstructInput,
+                                  });
+                                }
+                              }}
+                              placeholder="告诉 FolioBox 你想怎么改这一页…"
+                              disabled={
+                                instructBusy ||
+                                Boolean(boardCandidate) ||
+                                !activeBoard?.structureSource?.sectionId ||
+                                Boolean(activeBoard?.locked)
+                              }
+                              className="min-h-[68px] rounded-xl border-white/8 bg-secondary text-sm text-white placeholder:text-white/32"
+                            />
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-white/28">
+                                ⌘/Ctrl + Enter 发送
+                              </span>
+                              <Button
+                                type="button"
+                                onClick={() =>
+                                  void instructActiveBoard({
+                                    instruction: boardInstructInput,
+                                  })
+                                }
+                                disabled={
+                                  instructBusy ||
+                                  Boolean(boardCandidate) ||
+                                  !boardInstructInput.trim() ||
+                                  !activeBoard?.structureSource?.sectionId ||
+                                  Boolean(activeBoard?.locked)
+                                }
+                                className="h-7 rounded-lg bg-white px-3 text-xs text-neutral-950 hover:bg-neutral-100 disabled:bg-white/8 disabled:text-white/34"
+                              >
+                                {instructBusy ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  "发送"
+                                )}
+                              </Button>
                             </div>
+                          </div>
+                          {/* 快捷 chip：点击 = 直接送一条 intent，等价于用户写"请精简这一页"。 */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {(
+                              [
+                                { id: "rewrite", label: "优化文案" },
+                                { id: "shorten", label: "缩短一些" },
+                                { id: "credibility", label: "检查可信度" },
+                                { id: "expand", label: "补充细节" },
+                              ] as const
+                            ).map((chip) => (
+                              <button
+                                key={chip.id}
+                                type="button"
+                                onClick={() =>
+                                  void instructActiveBoard({ intent: chip.id })
+                                }
+                                disabled={
+                                  instructBusy ||
+                                  Boolean(boardCandidate) ||
+                                  !activeBoard?.structureSource?.sectionId ||
+                                  Boolean(activeBoard?.locked)
+                                }
+                                className="inline-flex h-6 items-center rounded-full border border-white/8 bg-white/3 px-2.5 text-[11px] text-white/72 transition-colors hover:border-white/14 hover:bg-white/6 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {chip.label}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => void generateActiveBoardVisual()}
+                              disabled={
+                                Boolean(boardAiBusy) ||
+                                Boolean(boardCandidate) ||
+                                !activeBoard?.structureSource?.sectionId ||
+                                Boolean(activeBoard?.locked)
+                              }
+                              className="inline-flex h-6 items-center gap-1 rounded-full border border-white/8 bg-white/3 px-2.5 text-[11px] text-white/72 transition-colors hover:border-white/14 hover:bg-white/6 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {boardAiBusy === "visual" ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <ImageIcon className="h-3 w-3" />
+                              )}
+                              补一张图
+                            </button>
+                          </div>
+                          {activeBoard?.locked ? (
+                            <p className="text-[11px] text-white/36">
+                              本页已锁定。解锁后才能 AI 改写。
+                            </p>
+                          ) : !activeBoard?.structureSource?.sectionId ? (
+                            <p className="text-[11px] text-white/36">
+                              本页未挂接结构章节，无法 AI 改写。
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className={cn(editorPanelCardClass, "space-y-3 p-3.5")}>
+                          {/* 移除：画板名称编辑（用户不知道改它有什么用，name 仍由结构章节自动同步）；
+                              尺寸（不支持自定义，导出时再展示）；
+                              当前状态（"内容稿 / 已生成排版 / 手动页"对用户来说是后台术语）。 */}
+                          <div className="space-y-2">
                             {activeBoardStructureLabel ? (
                               <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
                                 <p className="text-[11px] tracking-[0.14em] text-white/34">结构来源</p>
                                 <p className="mt-1 truncate text-sm text-white/78" title={activeBoardStructureLabel}>
                                   {activeBoardStructureLabel}
                                 </p>
-                              </div>
-                            ) : null}
-                            {activeBoard.pageType || isPrototypeBoard(activeBoard) || activeBoard.phase ? (
-                              <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
-                                <p className="text-[11px] tracking-[0.14em] text-white/34">当前状态</p>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
-                                  <p className="text-sm text-white/78">
-                                    {isPrototypeBoard(activeBoard)
-                                      ? "内容稿"
-                                      : activeBoard.phase === "generated"
-                                        ? "已生成排版"
-                                        : "手动页"}
-                                  </p>
-                                  {activeBoard.pageType ? (
-                                    <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] text-white/56">
-                                      {activeBoard.pageType}
-                                    </span>
-                                  ) : null}
-                                </div>
                               </div>
                             ) : null}
                             <div className={cn(editorPanelMutedCardClass, "px-3 py-2.5")}>
@@ -5395,23 +6213,16 @@ export function ProjectEditorFabricClient({
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => deleteBoard(activeBoard.id)}
-                          disabled={scene.boards.length <= 1}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-xs text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          删除当前画板
-                        </button>
-                      </TabsContent>
-
-                      <TabsContent
-                        value="ai"
-                        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-4"
-                      >
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-white/40">讲述目标</p>
+                        {/* 讲述目标：用户给 AI 的方向输入，与画板上的可视化文案
+                            不重复（一个是 input，另一个是 output）。原本的"推荐补充
+                            内容"列表已删除——它和画板节点 + 讲述目标都说同一件事。 */}
+                        <div className={cn(editorPanelMutedCardClass, "space-y-2 p-3")}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs tracking-[0.16em] text-white/30">
+                              讲述目标
+                            </p>
+                            <span className="text-[10px] text-white/30">给 AI 的方向</span>
+                          </div>
                           <Textarea
                             value={activeBoard.intent}
                             onChange={(event) =>
@@ -5422,23 +6233,17 @@ export function ProjectEditorFabricClient({
                           />
                         </div>
 
-                        {(activeBoard.contentSuggestions?.length ?? 0) > 0 ? (
-                          <div className="rounded-xl border border-white/6 bg-white/2.5 p-3">
-                            <p className="mb-2 text-xs tracking-[0.16em] text-white/30">推荐补充内容</p>
-                            <ul className="space-y-1.5">
-                              {activeBoard.contentSuggestions!.map((item, i) => (
-                                <li key={i} className="flex items-start gap-1.5">
-                                  <span className="mt-0.5 shrink-0 text-xs text-white/20">·</span>
-                                  <span className="text-xs leading-relaxed text-white/55">{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <EditorEmptyState>暂无建议。</EditorEmptyState>
-                        )}
-                      </TabsContent>
-                    </Tabs>
+                        <button
+                          type="button"
+                          onClick={() => deleteBoard(activeBoard.id)}
+                          disabled={scene.boards.length <= 1}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-400/20 bg-red-400/4 px-3 text-xs text-red-200/80 transition-colors hover:border-red-400/40 hover:bg-red-400/8 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          删除当前画板
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="p-4">
                       <EditorEmptyState>尚未选择画板。</EditorEmptyState>

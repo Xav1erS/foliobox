@@ -1012,7 +1012,7 @@ function getPrototypeCardLines(draft: ProjectPrototypeBoardDraft, pageType: Proj
   return cards.slice(0, 3).map((card) => `${card.label}\n${card.value}`);
 }
 
-function buildPrototypeNodesForPageType(params: {
+export function buildPrototypeNodesForPageType(params: {
   pageType: ProjectPageType;
   groupLabel: string;
   sectionId: string;

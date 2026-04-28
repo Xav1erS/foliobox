@@ -27,6 +27,8 @@ export type FabricSceneObject = FabricObject & {
     placeholder?: boolean;
     /** Snap 辅助线标记，命中后跳过状态同步 / 缩略图重抓。 */
     snapGuide?: boolean;
+    /** Hover 高亮描边层标记，同样跳过状态同步 / 缩略图重抓 / 选中。 */
+    hoverOutline?: boolean;
   };
 };
 
